@@ -37,6 +37,16 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function PendingRoute({ children }: { children: React.ReactNode }) {
+  const { user, isApproved, isLoading } = useAuth();
+
+  if (isLoading) return <div className="flex min-h-screen items-center justify-center">Cargando...</div>;
+  if (!user) return <Navigate to="/auth" replace />;
+  if (isApproved) return <Navigate to="/" replace />;
+
+  return <>{children}</>;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -46,7 +56,7 @@ const App = () => (
         <AuthProvider>
           <Routes>
             <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
-            <Route path="/pending" element={<PendingApproval />} />
+            <Route path="/pending" element={<PendingRoute><PendingApproval /></PendingRoute>} />
             <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/admin/users" element={<ProtectedRoute adminOnly><AdminUsers /></ProtectedRoute>} />
             <Route path="/admin/data" element={<ProtectedRoute adminOnly><AdminData /></ProtectedRoute>} />

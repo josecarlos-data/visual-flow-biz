@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Clock } from "lucide-react";
@@ -5,6 +7,14 @@ import { useAuth } from "@/hooks/useAuth";
 
 export default function PendingApproval() {
   const { signOut } = useAuth();
+  const navigate = useNavigate();
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const handleSignOut = async () => {
+    setLoggingOut(true);
+    await signOut();
+    navigate("/auth", { replace: true });
+  };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
@@ -19,8 +29,8 @@ export default function PendingApproval() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Button variant="outline" onClick={signOut}>
-            Cerrar sesión
+          <Button variant="outline" onClick={handleSignOut} disabled={loggingOut}>
+            {loggingOut ? "Cerrando sesión…" : "Cerrar sesión"}
           </Button>
         </CardContent>
       </Card>
