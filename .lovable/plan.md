@@ -1,88 +1,54 @@
 
+Objetivo inmediato: corregir el bloqueo en “Cuenta pendiente de aprobación” para que:
+1) un usuario aprobado (incluido Admin) entre al dashboard correctamente, y  
+2) el botón “Cerrar sesión” saque siempre a la pantalla de login.
 
-# Dashboard Comercial - Plan de Implementación (MVP)
+Diagnóstico confirmado
+- El backend ya tiene tu usuario `josecarlossobrino.analista@gmail.com` con `is_approved = true` y rol `admin`.
+- El problema principal está en frontend, en el flujo de auth/rutas:
+  - En `useAuth`, `isLoading` pasa a `false` antes de terminar `fetchUserData`.
+  - Durante ese intervalo, `isApproved` sigue en `false` por defecto y `/` redirige a `/pending`.
+  - La ruta `/pending` no tiene guardia para “usuario ya aprobado”, así que te quedas ahí aunque luego llegue `isApproved=true`.
+  - El botón “Cerrar sesión” sí puede cerrar sesión, pero como sigues en `/pending`, parece que “no hace nada”.
 
-## Visión General
-Aplicación tipo Power BI con dashboard de ventas, control de accesos por roles jerárquicos y panel de administración para gestión de usuarios y carga de datos.
+Alcance de implementación (sin cambios de base de datos)
+- No se requieren migraciones ni cambios de RLS.
+- Solo ajustes en lógica de estado/routing en:
+  - `src/hooks/useAuth.tsx`
+  - `src/App.tsx`
+  - `src/pages/PendingApproval.tsx`
 
----
+Plan de cambios
+1) Robustecer inicialización de auth (`useAuth.tsx`)
+- Hacer que el estado de carga cubra también la lectura de perfil/rol.
+- Eliminar la carrera causada por `setTimeout(() => fetchUserData(...), 0)` + `setIsLoading(false)` prematuro.
+- Secuencia:
+  - Si hay sesión: esperar `fetchUserData` y después `setIsLoading(false)`.
+  - Si no hay sesión: limpiar estado y luego `setIsLoading(false)`.
+- Mantener roles en `user_roles` (tabla separada), sin mover roles a `profiles`.
 
-## 🔐 1. Autenticación y Roles
+2) Proteger correctamente la ruta `/pending` (`App.tsx`)
+- Crear un `PendingRoute` (o lógica equivalente) con reglas:
+  - `isLoading` => pantalla de carga.
+  - `!user` => redirigir a `/auth`.
+  - `user && isApproved` => redirigir a `/`.
+  - `user && !isApproved` => renderizar `PendingApproval`.
+- Con esto, un admin aprobado nunca quedará “atrapado” en `/pending`.
 
-### Sistema de Login
-- Página de inicio de sesión con email y contraseña
-- Los nuevos usuarios se registran pero **no pueden acceder** hasta que el Admin apruebe su cuenta
+3) Hacer explícita la salida desde pendiente (`PendingApproval.tsx`)
+- En el click de “Cerrar sesión”:
+  - Ejecutar `await signOut()`.
+  - Navegar a `/auth` con `replace`.
+- Añadir estado local de “cerrando sesión…” para evitar doble clic y mejorar UX.
 
-### Jerarquía de Roles (4 niveles)
-| Rol | Acceso a datos |
-|-----|---------------|
-| **Admin** | Todo + Panel de administración |
-| **Director Comercial** | Ve ventas de todas las zonas |
-| **Jefe de Zona** | Ve ventas de los comerciales de su zona |
-| **Comercial** | Solo ve sus propias ventas |
+Validación end-to-end que ejecutaré después
+- Caso A (usuario pendiente): login -> `/pending`; “Cerrar sesión” -> `/auth`.
+- Caso B (tu usuario admin aprobado): login -> entra directo a `/` (dashboard), sin pasar por bloqueo en `/pending`.
+- Caso C (recarga de página en sesión aprobada): permanece en dashboard.
+- Caso D (abrir `/pending` manualmente siendo aprobado): redirige a `/`.
 
-### Base de datos
-- Tabla de perfiles de usuario (nombre, zona/delegación asignada)
-- Tabla de roles separada (seguridad contra escalación de privilegios)
-- Tabla de zonas/delegaciones
-- Políticas RLS para aislar datos según rol y zona
-
----
-
-## 📊 2. Dashboard de Ventas
-
-### Vista principal (para todos los roles)
-- Panel con KPIs principales (ventas totales, objetivos, etc.)
-- Gráficos de evolución de ventas
-- Tabla resumen de datos
-- Los datos mostrados se filtran automáticamente según el rol del usuario:
-  - Comercial → solo sus datos
-  - Jefe de zona → datos de su zona
-  - Director → todos los datos
-
----
-
-## ⚙️ 3. Panel de Administración (solo Admin)
-
-### 3a. Gestión de Usuarios
-- Lista de usuarios pendientes de aprobación
-- Aprobar o rechazar nuevos registros
-- Asignar rol a cada usuario (Director, Jefe de Zona, Comercial)
-- Asignar zona/delegación
-- Editar permisos de usuarios existentes
-
-### 3b. Gestión de Datos (Carga de tablas)
-- Vista con tarjetas/slicers que representan cada tabla de datos disponible
-- Al hacer clic en una tabla, aparecen 3 opciones:
-  - **📤 Actualizar datos**: Subir archivo XLS o CSV para reemplazar/actualizar la tabla
-  - **📥 Exportar datos**: Descargar la tabla actual en CSV/XLS
-  - **👁️ Previsualizar**: Mostrar las 10 primeras filas con encabezados
-
----
-
-## 🎨 4. Diseño y Navegación
-
-- Estilo **moderno y minimalista** con tema claro
-- Sidebar de navegación con las secciones según el rol
-- Diseño responsive (funcional en móvil y escritorio)
-- Colores corporativos neutros con acentos para KPIs
-
----
-
-## 🚀 Fases del MVP
-
-**Fase 1** - Fundamentos:
-- Configurar Supabase (auth, tablas, RLS)
-- Login y registro con aprobación
-- Sistema de roles y permisos
-
-**Fase 2** - Admin:
-- Panel de gestión de usuarios
-- Carga y previsualización de datos (CSV/XLS)
-
-**Fase 3** - Dashboard:
-- Dashboard con gráficos y KPIs básicos
-- Filtrado automático por rol/zona
-
-> **Nota**: La estructura exacta de la base de datos de ventas se definirá cuando subas el archivo con la estructura. Por ahora se creará la arquitectura base de roles, usuarios y zonas.
-
+Riesgos y mitigación
+- Riesgo: parpadeo de rutas al iniciar sesión.
+  - Mitigación: no desactivar `isLoading` hasta terminar perfil+rol.
+- Riesgo: inconsistencias por sesiones previas en navegador.
+  - Mitigación: limpiar estado de auth en signOut y navegación explícita a `/auth`.
