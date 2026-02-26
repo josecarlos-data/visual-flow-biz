@@ -14,6 +14,105 @@ export type Database = {
   }
   public: {
     Tables: {
+      detalle_ventas: {
+        Row: {
+          cod_cliente: number
+          created_at: string
+          documento: string
+          fecha: string
+          id: string
+          importe: number | null
+          referencia: string
+          vendedor: string | null
+        }
+        Insert: {
+          cod_cliente: number
+          created_at?: string
+          documento: string
+          fecha: string
+          id?: string
+          importe?: number | null
+          referencia: string
+          vendedor?: string | null
+        }
+        Update: {
+          cod_cliente?: number
+          created_at?: string
+          documento?: string
+          fecha?: string
+          id?: string
+          importe?: number | null
+          referencia?: string
+          vendedor?: string | null
+        }
+        Relationships: []
+      }
+      historico_facturacion: {
+        Row: {
+          cliente: string
+          cod_cliente: number
+          comercial_code: string | null
+          created_at: string
+          crecimiento_previsto: number | null
+          delegacion: string | null
+          enero_2026: number | null
+          febrero_2026: number | null
+          id: string
+          margen_pct: number | null
+          peso_25: number | null
+          peso_26: number | null
+          proyeccion_2026: number | null
+          top_truck: string | null
+          updated_at: string
+          vendedor: string
+          ventas_2024: number | null
+          ventas_2025: number | null
+          ventas_2026: number | null
+        }
+        Insert: {
+          cliente: string
+          cod_cliente: number
+          comercial_code?: string | null
+          created_at?: string
+          crecimiento_previsto?: number | null
+          delegacion?: string | null
+          enero_2026?: number | null
+          febrero_2026?: number | null
+          id?: string
+          margen_pct?: number | null
+          peso_25?: number | null
+          peso_26?: number | null
+          proyeccion_2026?: number | null
+          top_truck?: string | null
+          updated_at?: string
+          vendedor: string
+          ventas_2024?: number | null
+          ventas_2025?: number | null
+          ventas_2026?: number | null
+        }
+        Update: {
+          cliente?: string
+          cod_cliente?: number
+          comercial_code?: string | null
+          created_at?: string
+          crecimiento_previsto?: number | null
+          delegacion?: string | null
+          enero_2026?: number | null
+          febrero_2026?: number | null
+          id?: string
+          margen_pct?: number | null
+          peso_25?: number | null
+          peso_26?: number | null
+          proyeccion_2026?: number | null
+          top_truck?: string | null
+          updated_at?: string
+          vendedor?: string
+          ventas_2024?: number | null
+          ventas_2025?: number | null
+          ventas_2026?: number | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
