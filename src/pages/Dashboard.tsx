@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, Users, Target, DollarSign } from "lucide-react";
+import ComercialFilter from "@/components/ComercialFilter";
 
 const kpis = [
   { title: "Ventas Totales", value: "—", icon: DollarSign, change: "" },
@@ -11,6 +13,9 @@ const kpis = [
 
 export default function Dashboard() {
   const { role } = useAuth();
+  const [selectedComerciales, setSelectedComerciales] = useState<string[]>([]);
+
+  const showFilter = role === "admin" || role === "director_comercial";
 
   return (
     <div className="space-y-6">
@@ -24,6 +29,13 @@ export default function Dashboard() {
             : "Tus ventas"}
         </p>
       </div>
+
+      {showFilter && (
+        <ComercialFilter
+          selectedIds={selectedComerciales}
+          onSelectionChange={setSelectedComerciales}
+        />
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {kpis.map((kpi) => (
@@ -46,7 +58,9 @@ export default function Dashboard() {
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground">
-            Los datos se mostrarán cuando el administrador cargue la estructura de ventas.
+            {selectedComerciales.length > 0
+              ? `Mostrando datos para ${selectedComerciales.length} comercial(es) seleccionado(s). Los datos se mostrarán cuando se cargue la estructura de ventas.`
+              : "Los datos se mostrarán cuando el administrador cargue la estructura de ventas."}
           </p>
         </CardContent>
       </Card>
