@@ -1,6 +1,7 @@
-import { BarChart3, Users, Database, LayoutDashboard, LogOut } from "lucide-react";
+import { Users, Database, LayoutDashboard, LogOut } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
+import logoRimosaIcon from "@/assets/logo_rimosa_icon.png";
 import {
   Sidebar,
   SidebarContent,
@@ -30,8 +31,8 @@ export function AppSidebar() {
   return (
     <Sidebar className="border-r">
       <div className="flex h-14 items-center gap-2 border-b px-4">
-        <BarChart3 className="h-6 w-6 text-primary" />
-        <span className="font-semibold">Dashboard Comercial</span>
+        <img src={logoRimosaIcon} alt="RIMOSA" className="h-8 w-8 object-contain" />
+        <span className="font-semibold text-primary">RIMOSA</span>
       </div>
 
       <SidebarContent>
