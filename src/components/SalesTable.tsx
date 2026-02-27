@@ -4,10 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ArrowUpDown, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { HistoricoRow } from "@/hooks/useHistoricoData";
+import type { ClienteConVentas } from "@/hooks/useHistoricoData";
 
 interface SalesTableProps {
-  data: HistoricoRow[];
+  data: ClienteConVentas[];
 }
 
 type SortKey = "cliente" | "vendedor" | "ventas_2024" | "ventas_2025" | "ventas_2026" | "proyeccion_2026" | "delegacion";
@@ -33,7 +33,7 @@ export default function SalesTable({ data }: SalesTableProps) {
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     let rows = data.filter(
-      (r) => r.cliente.toLowerCase().includes(q) || r.vendedor.toLowerCase().includes(q) || (r.delegacion ?? "").toLowerCase().includes(q)
+      (r) => r.cliente.toLowerCase().includes(q) || (r.vendedor ?? "").toLowerCase().includes(q) || (r.delegacion ?? "").toLowerCase().includes(q)
     );
     rows.sort((a, b) => {
       const av = a[sortKey] ?? 0;
@@ -76,15 +76,15 @@ export default function SalesTable({ data }: SalesTableProps) {
             </TableHeader>
             <TableBody>
               {filtered.slice(0, 100).map((r) => (
-                <TableRow key={r.id}>
+                <TableRow key={r.cod_cliente}>
                   <TableCell className="font-medium max-w-[200px] truncate">{r.cliente}</TableCell>
-                  <TableCell>{r.vendedor}</TableCell>
+                  <TableCell>{r.vendedor || "—"}</TableCell>
                   <TableCell>{r.delegacion || "—"}</TableCell>
-                  <TableCell className="text-right">{fmt(Number(r.ventas_2024))}</TableCell>
-                  <TableCell className="text-right">{fmt(Number(r.ventas_2025))}</TableCell>
-                  <TableCell className="text-right">{fmt(Number(r.ventas_2026))}</TableCell>
-                  <TableCell className="text-right">{fmt(Number(r.proyeccion_2026))}</TableCell>
-                  <TableCell className="text-right">{pct(Number(r.crecimiento_previsto))}</TableCell>
+                  <TableCell className="text-right">{fmt(r.ventas_2024)}</TableCell>
+                  <TableCell className="text-right">{fmt(r.ventas_2025)}</TableCell>
+                  <TableCell className="text-right">{fmt(r.ventas_2026)}</TableCell>
+                  <TableCell className="text-right">{fmt(r.proyeccion_2026)}</TableCell>
+                  <TableCell className="text-right">{pct(r.crecimiento_previsto)}</TableCell>
                 </TableRow>
               ))}
               {filtered.length === 0 && (

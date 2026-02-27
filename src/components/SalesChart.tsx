@@ -1,22 +1,22 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { HistoricoRow } from "@/hooks/useHistoricoData";
+import type { ClienteConVentas } from "@/hooks/useHistoricoData";
 
 interface SalesChartProps {
-  data: HistoricoRow[];
+  data: ClienteConVentas[];
   groupBy: "vendedor" | "delegacion";
   title: string;
 }
 
-function aggregate(data: HistoricoRow[], key: "vendedor" | "delegacion") {
+function aggregate(data: ClienteConVentas[], key: "vendedor" | "delegacion") {
   const map = new Map<string, { ventas_2024: number; ventas_2025: number; ventas_2026: number }>();
   for (const row of data) {
     const k = (row[key] as string) || "Sin asignar";
     const prev = map.get(k) || { ventas_2024: 0, ventas_2025: 0, ventas_2026: 0 };
     map.set(k, {
-      ventas_2024: prev.ventas_2024 + (Number(row.ventas_2024) || 0),
-      ventas_2025: prev.ventas_2025 + (Number(row.ventas_2025) || 0),
-      ventas_2026: prev.ventas_2026 + (Number(row.ventas_2026) || 0),
+      ventas_2024: prev.ventas_2024 + row.ventas_2024,
+      ventas_2025: prev.ventas_2025 + row.ventas_2025,
+      ventas_2026: prev.ventas_2026 + row.ventas_2026,
     });
   }
   return Array.from(map.entries())

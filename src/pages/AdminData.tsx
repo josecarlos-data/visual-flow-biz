@@ -10,75 +10,86 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
 
-interface ParsedRow {
+interface ParsedCliente {
   cod_cliente: number;
   cliente: string;
-  vendedor: string;
-  ventas_2024: number | null;
-  ventas_2025: number | null;
-  peso_25: number | null;
-  enero_2026: number | null;
-  febrero_2026: number | null;
-  ventas_2026: number | null;
-  peso_26: number | null;
+  delegacion: string | null;
+  localidad: string | null;
+  vendedor: string | null;
+  tipo_cliente: string | null;
+  observaciones: string | null;
+  transporte: number | null;
   proyeccion_2026: number | null;
   crecimiento_previsto: number | null;
-  margen_pct: number | null;
   top_truck: string | null;
-  delegacion: string | null;
-  comercial_code: string | null;
+  gsmart_delegacion: string | null;
+  gsmart_comercial: string | null;
 }
 
-// Map Excel column names to our DB fields
-const COL_MAP: Record<string, keyof ParsedRow> = {
-  "COD.CLIENTE": "cod_cliente",
-  "CLIENTE": "cliente",
-  "VENDEDOR": "vendedor",
-  "VENTAS 2024": "ventas_2024",
-  "VENTAS 2025": "ventas_2025",
-  "PESO 25": "peso_25",
-  "ENERO 2026": "enero_2026",
-  "FEBRERO 2026": "febrero_2026",
-  "VENTAS 2026": "ventas_2026",
-  "PESO 26": "peso_26",
-  "PROYECCIÓN 2026": "proyeccion_2026",
-  "PROYECCION 2026": "proyeccion_2026",
-  "CRECIMIENTO PREVISTO": "crecimiento_previsto",
-  "% MARGEN": "margen_pct",
-  "TOP TRUCK": "top_truck",
-  "DELEGACIÓN": "delegacion",
-  "DELEGACION": "delegacion",
-  "GSmart.COMERCIAL": "comercial_code",
-};
+interface ParsedVenta {
+  cod_cliente: number;
+  anio: number;
+  mes: number;
+  valor: number;
+}
 
-function parseExcel(buffer: ArrayBuffer): ParsedRow[] {
+interface ParsedData {
+  clientes: ParsedCliente[];
+  ventas: ParsedVenta[];
+}
+
+function parseExcel(buffer: ArrayBuffer): ParsedData {
   const wb = XLSX.read(buffer, { type: "array" });
-  // Try to find the sheet
-  const sheetName = wb.SheetNames.find((n) => n.toLowerCase().includes("historico")) || wb.SheetNames[0];
-  const ws = wb.Sheets[sheetName];
+  const ws = wb.Sheets[wb.SheetNames[0]];
   const raw: Record<string, unknown>[] = XLSX.utils.sheet_to_json(ws, { defval: null });
 
-  return raw
-    .map((row) => {
-      const mapped: Record<string, unknown> = {};
-      for (const [excelKey, dbKey] of Object.entries(COL_MAP)) {
-        const val = row[excelKey] ?? row[excelKey.toUpperCase()] ?? row[excelKey.toLowerCase()];
-        mapped[dbKey] = val;
-      }
-      // Also try matching keys case-insensitively
-      for (const rawKey of Object.keys(row)) {
-        const upper = rawKey.toUpperCase().trim();
-        if (COL_MAP[upper] && mapped[COL_MAP[upper]] == null) {
-          mapped[COL_MAP[upper]] = row[rawKey];
-        }
-      }
-      return mapped as unknown as ParsedRow;
-    })
-    .filter((r) => r.cod_cliente != null && r.cliente != null && r.vendedor != null);
+  const clientesMap = new Map<number, ParsedCliente>();
+  const ventas: ParsedVenta[] = [];
+
+  for (const row of raw) {
+    const cod = Number(row["Cod."] ?? row["Cod"] ?? row["cod_cliente"]);
+    if (!cod || isNaN(cod)) continue;
+
+    const cliente = String(row["Cliente"] ?? row["cliente"] ?? "");
+    if (!cliente) continue;
+
+    // Upsert client master data
+    if (!clientesMap.has(cod)) {
+      clientesMap.set(cod, {
+        cod_cliente: cod,
+        cliente,
+        delegacion: row["Delegación"] as string ?? row["Delegacion"] as string ?? null,
+        localidad: row["Localidad"] as string ?? null,
+        vendedor: row["Vendedor"] as string ?? null,
+        tipo_cliente: row["Tip cli"] as string ?? null,
+        observaciones: row["Observaciones"] as string ?? null,
+        transporte: row["Transport."] != null ? Number(row["Transport."]) : null,
+        proyeccion_2026: row["Proyección 2026"] != null ? Number(row["Proyección 2026"]) : (row["Proyeccion 2026"] != null ? Number(row["Proyeccion 2026"]) : null),
+        crecimiento_previsto: row["Crecimiento Previsto"] != null ? Number(row["Crecimiento Previsto"]) : null,
+        top_truck: row["Top Truck"] as string ?? null,
+        gsmart_delegacion: row["GSmart.DELEGACIÓN"] as string ?? row["GSmart.DELEGACION"] as string ?? null,
+        gsmart_comercial: row["GSmart.COMERCIAL"] as string ?? null,
+      });
+    }
+
+    // Parse monthly sales
+    const anio = Number(row["Año"] ?? row["Ano"]);
+    const mes = Number(row["MesNumero"]);
+    const valor = Number(row["Valor"] ?? 0);
+
+    if (anio && mes && !isNaN(anio) && !isNaN(mes)) {
+      ventas.push({ cod_cliente: cod, anio, mes, valor });
+    }
+  }
+
+  return {
+    clientes: Array.from(clientesMap.values()),
+    ventas,
+  };
 }
 
 export default function AdminData() {
-  const [parsedData, setParsedData] = useState<ParsedRow[]>([]);
+  const [parsedData, setParsedData] = useState<ParsedData | null>(null);
   const [fileName, setFileName] = useState<string>("");
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<{ success: number; errors: number } | null>(null);
@@ -95,7 +106,10 @@ export default function AdminData() {
       try {
         const data = parseExcel(ev.target!.result as ArrayBuffer);
         setParsedData(data);
-        toast({ title: `${data.length} registros detectados`, description: `Archivo: ${file.name}` });
+        toast({
+          title: `${data.clientes.length} clientes y ${data.ventas.length} registros de ventas detectados`,
+          description: `Archivo: ${file.name}`,
+        });
       } catch {
         toast({ title: "Error al leer el archivo", description: "Asegúrate de que es un archivo Excel válido.", variant: "destructive" });
       }
@@ -104,53 +118,76 @@ export default function AdminData() {
   }, []);
 
   const handleUpload = async () => {
-    if (parsedData.length === 0) return;
+    if (!parsedData || parsedData.clientes.length === 0) return;
     setUploading(true);
     setUploadResult(null);
 
-    const BATCH_SIZE = 200;
     let success = 0;
     let errors = 0;
+    const BATCH = 200;
 
-    for (let i = 0; i < parsedData.length; i += BATCH_SIZE) {
-      const batch = parsedData.slice(i, i + BATCH_SIZE).map((r) => ({
-        cod_cliente: Number(r.cod_cliente),
-        cliente: String(r.cliente),
-        vendedor: String(r.vendedor),
-        ventas_2024: r.ventas_2024 != null ? Number(r.ventas_2024) : null,
-        ventas_2025: r.ventas_2025 != null ? Number(r.ventas_2025) : null,
-        peso_25: r.peso_25 != null ? Number(r.peso_25) : null,
-        enero_2026: r.enero_2026 != null ? Number(r.enero_2026) : null,
-        febrero_2026: r.febrero_2026 != null ? Number(r.febrero_2026) : null,
-        ventas_2026: r.ventas_2026 != null ? Number(r.ventas_2026) : null,
-        peso_26: r.peso_26 != null ? Number(r.peso_26) : null,
-        proyeccion_2026: r.proyeccion_2026 != null ? Number(r.proyeccion_2026) : null,
-        crecimiento_previsto: r.crecimiento_previsto != null ? Number(r.crecimiento_previsto) : null,
-        margen_pct: r.margen_pct != null ? Number(r.margen_pct) : null,
-        top_truck: r.top_truck != null ? String(r.top_truck) : null,
-        delegacion: r.delegacion != null ? String(r.delegacion) : null,
-        comercial_code: r.comercial_code != null ? String(r.comercial_code) : null,
+    // 1. Delete existing data
+    await supabase.from("ventas_mensuales").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    await supabase.from("clientes").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+
+    // 2. Upsert clientes
+    for (let i = 0; i < parsedData.clientes.length; i += BATCH) {
+      const batch = parsedData.clientes.slice(i, i + BATCH).map((c) => ({
+        cod_cliente: c.cod_cliente,
+        cliente: c.cliente,
+        delegacion: c.delegacion,
+        localidad: c.localidad,
+        vendedor: c.vendedor,
+        tipo_cliente: c.tipo_cliente,
+        observaciones: c.observaciones,
+        transporte: c.transporte,
+        proyeccion_2026: c.proyeccion_2026,
+        crecimiento_previsto: c.crecimiento_previsto,
+        top_truck: c.top_truck,
+        gsmart_delegacion: c.gsmart_delegacion,
+        gsmart_comercial: c.gsmart_comercial,
       }));
 
-      const { error } = await supabase.from("historico_facturacion").upsert(batch, { onConflict: "cod_cliente" });
+      const { error } = await supabase.from("clientes").upsert(batch, { onConflict: "cod_cliente" });
       if (error) {
         errors += batch.length;
-        console.error("Upsert error:", error);
+        console.error("Clientes upsert error:", error);
       } else {
         success += batch.length;
       }
     }
 
-    setUploadResult({ success, errors });
+    // 3. Insert ventas mensuales
+    let ventasSuccess = 0;
+    let ventasErrors = 0;
+    for (let i = 0; i < parsedData.ventas.length; i += BATCH) {
+      const batch = parsedData.ventas.slice(i, i + BATCH).map((v) => ({
+        cod_cliente: v.cod_cliente,
+        anio: v.anio,
+        mes: v.mes,
+        valor: v.valor,
+      }));
+
+      const { error } = await supabase.from("ventas_mensuales").upsert(batch, { onConflict: "cod_cliente,anio,mes" });
+      if (error) {
+        ventasErrors += batch.length;
+        console.error("Ventas upsert error:", error);
+      } else {
+        ventasSuccess += batch.length;
+      }
+    }
+
+    const totalErrors = errors + ventasErrors;
+    setUploadResult({ success: success + ventasSuccess, errors: totalErrors });
     setUploading(false);
-    queryClient.invalidateQueries({ queryKey: ["historico_facturacion"] });
+    queryClient.invalidateQueries({ queryKey: ["historico_data"] });
     queryClient.invalidateQueries({ queryKey: ["vendedores_list"] });
     queryClient.invalidateQueries({ queryKey: ["delegaciones_list"] });
 
     toast({
-      title: errors === 0 ? "Carga completada" : "Carga con errores",
-      description: `${success} registros cargados, ${errors} errores.`,
-      variant: errors > 0 ? "destructive" : "default",
+      title: totalErrors === 0 ? "Carga completada" : "Carga con errores",
+      description: `${success} clientes, ${ventasSuccess} ventas cargadas. ${totalErrors} errores.`,
+      variant: totalErrors > 0 ? "destructive" : "default",
     });
   };
 
@@ -163,7 +200,7 @@ export default function AdminData() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Gestión de Datos</h1>
-        <p className="text-muted-foreground">Carga y gestiona las tablas de datos del histórico de facturación</p>
+        <p className="text-muted-foreground">Carga y gestiona los datos de ventas mensuales por cliente</p>
       </div>
 
       {/* Upload section */}
@@ -171,7 +208,7 @@ export default function AdminData() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Upload className="h-5 w-5" />
-            Cargar Histórico de Facturación
+            Cargar Datos de Ventas
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -180,14 +217,14 @@ export default function AdminData() {
               <Input type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} className="hidden" />
               <div className="flex items-center gap-2 rounded-md border border-dashed border-input px-4 py-3 text-sm transition-colors hover:bg-accent">
                 <FileSpreadsheet className="h-5 w-5 text-muted-foreground" />
-                <span>{fileName || "Seleccionar archivo Excel/CSV"}</span>
+                <span>{fileName || "Seleccionar archivo Excel"}</span>
               </div>
             </label>
 
-            {parsedData.length > 0 && (
+            {parsedData && parsedData.clientes.length > 0 && (
               <Button onClick={handleUpload} disabled={uploading}>
                 {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-                Subir {parsedData.length} registros
+                Subir {parsedData.clientes.length} clientes
               </Button>
             )}
           </div>
@@ -211,13 +248,14 @@ export default function AdminData() {
       </Card>
 
       {/* Preview */}
-      {parsedData.length > 0 && (
+      {parsedData && parsedData.clientes.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <DbIcon className="h-5 w-5" />
               Vista previa
-              <Badge variant="secondary">{parsedData.length} registros</Badge>
+              <Badge variant="secondary">{parsedData.clientes.length} clientes</Badge>
+              <Badge variant="outline">{parsedData.ventas.length} registros mensuales</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -225,34 +263,34 @@ export default function AdminData() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Cod. Cliente</TableHead>
+                    <TableHead>Cod.</TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>Vendedor</TableHead>
                     <TableHead>Delegación</TableHead>
-                    <TableHead className="text-right">Ventas 2024</TableHead>
-                    <TableHead className="text-right">Ventas 2025</TableHead>
-                    <TableHead className="text-right">Ventas 2026</TableHead>
+                    <TableHead>Localidad</TableHead>
                     <TableHead className="text-right">Proyección 2026</TableHead>
+                    <TableHead className="text-right">Meses datos</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {parsedData.slice(0, 20).map((r, i) => (
+                  {parsedData.clientes.slice(0, 20).map((c, i) => (
                     <TableRow key={i}>
-                      <TableCell>{r.cod_cliente}</TableCell>
-                      <TableCell className="max-w-[180px] truncate">{r.cliente}</TableCell>
-                      <TableCell>{r.vendedor}</TableCell>
-                      <TableCell>{r.delegacion || "—"}</TableCell>
-                      <TableCell className="text-right">{fmt(r.ventas_2024)}</TableCell>
-                      <TableCell className="text-right">{fmt(r.ventas_2025)}</TableCell>
-                      <TableCell className="text-right">{fmt(r.ventas_2026)}</TableCell>
-                      <TableCell className="text-right">{fmt(r.proyeccion_2026)}</TableCell>
+                      <TableCell>{c.cod_cliente}</TableCell>
+                      <TableCell className="max-w-[180px] truncate">{c.cliente}</TableCell>
+                      <TableCell>{c.vendedor || "—"}</TableCell>
+                      <TableCell>{c.delegacion || "—"}</TableCell>
+                      <TableCell>{c.localidad || "—"}</TableCell>
+                      <TableCell className="text-right">{fmt(c.proyeccion_2026)}</TableCell>
+                      <TableCell className="text-right">
+                        {parsedData.ventas.filter((v) => v.cod_cliente === c.cod_cliente).length}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </div>
-            {parsedData.length > 20 && (
-              <p className="text-xs text-muted-foreground p-3">Mostrando 20 de {parsedData.length} registros</p>
+            {parsedData.clientes.length > 20 && (
+              <p className="text-xs text-muted-foreground p-3">Mostrando 20 de {parsedData.clientes.length} clientes</p>
             )}
           </CardContent>
         </Card>

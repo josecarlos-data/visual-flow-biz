@@ -1,9 +1,9 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { HistoricoRow } from "@/hooks/useHistoricoData";
+import type { ClienteConVentas } from "@/hooks/useHistoricoData";
 
 interface TopClientsChartProps {
-  data: HistoricoRow[];
+  data: ClienteConVentas[];
 }
 
 const fmt = (v: number) =>
@@ -11,11 +11,11 @@ const fmt = (v: number) =>
 
 export default function TopClientsChart({ data }: TopClientsChartProps) {
   const top = [...data]
-    .sort((a, b) => (Number(b.ventas_2025) || 0) - (Number(a.ventas_2025) || 0))
+    .sort((a, b) => b.ventas_2025 - a.ventas_2025)
     .slice(0, 10)
     .map((r) => ({
       name: r.cliente.length > 25 ? r.cliente.slice(0, 22) + "..." : r.cliente,
-      ventas_2025: Number(r.ventas_2025) || 0,
+      ventas_2025: r.ventas_2025,
     }));
 
   return (

@@ -7,7 +7,6 @@ import DelegacionFilter from "@/components/DelegacionFilter";
 import SalesChart from "@/components/SalesChart";
 import TopClientsChart from "@/components/TopClientsChart";
 import SalesTable from "@/components/SalesTable";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -32,18 +31,13 @@ export default function Dashboard() {
 
   const kpis = useMemo(() => {
     if (rows.length === 0) return null;
-    const totalVentas2025 = rows.reduce((s, r) => s + (Number(r.ventas_2025) || 0), 0);
+    const totalVentas2025 = rows.reduce((s, r) => s + r.ventas_2025, 0);
     const totalProyeccion = rows.reduce((s, r) => s + (Number(r.proyeccion_2026) || 0), 0);
-    const totalVentas2024 = rows.reduce((s, r) => s + (Number(r.ventas_2024) || 0), 0);
+    const totalVentas2024 = rows.reduce((s, r) => s + r.ventas_2024, 0);
     const crecimiento = totalVentas2024 > 0 ? ((totalVentas2025 - totalVentas2024) / totalVentas2024) * 100 : 0;
-    const clientesActivos = rows.filter((r) => (Number(r.ventas_2025) || 0) > 0).length;
+    const clientesActivos = rows.filter((r) => r.ventas_2025 > 0).length;
 
-    return {
-      totalVentas2025,
-      totalProyeccion,
-      crecimiento,
-      clientesActivos,
-    };
+    return { totalVentas2025, totalProyeccion, crecimiento, clientesActivos };
   }, [rows]);
 
   const toggleVendedor = (v: string) => {
@@ -80,7 +74,6 @@ export default function Dashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Vendedores */}
             {vendedoresList && vendedoresList.length > 0 && (
               <div>
                 <p className="text-sm font-medium mb-2">Vendedores</p>
@@ -102,7 +95,6 @@ export default function Dashboard() {
               </div>
             )}
 
-            {/* Delegaciones */}
             {delegacionesList && delegacionesList.length > 0 && (
               <div>
                 <p className="text-sm font-medium mb-2">Delegaciones</p>
@@ -178,7 +170,7 @@ export default function Dashboard() {
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
             <BarChart3 className="h-12 w-12 mx-auto mb-3 opacity-50" />
-            <p>Sin datos. Carga el histórico de facturación desde Administración → Datos.</p>
+            <p>Sin datos. Carga los datos de ventas desde Administración → Datos.</p>
           </CardContent>
         </Card>
       )}
