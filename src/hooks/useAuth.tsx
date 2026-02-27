@@ -31,13 +31,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchUserData = async (userId: string) => {
-    const [profileRes, roleRes] = await Promise.all([
-      supabase.from("profiles").select("is_approved").eq("user_id", userId).single(),
-      supabase.from("user_roles").select("role").eq("user_id", userId).single(),
-    ]);
+    try {
+      const [profileRes, roleRes] = await Promise.all([
+        supabase.from("profiles").select("is_approved").eq("user_id", userId).single(),
+        supabase.from("user_roles").select("role").eq("user_id", userId).single(),
+      ]);
 
-    setIsApproved(profileRes.data?.is_approved ?? false);
-    setRole((roleRes.data?.role as AppRole) ?? null);
+      setIsApproved(profileRes.data?.is_approved ?? false);
+      setRole((roleRes.data?.role as AppRole) ?? null);
+    } catch (err) {
+      console.error("Error fetching user data:", err);
+      setIsApproved(false);
+      setRole(null);
+    }
   };
 
   useEffect(() => {
@@ -67,7 +73,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await fetchUserData(session.user.id);
       }
       if (mounted) setIsLoading(false);
+    }).catch(() => {
+      if (mounted) setIsLoading(false);
     });
+
+    // Safety timeout to prevent infinite loading
+    const timeout = setTimeout(() => {
+      if (mounted) setIsLoading(false);
+    }, 5000);
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
 
     return () => {
       mounted = false;
