@@ -1,0 +1,41 @@
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { HistoricoRow } from "@/hooks/useHistoricoData";
+
+interface TopClientsChartProps {
+  data: HistoricoRow[];
+}
+
+const fmt = (v: number) =>
+  new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
+
+export default function TopClientsChart({ data }: TopClientsChartProps) {
+  const top = [...data]
+    .sort((a, b) => (Number(b.ventas_2025) || 0) - (Number(a.ventas_2025) || 0))
+    .slice(0, 10)
+    .map((r) => ({
+      name: r.cliente.length > 25 ? r.cliente.slice(0, 22) + "..." : r.cliente,
+      ventas_2025: Number(r.ventas_2025) || 0,
+    }));
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Top 10 Clientes (2025)</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="h-[350px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={top} layout="vertical" margin={{ top: 5, right: 20, left: 100, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+              <XAxis type="number" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} className="fill-muted-foreground" />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} className="fill-muted-foreground" width={95} />
+              <Tooltip formatter={(v: number) => fmt(v)} />
+              <Bar dataKey="ventas_2025" name="Ventas 2025" fill="hsl(174, 100%, 29%)" radius={[0, 4, 4, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
