@@ -32,33 +32,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserData = async (userId: string) => {
     try {
-      const profileRes = await supabase
-        .from("profiles")
-        .select("is_approved")
-        .eq("user_id", userId)
-        .maybeSingle();
+      console.log("[Auth] Fetching user data for:", userId);
+      
+      const [profileRes, roleRes] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("is_approved")
+          .eq("user_id", userId)
+          .maybeSingle(),
+        supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", userId)
+          .maybeSingle(),
+      ]);
+
+      console.log("[Auth] Profile result:", JSON.stringify(profileRes));
+      console.log("[Auth] Role result:", JSON.stringify(roleRes));
 
       if (profileRes.error) {
-        console.error("Error fetching profile:", profileRes.error);
+        console.error("[Auth] Error fetching profile:", profileRes.error);
         setIsApproved(false);
       } else {
         setIsApproved(profileRes.data?.is_approved ?? false);
       }
 
-      const roleRes = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", userId)
-        .maybeSingle();
-
       if (roleRes.error) {
-        console.error("Error fetching role:", roleRes.error);
+        console.error("[Auth] Error fetching role:", roleRes.error);
         setRole(null);
       } else {
         setRole((roleRes.data?.role as AppRole) ?? null);
       }
     } catch (err) {
-      console.error("Error fetching user data:", err);
+      console.error("[Auth] Error fetching user data:", err);
       setIsApproved(false);
       setRole(null);
     }
@@ -67,24 +73,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        if (!mounted) return;
-        setSession(session);
-        setUser(session?.user ?? null);
-
-        if (session?.user) {
-          await fetchUserData(session.user.id);
-        } else {
-          setRole(null);
-          setIsApproved(false);
-        }
-        if (mounted) setIsLoading(false);
-      }
-    );
-
+    // Get initial session first
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!mounted) return;
+      console.log("[Auth] Initial session:", session?.user?.id ?? "none");
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -94,6 +86,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }).catch(() => {
       if (mounted) setIsLoading(false);
     });
+
+    // Then listen for changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (!mounted) return;
+        console.log("[Auth] Auth state change:", _event, session?.user?.id ?? "none");
+        setSession(session);
+        setUser(session?.user ?? null);
+
+        if (session?.user) {
+          // Defer Supabase calls to avoid deadlock inside onAuthStateChange
+          setTimeout(async () => {
+            if (!mounted) return;
+            await fetchUserData(session.user.id);
+            if (mounted) setIsLoading(false);
+          }, 0);
+        } else {
+          setRole(null);
+          setIsApproved(false);
+          setIsLoading(false);
+        }
+      }
+    );
 
     // Safety timeout to prevent infinite loading
     const timeout = setTimeout(() => {
