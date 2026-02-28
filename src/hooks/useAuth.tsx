@@ -32,13 +32,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserData = async (userId: string) => {
     try {
-      const [profileRes, roleRes] = await Promise.all([
-        supabase.from("profiles").select("is_approved").eq("user_id", userId).single(),
-        supabase.from("user_roles").select("role").eq("user_id", userId).single(),
-      ]);
+      const profileRes = await supabase
+        .from("profiles")
+        .select("is_approved")
+        .eq("user_id", userId)
+        .maybeSingle();
 
-      setIsApproved(profileRes.data?.is_approved ?? false);
-      setRole((roleRes.data?.role as AppRole) ?? null);
+      if (profileRes.error) {
+        console.error("Error fetching profile:", profileRes.error);
+        setIsApproved(false);
+      } else {
+        setIsApproved(profileRes.data?.is_approved ?? false);
+      }
+
+      const roleRes = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (roleRes.error) {
+        console.error("Error fetching role:", roleRes.error);
+        setRole(null);
+      } else {
+        setRole((roleRes.data?.role as AppRole) ?? null);
+      }
     } catch (err) {
       console.error("Error fetching user data:", err);
       setIsApproved(false);
@@ -87,19 +105,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       subscription.unsubscribe();
       clearTimeout(timeout);
     };
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
   }, []);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    setSession(null);
-    setUser(null);
-    setRole(null);
-    setIsApproved(false);
+    try {
+      await Promise.race([
+        supabase.auth.signOut(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Sign out timeout")), 4000)),
+      ]);
+    } catch (err) {
+      console.error("Error during sign out:", err);
+    } finally {
+      setSession(null);
+      setUser(null);
+      setRole(null);
+      setIsApproved(false);
+      setIsLoading(false);
+    }
   };
 
   return (

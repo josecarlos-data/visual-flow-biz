@@ -12,8 +12,12 @@ export default function PendingApproval() {
 
   const handleSignOut = async () => {
     setLoggingOut(true);
-    await signOut();
-    navigate("/auth", { replace: true });
+    try {
+      await signOut();
+      navigate("/auth", { replace: true });
+    } finally {
+      setLoggingOut(false);
+    }
   };
 
   return (
