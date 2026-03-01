@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { AppLayout } from "@/components/AppLayout";
+import LoadingScreen from "@/components/LoadingScreen";
 import Auth from "./pages/Auth";
 import PendingApproval from "./pages/PendingApproval";
 import Dashboard from "./pages/Dashboard";
@@ -18,7 +19,7 @@ function ProtectedRoute({ children, adminOnly = false }: { children: React.React
   const { user, isApproved, role, isLoading } = useAuth();
 
   if (isLoading) {
-    return <div className="flex min-h-screen items-center justify-center">Cargando...</div>;
+    return <LoadingScreen />;
   }
   if (!user) return <Navigate to="/auth" replace />;
   if (!isApproved) return <Navigate to="/pending" replace />;
@@ -30,7 +31,7 @@ function ProtectedRoute({ children, adminOnly = false }: { children: React.React
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, isApproved, isLoading } = useAuth();
 
-  if (isLoading) return <div className="flex min-h-screen items-center justify-center">Cargando...</div>;
+  if (isLoading) return <LoadingScreen />;
   if (user && isApproved) return <Navigate to="/" replace />;
   if (user && !isApproved) return <Navigate to="/pending" replace />;
 
@@ -40,7 +41,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 function PendingRoute({ children }: { children: React.ReactNode }) {
   const { user, isApproved, isLoading } = useAuth();
 
-  if (isLoading) return <div className="flex min-h-screen items-center justify-center">Cargando...</div>;
+  if (isLoading) return <LoadingScreen />;
   if (!user) return <Navigate to="/auth" replace />;
   if (isApproved) return <Navigate to="/" replace />;
 
