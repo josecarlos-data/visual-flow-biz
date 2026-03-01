@@ -18,46 +18,48 @@ interface UserRow {
   email: string | null;
   employee_code: string | null;
   is_approved: boolean;
-  zone_id: string | null;
+  delegacion: string | null;
   role: AppRole | null;
-  zone_name: string | null;
 }
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<UserRow[]>([]);
-  const [zones, setZones] = useState<{ id: string; name: string }[]>([]);
+  const [vendedores, setVendedores] = useState<string[]>([]);
+  const [delegaciones, setDelegaciones] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingField, setEditingField] = useState<{ userId: string; field: "full_name" | "employee_code" } | null>(null);
+  const [editingField, setEditingField] = useState<{ userId: string; field: "full_name" } | null>(null);
   const [editValue, setEditValue] = useState("");
 
   const fetchData = async () => {
     setLoading(true);
-    const [profilesRes, zonesRes] = await Promise.all([
-      supabase.from("profiles").select("user_id, full_name, email, employee_code, is_approved, zone_id"),
-      supabase.from("zones").select("id, name"),
+    const [profilesRes, clientesRes] = await Promise.all([
+      supabase.from("profiles").select("user_id, full_name, email, employee_code, is_approved, delegacion"),
+      supabase.from("clientes").select("vendedor, delegacion"),
     ]);
 
     const profiles = profilesRes.data ?? [];
-    const zonesList = zonesRes.data ?? [];
-    setZones(zonesList);
+    const clientes = clientesRes.data ?? [];
+
+    // Extract unique vendedores and delegaciones
+    const uniqueVendedores = [...new Set(clientes.map((c) => c.vendedor).filter(Boolean) as string[])].sort();
+    const uniqueDelegaciones = [...new Set(clientes.map((c) => c.delegacion).filter(Boolean) as string[])].sort();
+    setVendedores(uniqueVendedores);
+    setDelegaciones(uniqueDelegaciones);
 
     const userIds = profiles.map((p) => p.user_id);
     const rolesRes = await supabase.from("user_roles").select("user_id, role").in("user_id", userIds);
     const rolesMap = new Map<string, AppRole>();
     (rolesRes.data ?? []).forEach((r) => rolesMap.set(r.user_id, r.role as AppRole));
 
-    const zonesMap = new Map(zonesList.map((z) => [z.id, z.name]));
-
     setUsers(
       profiles.map((p) => ({
         user_id: p.user_id,
         full_name: p.full_name,
-        email: (p as any).email ?? null,
-        employee_code: (p as any).employee_code ?? null,
+        email: p.email ?? null,
+        employee_code: p.employee_code ?? null,
         is_approved: p.is_approved,
-        zone_id: p.zone_id,
+        delegacion: (p as any).delegacion ?? null,
         role: rolesMap.get(p.user_id) ?? null,
-        zone_name: p.zone_id ? zonesMap.get(p.zone_id) ?? null : null,
       }))
     );
     setLoading(false);
@@ -84,29 +86,30 @@ export default function AdminUsers() {
     else { toast({ title: "Rol asignado" }); fetchData(); }
   };
 
-  const assignZone = async (userId: string, zoneId: string) => {
-    const { error } = await supabase.from("profiles").update({ zone_id: zoneId } as any).eq("user_id", userId);
+  const assignVendedor = async (userId: string, vendedor: string) => {
+    const value = vendedor === "__none__" ? null : vendedor;
+    const { error } = await supabase.from("profiles").update({ employee_code: value } as any).eq("user_id", userId);
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
-    else { toast({ title: "Zona asignada" }); fetchData(); }
+    else { toast({ title: "Vendedor asignado" }); fetchData(); }
   };
 
-  const startEdit = (userId: string, field: "full_name" | "employee_code", currentValue: string | null) => {
-    setEditingField({ userId, field });
+  const assignDelegacion = async (userId: string, delegacion: string) => {
+    const value = delegacion === "__none__" ? null : delegacion;
+    const { error } = await supabase.from("profiles").update({ delegacion: value } as any).eq("user_id", userId);
+    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+    else { toast({ title: "Delegación asignada" }); fetchData(); }
+  };
+
+  const startEdit = (userId: string, currentValue: string | null) => {
+    setEditingField({ userId, field: "full_name" });
     setEditValue(currentValue ?? "");
   };
 
   const saveEdit = async () => {
     if (!editingField) return;
-    const { userId, field } = editingField;
-    const updateData = { [field]: editValue || null } as any;
-    const { error } = await supabase.from("profiles").update(updateData).eq("user_id", userId);
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Guardado" });
-      setEditingField(null);
-      fetchData();
-    }
+    const { error } = await supabase.from("profiles").update({ full_name: editValue || null } as any).eq("user_id", editingField.userId);
+    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+    else { toast({ title: "Guardado" }); setEditingField(null); fetchData(); }
   };
 
   const cancelEdit = () => setEditingField(null);
@@ -114,8 +117,8 @@ export default function AdminUsers() {
   const pendingUsers = users.filter((u) => !u.is_approved);
   const approvedUsers = users.filter((u) => u.is_approved);
 
-  const renderEditableCell = (user: UserRow, field: "full_name" | "employee_code", displayValue: string) => {
-    const isEditing = editingField?.userId === user.user_id && editingField?.field === field;
+  const renderEditableName = (user: UserRow) => {
+    const isEditing = editingField?.userId === user.user_id;
     if (isEditing) {
       return (
         <div className="flex items-center gap-1">
@@ -133,8 +136,8 @@ export default function AdminUsers() {
     }
     return (
       <div className="flex items-center gap-1 group">
-        <span>{displayValue}</span>
-        <Button size="icon" variant="ghost" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => startEdit(user.user_id, field, field === "full_name" ? user.full_name : user.employee_code)}>
+        <span>{user.full_name || "Sin nombre"}</span>
+        <Button size="icon" variant="ghost" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => startEdit(user.user_id, user.full_name)}>
           <Pencil className="h-3.5 w-3.5" />
         </Button>
       </div>
@@ -145,7 +148,7 @@ export default function AdminUsers() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Gestión de Usuarios</h1>
-        <p className="text-muted-foreground">Aprueba usuarios y asigna roles, zonas y códigos</p>
+        <p className="text-muted-foreground">Aprueba usuarios y asigna roles, vendedores y delegaciones</p>
       </div>
 
       {pendingUsers.length > 0 && (
@@ -201,17 +204,29 @@ export default function AdminUsers() {
                 <TableRow>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Email</TableHead>
-                  <TableHead>Código</TableHead>
+                  <TableHead>Vendedor</TableHead>
                   <TableHead>Rol</TableHead>
-                  <TableHead>Zona</TableHead>
+                  <TableHead>Delegación</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {approvedUsers.map((u) => (
                   <TableRow key={u.user_id}>
-                    <TableCell>{renderEditableCell(u, "full_name", u.full_name || "Sin nombre")}</TableCell>
+                    <TableCell>{renderEditableName(u)}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">{u.email || "—"}</TableCell>
-                    <TableCell>{renderEditableCell(u, "employee_code", u.employee_code || "—")}</TableCell>
+                    <TableCell>
+                      <Select value={u.employee_code ?? "__none__"} onValueChange={(val) => assignVendedor(u.user_id, val)}>
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue placeholder="Asignar vendedor" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">Ninguno</SelectItem>
+                          {vendedores.map((v) => (
+                            <SelectItem key={v} value={v}>{v}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
                     <TableCell>
                       <Select value={u.role ?? ""} onValueChange={(val) => assignRole(u.user_id, val as AppRole)}>
                         <SelectTrigger className="w-[180px]">
@@ -226,13 +241,14 @@ export default function AdminUsers() {
                       </Select>
                     </TableCell>
                     <TableCell>
-                      <Select value={u.zone_id ?? ""} onValueChange={(val) => assignZone(u.user_id, val)}>
+                      <Select value={u.delegacion ?? "__none__"} onValueChange={(val) => assignDelegacion(u.user_id, val)}>
                         <SelectTrigger className="w-[180px]">
-                          <SelectValue placeholder="Asignar zona" />
+                          <SelectValue placeholder="Asignar delegación" />
                         </SelectTrigger>
                         <SelectContent>
-                          {zones.map((z) => (
-                            <SelectItem key={z.id} value={z.id}>{z.name}</SelectItem>
+                          <SelectItem value="__none__">Ninguno</SelectItem>
+                          {delegaciones.map((d) => (
+                            <SelectItem key={d} value={d}>{d}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
