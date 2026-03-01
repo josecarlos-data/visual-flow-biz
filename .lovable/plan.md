@@ -1,101 +1,55 @@
 
-# Mejoras en Admin y Dashboard del Director Comercial
+## Plan: Mejoras en la pantalla de carga y gestion de usuarios
 
-## Resumen
-Dos cambios principales:
-1. **Panel de Admin**: Ampliar la tabla de usuarios para mostrar email, permitir editar nombre y asignar un "codigo de comercial" (numero identificador para vincular con datos de ventas).
-2. **Dashboard Director Comercial**: Filtro multi-seleccion de comerciales para comparar datos entre ellos.
+### 1. Pantalla de carga durante la transicion de login
 
----
+Actualmente, al iniciar sesion, se muestra brevemente la pantalla de "Pendiente de aprobacion" antes de redirigir al Dashboard. Se reemplazara el texto simple "Cargando..." por un componente visual con spinner y mensaje, y se asegurara que aparezca mientras se resuelven los datos del usuario.
 
-## 1. Base de datos: nuevo campo `employee_code` en `profiles`
+**Cambios:**
+- Crear un componente `LoadingScreen` con spinner centrado y texto "Cargando datos..."
+- Usarlo en `ProtectedRoute`, `PublicRoute` y `PendingRoute` en `App.tsx`
 
-Migración SQL para añadir una columna `employee_code` (texto, nullable, unico) a la tabla `profiles`. Este codigo es el que vinculara al usuario con sus filas en las tablas de ventas que se carguen posteriormente.
+### 2. Reemplazar "Codigo de empleado" por "Vendedor"
 
-```text
-profiles
-  + employee_code TEXT UNIQUE (nullable)
-```
+El campo `employee_code` en la tabla `profiles` se renombrara conceptualmente a **Vendedor**. En lugar de ser un campo de texto libre, sera un desplegable que muestra los valores unicos de la columna `clientes.vendedor`.
 
-No se necesitan cambios de RLS: las politicas existentes ya cubren SELECT y UPDATE sobre `profiles` para admins.
+Valores actuales en la base de datos:
+- Alberto Sanchez, David Maestre, Encargado AL, Encargado GR, Encargado JAEN, Encargado MA, Encargado MZ, J. Antonio Bautista, Juan Diaz, M. Angeles Galvez, Manuel Hernandez, Manuel Villarejo, Rafael Cardenas
 
----
+**Cambios en `AdminUsers.tsx`:**
+- Renombrar la columna de la tabla de "Codigo" a "Vendedor"
+- Reemplazar el campo editable de texto por un `Select` con las opciones unicas de `clientes.vendedor`
+- Incluir opcion "Ninguno" para usuarios que no filtran (directores, gerentes)
+- Al seleccionar un vendedor, se guardara en `profiles.employee_code`
+- Se cargaran los vendedores unicos al montar el componente con una query `SELECT DISTINCT vendedor FROM clientes`
 
-## 2. Panel de Admin (`AdminUsers.tsx`) - Mejoras
+### 3. Reemplazar "Zona" por "Delegacion"
 
-### Datos mostrados por usuario
-- **Email**: se obtendra consultando `auth.users` a traves de una funcion `security definer` (ya que no se puede consultar `auth.users` directamente desde el cliente). Alternativa mas simple: almacenar el email en `profiles` mediante el trigger `handle_new_user` que ya existe.
-  - **Enfoque elegido**: Modificar el trigger `handle_new_user` para guardar tambien el email en profiles (nuevo campo `email`). Esto evita funciones extra y es mas eficiente.
+La columna "Zona" actualmente usa la tabla `zones`. Se cambiara para que use los valores unicos de `clientes.delegacion` en su lugar.
 
-- **Nombre**: editable inline con un boton de edicion que abre un dialogo o input inline.
-- **Codigo de comercial**: input editable para asignar/cambiar el numero identificador.
-- **Rol y Zona**: ya existen, se mantienen.
+Valores actuales: ALMERIA, GRANADA, GUARROMAN, MALAGA, MANZANARES
 
-### Tabla de usuarios pendientes
-Tambien mostrara el email para identificar mejor a cada usuario.
+**Cambios en `AdminUsers.tsx`:**
+- Renombrar la columna de "Zona" a "Delegacion"
+- Reemplazar el Select que lee de la tabla `zones` por uno que lee valores unicos de `clientes.delegacion`
+- Incluir opcion "Ninguno" para limpiar la asignacion
+- Al seleccionar, se guardara en `profiles.zone_id` (reutilizando el campo existente, pero almacenando el nombre de la delegacion como texto)
 
-### Tabla de usuarios aprobados - Columnas finales
-| Nombre (editable) | Email | Codigo | Rol | Zona |
+**Nota tecnica:** Como `zone_id` es de tipo `uuid` y las delegaciones son texto, se necesitara una migracion para agregar un campo `delegacion` (text) a `profiles`, o bien cambiar el tipo de `zone_id`. La opcion mas limpia es agregar una columna `delegacion` (text) a `profiles`.
 
-### Flujo de edicion
-- Click en nombre o codigo -> input inline o dialogo modal para editar.
-- Guardar llama a `supabase.from("profiles").update(...)`.
+### 4. Migracion de base de datos
 
----
-
-## 3. Migracion de base de datos
+Agregar columna `delegacion` de tipo `text` a la tabla `profiles` para almacenar la delegacion asignada (en lugar de usar `zone_id` con la tabla `zones`).
 
 ```sql
--- Añadir email y employee_code a profiles
-ALTER TABLE public.profiles ADD COLUMN email TEXT;
-ALTER TABLE public.profiles ADD COLUMN employee_code TEXT UNIQUE;
-
--- Actualizar trigger para guardar email
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $$
-BEGIN
-  INSERT INTO public.profiles (user_id, full_name, email)
-  VALUES (NEW.id, COALESCE(NEW.raw_user_meta_data->>'full_name', ''), NEW.email);
-  RETURN NEW;
-END;
-$$;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS delegacion text;
 ```
 
----
-
-## 4. Dashboard Director Comercial
-
-### Filtro de comerciales
-- Componente multi-select que lista todos los comerciales (nombre + codigo).
-- Para roles `director_comercial` y `admin`: pueden seleccionar uno o varios comerciales.
-- Al seleccionar multiples, los KPIs y graficos muestran datos comparativos lado a lado.
-- Cuando no hay datos de ventas aun, el filtro aparecera pero mostrara un mensaje indicando que no hay datos.
-
-### Implementacion
-- Nuevo componente `ComercialFilter` con checkboxes/multi-select.
-- El Dashboard recibe los IDs seleccionados y filtra las queries.
-- Como aun no hay tablas de ventas, se preparara la UI del filtro y la logica de seleccion, lista para conectarse cuando se carguen datos.
-
----
-
-## 5. Archivos a crear/modificar
+### Resumen de archivos a modificar
 
 | Archivo | Cambio |
-|---------|--------|
-| Migracion SQL | Añadir `email` y `employee_code` a `profiles`, actualizar trigger |
-| `src/pages/AdminUsers.tsx` | Añadir columnas email, codigo; edicion inline de nombre y codigo |
-| `src/pages/Dashboard.tsx` | Añadir filtro multi-select de comerciales para director/admin |
-| `src/components/ComercialFilter.tsx` | Nuevo componente de filtro multi-seleccion |
-
----
-
-## Seccion tecnica
-
-- El campo `employee_code` es `TEXT` y no `INTEGER` para flexibilidad (codigos con prefijos, ceros a la izquierda, etc.).
-- La constraint `UNIQUE` en `employee_code` previene duplicados.
-- El email se copia a `profiles` en el trigger para evitar queries a `auth.users` (schema protegido).
-- El filtro multi-select del director usara un estado local con array de `user_id` seleccionados, que se pasara como parametro a las futuras queries de ventas.
+|---|---|
+| `src/components/LoadingScreen.tsx` | Nuevo componente de carga con spinner |
+| `src/App.tsx` | Usar LoadingScreen en las rutas protegidas |
+| `src/pages/AdminUsers.tsx` | Reemplazar Codigo por Vendedor (dropdown), Zona por Delegacion (dropdown), ambos con opcion "Ninguno" |
+| Migracion SQL | Agregar columna `delegacion` a `profiles` |
