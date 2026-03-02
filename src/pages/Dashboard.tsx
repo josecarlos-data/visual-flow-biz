@@ -7,21 +7,34 @@ import DelegacionFilter from "@/components/DelegacionFilter";
 import SalesChart from "@/components/SalesChart";
 import TopClientsChart from "@/components/TopClientsChart";
 import SalesTable from "@/components/SalesTable";
+import MonthlyComparisonChart from "@/components/MonthlyComparisonChart";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
 
+const AVAILABLE_YEARS = [2024, 2025, 2026];
+
 export default function Dashboard() {
-  const { role } = useAuth();
+  const { role, employeeCode, delegacion: userDelegacion } = useAuth();
   const [selectedVendedores, setSelectedVendedores] = useState<string[]>([]);
   const [selectedDelegaciones, setSelectedDelegaciones] = useState<string[]>([]);
+  const [selectedYears, setSelectedYears] = useState<number[]>([2024, 2025, 2026]);
+  const [monthStart, setMonthStart] = useState(1);
+  const [monthEnd, setMonthEnd] = useState(12);
+
+  // Role-based auto-filtering
+  const userVendedor = role === "comercial" ? employeeCode : null;
+  const userDelegacionFilter = role === "jefe_de_zona" ? userDelegacion : null;
 
   const { data: allData, isLoading } = useHistoricoData({
     vendedores: selectedVendedores.length > 0 ? selectedVendedores : undefined,
     delegaciones: selectedDelegaciones.length > 0 ? selectedDelegaciones : undefined,
+    userVendedor,
+    userDelegacion: userDelegacionFilter,
   });
   const { data: vendedoresList } = useVendedores();
   const { data: delegacionesList } = useDelegaciones();
@@ -43,6 +56,12 @@ export default function Dashboard() {
   const toggleVendedor = (v: string) => {
     setSelectedVendedores((prev) =>
       prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]
+    );
+  };
+
+  const toggleYear = (year: number) => {
+    setSelectedYears((prev) =>
+      prev.includes(year) ? prev.filter((y) => y !== year) : [...prev, year].sort()
     );
   };
 
@@ -108,6 +127,67 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       )}
+
+      {/* Year & Month filters */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Período</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap items-center gap-6">
+            <div>
+              <p className="text-sm font-medium mb-2">Años</p>
+              <div className="flex gap-2">
+                {AVAILABLE_YEARS.map((year) => (
+                  <label
+                    key={year}
+                    className="flex items-center gap-2 cursor-pointer rounded-md border px-3 py-1.5 text-sm transition-colors hover:bg-accent data-[checked=true]:bg-accent"
+                    data-checked={selectedYears.includes(year)}
+                  >
+                    <Checkbox
+                      checked={selectedYears.includes(year)}
+                      onCheckedChange={() => toggleYear(year)}
+                    />
+                    <span>{year}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-4">
+              <div>
+                <p className="text-sm font-medium mb-2">Mes inicio</p>
+                <Select value={String(monthStart)} onValueChange={(v) => setMonthStart(Number(v))}>
+                  <SelectTrigger className="w-28">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                      <SelectItem key={m} value={String(m)}>
+                        {["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"][m - 1]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <p className="text-sm font-medium mb-2">Mes fin</p>
+                <Select value={String(monthEnd)} onValueChange={(v) => setMonthEnd(Number(v))}>
+                  <SelectTrigger className="w-28">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                      <SelectItem key={m} value={String(m)}>
+                        {["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"][m - 1]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* KPIs */}
       {isLoading ? (
@@ -178,6 +258,12 @@ export default function Dashboard() {
       {/* Charts */}
       {rows.length > 0 && (
         <>
+          <MonthlyComparisonChart
+            data={rows}
+            selectedYears={selectedYears}
+            monthRange={[monthStart, monthEnd]}
+          />
+
           <div className="grid gap-6 lg:grid-cols-2">
             <SalesChart data={rows} groupBy="vendedor" title="Ventas por Vendedor" />
             <SalesChart data={rows} groupBy="delegacion" title="Ventas por Delegación" />

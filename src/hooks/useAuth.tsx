@@ -11,6 +11,8 @@ interface AuthContextType {
   role: AppRole | null;
   isApproved: boolean;
   isLoading: boolean;
+  employeeCode: string | null;
+  delegacion: string | null;
   signOut: () => Promise<void>;
 }
 
@@ -20,6 +22,8 @@ const AuthContext = createContext<AuthContextType>({
   role: null,
   isApproved: false,
   isLoading: true,
+  employeeCode: null,
+  delegacion: null,
   signOut: async () => {},
 });
 
@@ -29,6 +33,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<AppRole | null>(null);
   const [isApproved, setIsApproved] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [employeeCode, setEmployeeCode] = useState<string | null>(null);
+  const [delegacion, setDelegacion] = useState<string | null>(null);
 
   const fetchUserData = async (userId: string) => {
     try {
@@ -37,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const [profileRes, roleRes] = await Promise.all([
         supabase
           .from("profiles")
-          .select("is_approved")
+          .select("is_approved, employee_code, delegacion")
           .eq("user_id", userId)
           .maybeSingle(),
         supabase
@@ -53,8 +59,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (profileRes.error) {
         console.error("[Auth] Error fetching profile:", profileRes.error);
         setIsApproved(false);
+        setEmployeeCode(null);
+        setDelegacion(null);
       } else {
         setIsApproved(profileRes.data?.is_approved ?? false);
+        setEmployeeCode(profileRes.data?.employee_code ?? null);
+        setDelegacion(profileRes.data?.delegacion ?? null);
       }
 
       if (roleRes.error) {
@@ -140,7 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, role, isApproved, isLoading, signOut }}>
+    <AuthContext.Provider value={{ session, user, role, isApproved, isLoading, employeeCode, delegacion, signOut }}>
       {children}
     </AuthContext.Provider>
   );

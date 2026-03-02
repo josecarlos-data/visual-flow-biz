@@ -13,50 +13,86 @@ export interface ClienteConVentas {
   top_truck: string | null;
   gsmart_delegacion: string | null;
   gsmart_comercial: string | null;
-  // Aggregated yearly totals
   ventas_2024: number;
   ventas_2025: number;
   ventas_2026: number;
-  // Monthly breakdown
   ventas_mensuales: { anio: number; mes: number; valor: number }[];
 }
 
 interface UseHistoricoFilters {
   vendedores?: string[];
   delegaciones?: string[];
+  /** Auto-filter by role: vendedor assigned to user profile */
+  userVendedor?: string | null;
+  /** Auto-filter by role: delegacion assigned to user profile */
+  userDelegacion?: string | null;
+}
+
+async function fetchAllPaginated<T>(
+  buildQuery: () => ReturnType<ReturnType<typeof supabase.from>["select"]>,
+  pageSize = 1000
+): Promise<T[]> {
+  let all: T[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await buildQuery().range(from, from + pageSize - 1);
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    all = all.concat(data as T[]);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  return all;
 }
 
 export function useHistoricoData(filters?: UseHistoricoFilters) {
   return useQuery({
     queryKey: ["historico_data", filters],
     queryFn: async () => {
-      // Fetch clientes
-      let clienteQuery = supabase.from("clientes").select("*");
-      if (filters?.vendedores?.length) clienteQuery = clienteQuery.in("vendedor", filters.vendedores);
-      if (filters?.delegaciones?.length) clienteQuery = clienteQuery.in("delegacion", filters.delegaciones);
+      // Determine effective filters (role-based + manual)
+      const vendedorFilter = filters?.userVendedor
+        ? [filters.userVendedor]
+        : filters?.vendedores?.length
+        ? filters.vendedores
+        : undefined;
 
-      const { data: clientes, error: cErr } = await clienteQuery;
-      if (cErr) throw cErr;
+      const delegacionFilter = filters?.userDelegacion
+        ? [filters.userDelegacion]
+        : filters?.delegaciones?.length
+        ? filters.delegaciones
+        : undefined;
+
+      // Fetch ALL clientes with pagination
+      const clientes = await fetchAllPaginated<any>(() => {
+        let q = supabase.from("clientes").select("*");
+        if (vendedorFilter?.length) q = q.in("vendedor", vendedorFilter);
+        if (delegacionFilter?.length) q = q.in("delegacion", delegacionFilter);
+        return q;
+      });
+
       if (!clientes || clientes.length === 0) return [];
 
       const codClientes = clientes.map((c) => c.cod_cliente);
 
-      // Fetch ventas in batches if needed (supabase limit is 1000)
+      // Fetch ventas in batches
       let allVentas: { cod_cliente: number; anio: number; mes: number; valor: number }[] = [];
       const BATCH = 500;
       for (let i = 0; i < codClientes.length; i += BATCH) {
         const batch = codClientes.slice(i, i + BATCH);
-        const { data: ventas, error: vErr } = await supabase
-          .from("ventas_mensuales")
-          .select("cod_cliente, anio, mes, valor")
-          .in("cod_cliente", batch);
-        if (vErr) throw vErr;
-        if (ventas) allVentas = allVentas.concat(ventas.map((v) => ({
-          cod_cliente: v.cod_cliente,
-          anio: v.anio,
-          mes: v.mes,
-          valor: Number(v.valor) || 0,
-        })));
+        const ventas = await fetchAllPaginated<any>(() =>
+          supabase
+            .from("ventas_mensuales")
+            .select("cod_cliente, anio, mes, valor")
+            .in("cod_cliente", batch)
+        );
+        allVentas = allVentas.concat(
+          ventas.map((v) => ({
+            cod_cliente: v.cod_cliente,
+            anio: v.anio,
+            mes: v.mes,
+            valor: Number(v.valor) || 0,
+          }))
+        );
       }
 
       // Group ventas by cod_cliente
@@ -98,13 +134,9 @@ export function useVendedores() {
   return useQuery({
     queryKey: ["vendedores_list"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("clientes")
-        .select("vendedor")
-        .not("vendedor", "is", null)
-        .order("vendedor");
+      const { data, error } = await supabase.rpc("get_distinct_vendedores");
       if (error) throw error;
-      return [...new Set((data ?? []).map((d) => d.vendedor).filter(Boolean))] as string[];
+      return (data ?? []).map((d: { vendedor: string }) => d.vendedor);
     },
   });
 }
@@ -113,13 +145,9 @@ export function useDelegaciones() {
   return useQuery({
     queryKey: ["delegaciones_list"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("clientes")
-        .select("delegacion")
-        .not("delegacion", "is", null)
-        .order("delegacion");
+      const { data, error } = await supabase.rpc("get_distinct_delegaciones");
       if (error) throw error;
-      return [...new Set((data ?? []).map((d) => d.delegacion).filter(Boolean))] as string[];
+      return (data ?? []).map((d: { delegacion: string }) => d.delegacion);
     },
   });
 }
