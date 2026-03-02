@@ -1,55 +1,99 @@
 
-## Plan: Mejoras en la pantalla de carga y gestion de usuarios
+## Plan: Correccion de datos, filtrado por rol y mejoras visuales del Dashboard
 
-### 1. Pantalla de carga durante la transicion de login
+### Problemas identificados
 
-Actualmente, al iniciar sesion, se muestra brevemente la pantalla de "Pendiente de aprobacion" antes de redirigir al Dashboard. Se reemplazara el texto simple "Cargando..." por un componente visual con spinner y mensaje, y se asegurara que aparezca mientras se resuelven los datos del usuario.
+1. **Datos incompletos**: La tabla `clientes` tiene 3.227 registros y `ventas_mensuales` tiene 29.708. Las consultas sin limite solo devuelven 1.000 filas (limite por defecto), por lo que faltan datos en el dashboard y los filtros salen incompletos.
 
-**Cambios:**
-- Crear un componente `LoadingScreen` con spinner centrado y texto "Cargando datos..."
-- Usarlo en `ProtectedRoute`, `PublicRoute` y `PendingRoute` en `App.tsx`
+2. **Comercial ve todos los clientes**: El usuario `josecarlosrimosa@gmail.com` (rol `comercial`, vendedor `J. Antonio Bautista`) ve todos los clientes en lugar de solo los suyos. El hook `useHistoricoData` no filtra automaticamente segun el vendedor asignado al perfil del usuario.
 
-### 2. Reemplazar "Codigo de empleado" por "Vendedor"
+3. **Leyenda superpuesta en graficos**: En `SalesChart`, la leyenda de Recharts se superpone con las etiquetas del eje X rotadas.
 
-El campo `employee_code` en la tabla `profiles` se renombrara conceptualmente a **Vendedor**. En lugar de ser un campo de texto libre, sera un desplegable que muestra los valores unicos de la columna `clientes.vendedor`.
+4. **Filtros limitados para admin**: `useVendedores` y `useDelegaciones` traen todos los registros de `clientes` (max 1000) y deduplicaban en el cliente. Al haber 3.227 registros, los resultados salen truncados.
 
-Valores actuales en la base de datos:
-- Alberto Sanchez, David Maestre, Encargado AL, Encargado GR, Encargado JAEN, Encargado MA, Encargado MZ, J. Antonio Bautista, Juan Diaz, M. Angeles Galvez, Manuel Hernandez, Manuel Villarejo, Rafael Cardenas
+5. **Nuevas funcionalidades solicitadas**: histograma comparativo mensual con lineas por anio, y filtros de anios/meses.
 
-**Cambios en `AdminUsers.tsx`:**
-- Renombrar la columna de la tabla de "Codigo" a "Vendedor"
-- Reemplazar el campo editable de texto por un `Select` con las opciones unicas de `clientes.vendedor`
-- Incluir opcion "Ninguno" para usuarios que no filtran (directores, gerentes)
-- Al seleccionar un vendedor, se guardara en `profiles.employee_code`
-- Se cargaran los vendedores unicos al montar el componente con una query `SELECT DISTINCT vendedor FROM clientes`
+---
 
-### 3. Reemplazar "Zona" por "Delegacion"
+### Cambios planificados
 
-La columna "Zona" actualmente usa la tabla `zones`. Se cambiara para que use los valores unicos de `clientes.delegacion` en su lugar.
+#### 1. Corregir limite de 1000 filas en todas las consultas
 
-Valores actuales: ALMERIA, GRANADA, GUARROMAN, MALAGA, MANZANARES
+**Archivo: `src/hooks/useHistoricoData.ts`**
 
-**Cambios en `AdminUsers.tsx`:**
-- Renombrar la columna de "Zona" a "Delegacion"
-- Reemplazar el Select que lee de la tabla `zones` por uno que lee valores unicos de `clientes.delegacion`
-- Incluir opcion "Ninguno" para limpiar la asignacion
-- Al seleccionar, se guardara en `profiles.zone_id` (reutilizando el campo existente, pero almacenando el nombre de la delegacion como texto)
+- Modificar la consulta de `clientes` para paginar en bloques (igual que ya se hace con `ventas_mensuales`), asegurando que se traen los 3.227 registros completos.
+- Para `useVendedores` y `useDelegaciones`: crear una funcion RPC en la base de datos que devuelva valores distintos directamente, evitando traer miles de filas duplicadas.
 
-**Nota tecnica:** Como `zone_id` es de tipo `uuid` y las delegaciones son texto, se necesitara una migracion para agregar un campo `delegacion` (text) a `profiles`, o bien cambiar el tipo de `zone_id`. La opcion mas limpia es agregar una columna `delegacion` (text) a `profiles`.
-
-### 4. Migracion de base de datos
-
-Agregar columna `delegacion` de tipo `text` a la tabla `profiles` para almacenar la delegacion asignada (en lugar de usar `zone_id` con la tabla `zones`).
-
+**Migracion SQL**: Crear dos funciones de base de datos:
 ```sql
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS delegacion text;
+CREATE OR REPLACE FUNCTION get_distinct_vendedores()
+RETURNS TABLE(vendedor text) AS $$
+  SELECT DISTINCT vendedor FROM clientes 
+  WHERE vendedor IS NOT NULL ORDER BY vendedor;
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION get_distinct_delegaciones()
+RETURNS TABLE(delegacion text) AS $$
+  SELECT DISTINCT delegacion FROM clientes 
+  WHERE delegacion IS NOT NULL ORDER BY delegacion;
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
 ```
 
-### Resumen de archivos a modificar
+Actualizar `useVendedores` y `useDelegaciones` para llamar a estas funciones RPC.
 
-| Archivo | Cambio |
+#### 2. Filtrado automatico por rol del usuario
+
+**Archivo: `src/hooks/useHistoricoData.ts`**
+
+- Aceptar parametros adicionales: `userVendedor` (el `employee_code` del perfil) y `userDelegacion`.
+- Si el rol es `comercial`, filtrar automaticamente por `vendedor = employee_code`.
+- Si el rol es `jefe_de_zona`, filtrar por `delegacion = profiles.delegacion`.
+
+**Archivo: `src/pages/Dashboard.tsx`**
+
+- Pasar el `employee_code` y `delegacion` del perfil del usuario al hook.
+- Ampliar `useAuth` para exponer `employeeCode` y `delegacion` del perfil (o hacer una consulta adicional en el Dashboard).
+
+**Archivo: `src/hooks/useAuth.tsx`**
+
+- Incluir `employee_code` y `delegacion` en `fetchUserData` para que esten disponibles en el contexto de autenticacion.
+
+#### 3. Corregir superposicion de leyenda en graficos
+
+**Archivo: `src/components/SalesChart.tsx`**
+
+- Aumentar el margen inferior del grafico (de 60 a 90).
+- Mover la leyenda a la parte superior del grafico con `<Legend verticalAlign="top" />`.
+
+#### 4. Nuevo histograma comparativo mensual (lineas por anio)
+
+**Nuevo archivo: `src/components/MonthlyComparisonChart.tsx`**
+
+- Grafico de lineas con eje X = meses (Ene-Dic) y una linea por cada anio (2024, 2025, 2026).
+- Agregar los datos mensuales de `ventas_mensuales` sumando todos los clientes filtrados por mes.
+- Usar `LineChart` de Recharts con colores diferenciados por anio.
+
+**Archivo: `src/pages/Dashboard.tsx`**
+
+- Integrar el nuevo componente debajo de los graficos existentes.
+
+#### 5. Filtros de anios y meses
+
+**Archivo: `src/pages/Dashboard.tsx`**
+
+- Anadir filtro de anios (2024, 2025, 2026) como checkboxes para seleccionar que anios mostrar en los graficos.
+- Anadir filtro de rango de meses (mes inicio - mes fin) para limitar el periodo visible.
+- Estos filtros afectaran al histograma mensual y opcionalmente a los graficos de barras existentes.
+
+---
+
+### Resumen de archivos
+
+| Archivo | Accion |
 |---|---|
-| `src/components/LoadingScreen.tsx` | Nuevo componente de carga con spinner |
-| `src/App.tsx` | Usar LoadingScreen en las rutas protegidas |
-| `src/pages/AdminUsers.tsx` | Reemplazar Codigo por Vendedor (dropdown), Zona por Delegacion (dropdown), ambos con opcion "Ninguno" |
-| Migracion SQL | Agregar columna `delegacion` a `profiles` |
+| Migracion SQL | Funciones RPC para vendedores/delegaciones distintos |
+| `src/hooks/useAuth.tsx` | Exponer `employeeCode` y `delegacion` del perfil |
+| `src/hooks/useHistoricoData.ts` | Paginar clientes, filtrar por rol, usar RPCs |
+| `src/pages/Dashboard.tsx` | Pasar filtros de rol, anadir filtros anio/mes, integrar histograma |
+| `src/components/SalesChart.tsx` | Mover leyenda arriba, aumentar margen |
+| `src/components/MonthlyComparisonChart.tsx` | Nuevo grafico de lineas mensual comparativo |
