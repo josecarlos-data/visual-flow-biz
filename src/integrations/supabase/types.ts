@@ -233,6 +233,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_distinct_delegaciones: {
+        Args: never
+        Returns: {
+          delegacion: string
+        }[]
+      }
+      get_distinct_vendedores: {
+        Args: never
+        Returns: {
+          vendedor: string
+        }[]
+      }
       get_user_zone_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {

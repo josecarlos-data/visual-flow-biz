@@ -38,12 +38,12 @@ export default function SalesChart({ data, groupBy, title }: SalesChartProps) {
       <CardContent>
         <div className="h-[350px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 60 }}>
+            <BarChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 90 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
               <XAxis dataKey="name" angle={-35} textAnchor="end" interval={0} tick={{ fontSize: 11 }} className="fill-muted-foreground" />
               <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} className="fill-muted-foreground" />
               <Tooltip formatter={(v: number) => fmt(v)} />
-              <Legend />
+              <Legend verticalAlign="top" height={36} />
               <Bar dataKey="ventas_2024" name="2024" fill="hsl(210, 15%, 55%)" radius={[2, 2, 0, 0]} />
               <Bar dataKey="ventas_2025" name="2025" fill="hsl(174, 100%, 29%)" radius={[2, 2, 0, 0]} />
               <Bar dataKey="ventas_2026" name="2026" fill="hsl(174, 80%, 45%)" radius={[2, 2, 0, 0]} />
