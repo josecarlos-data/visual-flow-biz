@@ -52,9 +52,9 @@ export default function SalesTable({ data }: SalesTableProps) {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+      <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 space-y-0">
         <CardTitle className="text-base">Tabla de Clientes</CardTitle>
-        <div className="relative w-64">
+        <div className="relative w-full sm:w-64">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Buscar cliente..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8" />
         </div>
@@ -65,26 +65,26 @@ export default function SalesTable({ data }: SalesTableProps) {
             <TableHeader>
               <TableRow>
                 <TableHead><SortHeader label="Cliente" k="cliente" /></TableHead>
-                <TableHead><SortHeader label="Vendedor" k="vendedor" /></TableHead>
-                <TableHead><SortHeader label="Delegación" k="delegacion" /></TableHead>
+                <TableHead className="hidden md:table-cell"><SortHeader label="Vendedor" k="vendedor" /></TableHead>
+                <TableHead className="hidden md:table-cell"><SortHeader label="Delegación" k="delegacion" /></TableHead>
                 <TableHead className="text-right"><SortHeader label="2024" k="ventas_2024" /></TableHead>
                 <TableHead className="text-right"><SortHeader label="2025" k="ventas_2025" /></TableHead>
                 <TableHead className="text-right"><SortHeader label="2026" k="ventas_2026" /></TableHead>
-                <TableHead className="text-right"><SortHeader label="Proyección" k="proyeccion_2026" /></TableHead>
-                <TableHead className="text-right">Crecimiento</TableHead>
+                <TableHead className="text-right hidden lg:table-cell"><SortHeader label="Proyección" k="proyeccion_2026" /></TableHead>
+                <TableHead className="text-right hidden lg:table-cell">Crecimiento</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.slice(0, 100).map((r) => (
                 <TableRow key={r.cod_cliente}>
                   <TableCell className="font-medium max-w-[200px] truncate">{r.cliente}</TableCell>
-                  <TableCell>{r.vendedor || "—"}</TableCell>
-                  <TableCell>{r.delegacion || "—"}</TableCell>
+                  <TableCell className="hidden md:table-cell">{r.vendedor || "—"}</TableCell>
+                  <TableCell className="hidden md:table-cell">{r.delegacion || "—"}</TableCell>
                   <TableCell className="text-right">{fmt(r.ventas_2024)}</TableCell>
                   <TableCell className="text-right">{fmt(r.ventas_2025)}</TableCell>
                   <TableCell className="text-right">{fmt(r.ventas_2026)}</TableCell>
-                  <TableCell className="text-right">{fmt(r.proyeccion_2026)}</TableCell>
-                  <TableCell className="text-right">{pct(r.crecimiento_previsto)}</TableCell>
+                  <TableCell className="text-right hidden lg:table-cell">{fmt(r.proyeccion_2026)}</TableCell>
+                  <TableCell className="text-right hidden lg:table-cell">{pct(r.crecimiento_previsto)}</TableCell>
                 </TableRow>
               ))}
               {filtered.length === 0 && (
