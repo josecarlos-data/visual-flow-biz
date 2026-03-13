@@ -70,8 +70,8 @@ export default function SalesTable({ data }: SalesTableProps) {
                 <TableHead className="text-right"><SortHeader label="2024" k="ventas_2024" /></TableHead>
                 <TableHead className="text-right"><SortHeader label="2025" k="ventas_2025" /></TableHead>
                 <TableHead className="text-right"><SortHeader label="2026" k="ventas_2026" /></TableHead>
-                <TableHead className="text-right"><SortHeader label="Proyección" k="proyeccion_2026" /></TableHead>
-                <TableHead className="text-right">Crecimiento</TableHead>
+                <TableHead className="text-right hidden lg:table-cell"><SortHeader label="Proyección" k="proyeccion_2026" /></TableHead>
+                <TableHead className="text-right hidden lg:table-cell">Crecimiento</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
