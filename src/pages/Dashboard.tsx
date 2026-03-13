@@ -134,7 +134,7 @@ export default function Dashboard() {
           <CardTitle className="text-base">Período</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap items-center gap-6">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-6">
             <div>
               <p className="text-sm font-medium mb-2">Años</p>
               <div className="flex gap-2">

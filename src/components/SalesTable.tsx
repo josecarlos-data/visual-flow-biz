@@ -83,8 +83,8 @@ export default function SalesTable({ data }: SalesTableProps) {
                   <TableCell className="text-right">{fmt(r.ventas_2024)}</TableCell>
                   <TableCell className="text-right">{fmt(r.ventas_2025)}</TableCell>
                   <TableCell className="text-right">{fmt(r.ventas_2026)}</TableCell>
-                  <TableCell className="text-right">{fmt(r.proyeccion_2026)}</TableCell>
-                  <TableCell className="text-right">{pct(r.crecimiento_previsto)}</TableCell>
+                  <TableCell className="text-right hidden lg:table-cell">{fmt(r.proyeccion_2026)}</TableCell>
+                  <TableCell className="text-right hidden lg:table-cell">{pct(r.crecimiento_previsto)}</TableCell>
                 </TableRow>
               ))}
               {filtered.length === 0 && (

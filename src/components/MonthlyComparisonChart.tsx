@@ -1,5 +1,6 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useIsMobile } from "@/hooks/use-mobile";
 import type { ClienteConVentas } from "@/hooks/useHistoricoData";
 import { useMemo } from "react";
 
@@ -21,6 +22,8 @@ const fmt = (v: number) =>
   new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
 
 export default function MonthlyComparisonChart({ data, selectedYears, monthRange }: MonthlyComparisonChartProps) {
+  const isMobile = useIsMobile();
+
   const chartData = useMemo(() => {
     const monthlyTotals = new Map<string, Record<string, number>>();
 
@@ -54,12 +57,12 @@ export default function MonthlyComparisonChart({ data, selectedYears, monthRange
         <CardTitle className="text-base">Comparativa Mensual por Año</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-[350px]">
+        <div className="h-[280px] sm:h-[350px]">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+            <LineChart data={chartData} margin={{ top: 5, right: isMobile ? 10 : 20, left: isMobile ? 0 : 10, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-              <XAxis dataKey="name" className="fill-muted-foreground" tick={{ fontSize: 12 }} />
-              <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} className="fill-muted-foreground" />
+              <XAxis dataKey="name" className="fill-muted-foreground" tick={{ fontSize: isMobile ? 10 : 12 }} />
+              <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} className="fill-muted-foreground" width={isMobile ? 40 : 60} />
               <Tooltip formatter={(v: number) => fmt(v)} />
               <Legend verticalAlign="top" height={36} />
               {selectedYears.map((year) => (
@@ -70,8 +73,8 @@ export default function MonthlyComparisonChart({ data, selectedYears, monthRange
                   name={String(year)}
                   stroke={YEAR_COLORS[year] || "hsl(0, 0%, 50%)"}
                   strokeWidth={2}
-                  dot={{ r: 3 }}
-                  activeDot={{ r: 5 }}
+                  dot={{ r: isMobile ? 2 : 3 }}
+                  activeDot={{ r: isMobile ? 4 : 5 }}
                 />
               ))}
             </LineChart>
