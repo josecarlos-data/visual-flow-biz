@@ -34,7 +34,7 @@ export default function TopClientsChart({ data }: TopClientsChartProps) {
             <BarChart data={top} layout="vertical" margin={{ top: 5, right: 10, left: isMobile ? 5 : 100, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
               <XAxis type="number" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} className="fill-muted-foreground" />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: isMobile ? 9 : 11 }} className="fill-muted-foreground" width={isMobile ? 55 : 95} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: isMobile ? 8 : 11 }} className="fill-muted-foreground" width={isMobile ? 50 : 95} />
               <Tooltip formatter={(v: number) => fmt(v)} />
               <Bar dataKey="ventas_2025" name="Ventas 2025" fill="hsl(174, 100%, 29%)" radius={[0, 4, 4, 0]} />
             </BarChart>

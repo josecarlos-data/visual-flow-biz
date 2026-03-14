@@ -44,7 +44,7 @@ export default function SalesChart({ data, groupBy, title }: SalesChartProps) {
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
               <XAxis
                 dataKey="name"
-                angle={-35}
+                angle={isMobile ? -45 : -35}
                 textAnchor="end"
                 interval={isMobile ? "preserveStartEnd" : 0}
                 tick={{ fontSize: isMobile ? 10 : 11 }}

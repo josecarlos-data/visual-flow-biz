@@ -85,10 +85,10 @@ export default function SalesTable({ data }: SalesTableProps) {
             <TableBody>
               {filtered.slice(0, 100).map((r) => (
                 <TableRow key={r.cod_cliente}>
-                  <TableCell className="font-medium max-w-[200px] truncate">{r.cliente}</TableCell>
+                  <TableCell className="font-medium max-w-[120px] sm:max-w-[200px] truncate">{r.cliente}</TableCell>
                   <TableCell className="hidden md:table-cell">{r.vendedor || "—"}</TableCell>
                   <TableCell className="hidden md:table-cell">{r.delegacion || "—"}</TableCell>
-                  <TableCell className="text-right">{fmt(r.ventas_2024)}</TableCell>
+                  <TableCell className="text-right hidden sm:table-cell">{fmt(r.ventas_2024)}</TableCell>
                   <TableCell className="text-right">{fmt(r.ventas_2025)}</TableCell>
                   <TableCell className="text-right">{fmt(r.ventas_2026)}</TableCell>
                   <TableCell className="text-right hidden lg:table-cell">{fmt(r.proyeccion_2026)}</TableCell>
