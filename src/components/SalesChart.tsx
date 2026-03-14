@@ -40,7 +40,7 @@ export default function SalesChart({ data, groupBy, title }: SalesChartProps) {
       <CardContent>
         <div className="h-[280px] sm:h-[350px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 5, right: 10, left: isMobile ? 0 : 10, bottom: isMobile ? 70 : 90 }}>
+            <BarChart data={chartData} margin={{ top: 5, right: 10, left: isMobile ? 0 : 10, bottom: isMobile ? 50 : 90 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
               <XAxis
                 dataKey="name"
