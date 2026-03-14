@@ -31,7 +31,7 @@ export default function TopClientsChart({ data }: TopClientsChartProps) {
       <CardContent>
         <div className="h-[300px] sm:h-[350px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={top} layout="vertical" margin={{ top: 5, right: 10, left: isMobile ? 60 : 100, bottom: 5 }}>
+            <BarChart data={top} layout="vertical" margin={{ top: 5, right: 10, left: isMobile ? 5 : 100, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
               <XAxis type="number" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} className="fill-muted-foreground" />
               <YAxis type="category" dataKey="name" tick={{ fontSize: isMobile ? 9 : 11 }} className="fill-muted-foreground" width={isMobile ? 55 : 95} />
