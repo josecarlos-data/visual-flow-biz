@@ -12,8 +12,8 @@ const fmt = (v: number) =>
 
 export default function TopClientsChart({ data }: TopClientsChartProps) {
   const isMobile = useIsMobile();
-  const maxLen = isMobile ? 15 : 25;
-  const truncLen = isMobile ? 12 : 22;
+  const maxLen = isMobile ? 10 : 25;
+  const truncLen = isMobile ? 8 : 22;
 
   const top = [...data]
     .sort((a, b) => b.ventas_2025 - a.ventas_2025)
