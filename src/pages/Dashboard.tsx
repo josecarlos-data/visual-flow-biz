@@ -1,9 +1,10 @@
 import { useState, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, Users, Target, DollarSign, BarChart3 } from "lucide-react";
+import { TrendingUp, Users, Target, DollarSign, BarChart3, Filter, ChevronDown } from "lucide-react";
 import { useHistoricoData, useVendedores, useDelegaciones } from "@/hooks/useHistoricoData";
 import DelegacionFilter from "@/components/DelegacionFilter";
+import VendedorFilter from "@/components/VendedorFilter";
 import SalesChart from "@/components/SalesChart";
 import TopClientsChart from "@/components/TopClientsChart";
 import SalesTable from "@/components/SalesTable";
@@ -12,6 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
@@ -25,8 +28,9 @@ export default function Dashboard() {
   const [selectedYears, setSelectedYears] = useState<number[]>([2024, 2025, 2026]);
   const [monthStart, setMonthStart] = useState(1);
   const [monthEnd, setMonthEnd] = useState(12);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const isMobile = useIsMobile();
 
-  // Role-based auto-filtering
   const userVendedor = role === "comercial" ? employeeCode : null;
   const userDelegacionFilter = role === "jefe_de_zona" ? userDelegacion : null;
 
@@ -49,15 +53,8 @@ export default function Dashboard() {
     const totalVentas2024 = rows.reduce((s, r) => s + r.ventas_2024, 0);
     const crecimiento = totalVentas2024 > 0 ? ((totalVentas2025 - totalVentas2024) / totalVentas2024) * 100 : 0;
     const clientesActivos = rows.filter((r) => r.ventas_2025 > 0).length;
-
     return { totalVentas2025, totalProyeccion, crecimiento, clientesActivos };
   }, [rows]);
-
-  const toggleVendedor = (v: string) => {
-    setSelectedVendedores((prev) =>
-      prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]
-    );
-  };
 
   const toggleYear = (year: number) => {
     setSelectedYears((prev) =>
@@ -65,11 +62,13 @@ export default function Dashboard() {
     );
   };
 
+  const activeFilterCount = selectedVendedores.length + selectedDelegaciones.length;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 overflow-x-hidden">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dashboard</h1>
+        <p className="text-sm text-muted-foreground">
           {role === "admin" || role === "director_comercial"
             ? "Vista general de todas las ventas"
             : role === "jefe_de_zona"
@@ -78,171 +77,159 @@ export default function Dashboard() {
         </p>
       </div>
 
-      {/* Filters */}
-      {showFilter && (
+      {/* Consolidated Filters Card */}
+      <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Filtros
-              {(selectedVendedores.length > 0 || selectedDelegaciones.length > 0) && (
-                <Badge variant="secondary">
-                  {selectedVendedores.length + selectedDelegaciones.length} activos
-                </Badge>
+          <CollapsibleTrigger asChild>
+            <CardHeader className="pb-3 cursor-pointer hover:bg-accent/50 transition-colors">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Filter className="h-4 w-4" />
+                Filtros
+                {activeFilterCount > 0 && (
+                  <Badge variant="secondary">{activeFilterCount} activos</Badge>
+                )}
+                <ChevronDown className={`h-4 w-4 ml-auto transition-transform ${filtersOpen ? "rotate-180" : ""}`} />
+              </CardTitle>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="space-y-4 pt-0">
+              {/* Vendedores dropdown */}
+              {showFilter && vendedoresList && vendedoresList.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium mb-2">Vendedores</p>
+                  <VendedorFilter
+                    vendedores={vendedoresList}
+                    selected={selectedVendedores}
+                    onChange={setSelectedVendedores}
+                  />
+                </div>
               )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {vendedoresList && vendedoresList.length > 0 && (
-              <div>
-                <p className="text-sm font-medium mb-2">Vendedores</p>
-                <div className="flex flex-wrap gap-2">
-                  {vendedoresList.map((v) => (
-                    <label
-                      key={v}
-                      className="flex items-center gap-2 cursor-pointer rounded-md border px-3 py-1.5 text-sm transition-colors hover:bg-accent data-[checked=true]:bg-accent"
-                      data-checked={selectedVendedores.includes(v)}
-                    >
-                      <Checkbox
-                        checked={selectedVendedores.includes(v)}
-                        onCheckedChange={() => toggleVendedor(v)}
-                      />
-                      <span>{v}</span>
-                    </label>
-                  ))}
+
+              {/* Delegaciones dropdown */}
+              {showFilter && delegacionesList && delegacionesList.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium mb-2">Delegaciones</p>
+                  <DelegacionFilter
+                    delegaciones={delegacionesList}
+                    selected={selectedDelegaciones}
+                    onChange={setSelectedDelegaciones}
+                  />
+                </div>
+              )}
+
+              {/* Period filters */}
+              <div className="flex flex-col sm:flex-row sm:items-end gap-4">
+                <div>
+                  <p className="text-sm font-medium mb-2">Años</p>
+                  <div className="flex gap-2">
+                    {AVAILABLE_YEARS.map((year) => (
+                      <label
+                        key={year}
+                        className="flex items-center gap-1.5 cursor-pointer rounded-md border px-2.5 py-1.5 text-sm transition-colors hover:bg-accent data-[checked=true]:bg-accent"
+                        data-checked={selectedYears.includes(year)}
+                      >
+                        <Checkbox
+                          checked={selectedYears.includes(year)}
+                          onCheckedChange={() => toggleYear(year)}
+                        />
+                        <span>{year}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <div>
+                    <p className="text-sm font-medium mb-2">Mes inicio</p>
+                    <Select value={String(monthStart)} onValueChange={(v) => setMonthStart(Number(v))}>
+                      <SelectTrigger className="w-24">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                          <SelectItem key={m} value={String(m)}>
+                            {["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"][m - 1]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium mb-2">Mes fin</p>
+                    <Select value={String(monthEnd)} onValueChange={(v) => setMonthEnd(Number(v))}>
+                      <SelectTrigger className="w-24">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                          <SelectItem key={m} value={String(m)}>
+                            {["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"][m - 1]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
-            )}
-
-            {delegacionesList && delegacionesList.length > 0 && (
-              <div>
-                <p className="text-sm font-medium mb-2">Delegaciones</p>
-                <DelegacionFilter
-                  delegaciones={delegacionesList}
-                  selected={selectedDelegaciones}
-                  onChange={setSelectedDelegaciones}
-                />
-              </div>
-            )}
-          </CardContent>
+            </CardContent>
+          </CollapsibleContent>
         </Card>
-      )}
-
-      {/* Year & Month filters */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Período</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-6">
-            <div>
-              <p className="text-sm font-medium mb-2">Años</p>
-              <div className="flex gap-2">
-                {AVAILABLE_YEARS.map((year) => (
-                  <label
-                    key={year}
-                    className="flex items-center gap-2 cursor-pointer rounded-md border px-3 py-1.5 text-sm transition-colors hover:bg-accent data-[checked=true]:bg-accent"
-                    data-checked={selectedYears.includes(year)}
-                  >
-                    <Checkbox
-                      checked={selectedYears.includes(year)}
-                      onCheckedChange={() => toggleYear(year)}
-                    />
-                    <span>{year}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div className="flex gap-4">
-              <div>
-                <p className="text-sm font-medium mb-2">Mes inicio</p>
-                <Select value={String(monthStart)} onValueChange={(v) => setMonthStart(Number(v))}>
-                  <SelectTrigger className="w-28">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                      <SelectItem key={m} value={String(m)}>
-                        {["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"][m - 1]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <p className="text-sm font-medium mb-2">Mes fin</p>
-                <Select value={String(monthEnd)} onValueChange={(v) => setMonthEnd(Number(v))}>
-                  <SelectTrigger className="w-28">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                      <SelectItem key={m} value={String(m)}>
-                        {["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"][m - 1]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      </Collapsible>
 
       {/* KPIs */}
       {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {[1, 2, 3, 4].map((i) => (
             <Card key={i}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <Skeleton className="h-4 w-24" />
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-1 sm:pb-2">
+                <Skeleton className="h-4 w-16 sm:w-24" />
               </CardHeader>
-              <CardContent><Skeleton className="h-8 w-32" /></CardContent>
+              <CardContent className="p-3 sm:p-6 pt-0"><Skeleton className="h-6 sm:h-8 w-20 sm:w-32" /></CardContent>
             </Card>
           ))}
         </div>
       ) : kpis ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Ventas 2025</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-1 sm:pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium">Ventas 2025</CardTitle>
+              <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{fmt(kpis.totalVentas2025)}</div>
-              <p className="text-xs text-muted-foreground">{rows.length} clientes</p>
+            <CardContent className="p-3 sm:p-6 pt-0">
+              <div className="text-lg sm:text-2xl font-bold">{fmt(kpis.totalVentas2025)}</div>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">{rows.length} clientes</p>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Proyección 2026</CardTitle>
-              <Target className="h-4 w-4 text-muted-foreground" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-1 sm:pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium">Proyección 2026</CardTitle>
+              <Target className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{fmt(kpis.totalProyeccion)}</div>
-              <p className="text-xs text-muted-foreground">Estimación anual</p>
+            <CardContent className="p-3 sm:p-6 pt-0">
+              <div className="text-lg sm:text-2xl font-bold">{fmt(kpis.totalProyeccion)}</div>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">Estimación anual</p>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Clientes Activos</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-1 sm:pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium">Clientes Activos</CardTitle>
+              <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{kpis.clientesActivos}</div>
-              <p className="text-xs text-muted-foreground">Con ventas en 2025</p>
+            <CardContent className="p-3 sm:p-6 pt-0">
+              <div className="text-lg sm:text-2xl font-bold">{kpis.clientesActivos}</div>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">Con ventas en 2025</p>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Crecimiento</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-1 sm:pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium">Crecimiento</CardTitle>
+              <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${kpis.crecimiento >= 0 ? "text-primary" : "text-destructive"}`}>
+            <CardContent className="p-3 sm:p-6 pt-0">
+              <div className={`text-lg sm:text-2xl font-bold ${kpis.crecimiento >= 0 ? "text-primary" : "text-destructive"}`}>
                 {kpis.crecimiento >= 0 ? "+" : ""}{kpis.crecimiento.toFixed(1)}%
               </div>
-              <p className="text-xs text-muted-foreground">2024 vs 2025</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">2024 vs 2025</p>
             </CardContent>
           </Card>
         </div>
@@ -264,7 +251,7 @@ export default function Dashboard() {
             monthRange={[monthStart, monthEnd]}
           />
 
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
             <SalesChart data={rows} groupBy="vendedor" title="Ventas por Vendedor" />
             <SalesChart data={rows} groupBy="delegacion" title="Ventas por Delegación" />
           </div>
