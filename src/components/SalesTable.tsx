@@ -3,7 +3,7 @@ import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ArrowUpDown, Search } from "lucide-react";
-import { useIsMobile } from "@/hooks/use-mobile";
+
 import { Button } from "@/components/ui/button";
 import type { ClienteConVentas } from "@/hooks/useHistoricoData";
 
