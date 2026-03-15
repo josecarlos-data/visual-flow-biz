@@ -13,14 +13,9 @@ interface SalesTableProps {
 
 type SortKey = "cliente" | "vendedor" | "ventas_2024" | "ventas_2025" | "ventas_2026" | "proyeccion_2026" | "delegacion";
 
-const fmtFull = (v: number | null) =>
+const fmt = (v: number | null) =>
   v != null
-    ? new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v)
-    : "—";
-
-const fmtCompact = (v: number | null) =>
-  v != null
-    ? v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}€`
+    ? new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v) + " €"
     : "—";
 
 const pct = (v: number | null) =>
