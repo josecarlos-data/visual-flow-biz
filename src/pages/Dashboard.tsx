@@ -5,6 +5,7 @@ import { TrendingUp, Users, Target, DollarSign, BarChart3, Filter, ChevronDown }
 import { useHistoricoData, useVendedores, useDelegaciones } from "@/hooks/useHistoricoData";
 import DelegacionFilter from "@/components/DelegacionFilter";
 import VendedorFilter from "@/components/VendedorFilter";
+import ClienteFilter from "@/components/ClienteFilter";
 import SalesChart from "@/components/SalesChart";
 import TopClientsChart from "@/components/TopClientsChart";
 import SalesTable from "@/components/SalesTable";
@@ -25,6 +26,7 @@ export default function Dashboard() {
   const { role, employeeCode, delegacion: userDelegacion } = useAuth();
   const [selectedVendedores, setSelectedVendedores] = useState<string[]>([]);
   const [selectedDelegaciones, setSelectedDelegaciones] = useState<string[]>([]);
+  const [selectedClientes, setSelectedClientes] = useState<string[]>([]);
   const [selectedYears, setSelectedYears] = useState<number[]>([2024, 2025, 2026]);
   const [monthStart, setMonthStart] = useState(1);
   const [monthEnd, setMonthEnd] = useState(12);
@@ -46,15 +48,47 @@ export default function Dashboard() {
   const showFilter = role === "admin" || role === "director_comercial";
   const rows = allData ?? [];
 
-  const kpis = useMemo(() => {
-    if (rows.length === 0) return null;
-    const totalVentas2025 = rows.reduce((s, r) => s + r.ventas_2025, 0);
-    const totalProyeccion = rows.reduce((s, r) => s + (Number(r.proyeccion_2026) || 0), 0);
-    const totalVentas2024 = rows.reduce((s, r) => s + r.ventas_2024, 0);
-    const crecimiento = totalVentas2024 > 0 ? ((totalVentas2025 - totalVentas2024) / totalVentas2024) * 100 : 0;
-    const clientesActivos = rows.filter((r) => r.ventas_2025 > 0).length;
-    return { totalVentas2025, totalProyeccion, crecimiento, clientesActivos };
+  // List of unique client names for the filter
+  const clienteNames = useMemo(() => {
+    return [...new Set(rows.map((r) => r.cliente))].sort();
   }, [rows]);
+
+  // Apply month range + client filter globally
+  const filteredRows = useMemo(() => {
+    const isFullRange = monthStart === 1 && monthEnd === 12;
+    const hasClientFilter = selectedClientes.length > 0;
+
+    if (isFullRange && !hasClientFilter) return rows;
+
+    return rows
+      .filter((r) => !hasClientFilter || selectedClientes.includes(r.cliente))
+      .map((row) => {
+        if (isFullRange) return row;
+        const filtered = row.ventas_mensuales.filter((v) => v.mes >= monthStart && v.mes <= monthEnd);
+        const sumYear = (y: number) => filtered.filter((v) => v.anio === y).reduce((s, v) => s + v.valor, 0);
+        return {
+          ...row,
+          ventas_2024: sumYear(2024),
+          ventas_2025: sumYear(2025),
+          ventas_2026: sumYear(2026),
+          ventas_mensuales: filtered,
+        };
+      });
+  }, [rows, monthStart, monthEnd, selectedClientes]);
+
+  const isPartialRange = monthStart !== 1 || monthEnd !== 12;
+  const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+  const rangeLabel = isPartialRange ? ` (${monthNames[monthStart - 1]}-${monthNames[monthEnd - 1]})` : "";
+
+  const kpis = useMemo(() => {
+    if (filteredRows.length === 0) return null;
+    const totalVentas2025 = filteredRows.reduce((s, r) => s + r.ventas_2025, 0);
+    const totalProyeccion = filteredRows.reduce((s, r) => s + (Number(r.proyeccion_2026) || 0), 0);
+    const totalVentas2024 = filteredRows.reduce((s, r) => s + r.ventas_2024, 0);
+    const crecimiento = totalVentas2024 > 0 ? ((totalVentas2025 - totalVentas2024) / totalVentas2024) * 100 : 0;
+    const clientesActivos = filteredRows.filter((r) => r.ventas_2025 > 0).length;
+    return { totalVentas2025, totalProyeccion, crecimiento, clientesActivos };
+  }, [filteredRows]);
 
   const toggleYear = (year: number) => {
     setSelectedYears((prev) =>
@@ -62,7 +96,7 @@ export default function Dashboard() {
     );
   };
 
-  const activeFilterCount = selectedVendedores.length + selectedDelegaciones.length;
+  const activeFilterCount = selectedVendedores.length + selectedDelegaciones.length + selectedClientes.length;
 
   return (
     <div className="space-y-4 sm:space-y-6 overflow-x-hidden">
@@ -118,6 +152,18 @@ export default function Dashboard() {
                 </div>
               )}
 
+              {/* Cliente filter */}
+              {clienteNames.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium mb-2">Clientes</p>
+                  <ClienteFilter
+                    clientes={clienteNames}
+                    selected={selectedClientes}
+                    onChange={setSelectedClientes}
+                  />
+                </div>
+              )}
+
               {/* Period filters */}
               <div className="flex flex-col sm:flex-row sm:items-end gap-4">
                 <div>
@@ -148,7 +194,7 @@ export default function Dashboard() {
                       <SelectContent>
                         {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
                           <SelectItem key={m} value={String(m)}>
-                            {["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"][m - 1]}
+                            {monthNames[m - 1]}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -163,7 +209,7 @@ export default function Dashboard() {
                       <SelectContent>
                         {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
                           <SelectItem key={m} value={String(m)}>
-                            {["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"][m - 1]}
+                            {monthNames[m - 1]}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -192,12 +238,12 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-1 sm:pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">Ventas 2025</CardTitle>
+              <CardTitle className="text-xs sm:text-sm font-medium">Ventas 2025{rangeLabel}</CardTitle>
               <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="p-3 sm:p-6 pt-0">
               <div className="text-lg sm:text-2xl font-bold">{fmt(kpis.totalVentas2025)}</div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">{rows.length} clientes</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">{filteredRows.length} clientes</p>
             </CardContent>
           </Card>
           <Card>
@@ -212,7 +258,7 @@ export default function Dashboard() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-1 sm:pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">Clientes Activos</CardTitle>
+              <CardTitle className="text-xs sm:text-sm font-medium">Clientes Activos{rangeLabel}</CardTitle>
               <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="p-3 sm:p-6 pt-0">
@@ -222,7 +268,7 @@ export default function Dashboard() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-1 sm:pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">Crecimiento</CardTitle>
+              <CardTitle className="text-xs sm:text-sm font-medium">Crecimiento{rangeLabel}</CardTitle>
               <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="p-3 sm:p-6 pt-0">
@@ -243,22 +289,25 @@ export default function Dashboard() {
       )}
 
       {/* Charts */}
-      {rows.length > 0 && (
+      {filteredRows.length > 0 && (
         <>
           <MonthlyComparisonChart
-            data={rows}
+            data={filteredRows}
             selectedYears={selectedYears}
             monthRange={[monthStart, monthEnd]}
           />
 
-          <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
-            <SalesChart data={rows} groupBy="vendedor" title="Ventas por Vendedor" />
-            <SalesChart data={rows} groupBy="delegacion" title="Ventas por Delegación" />
-          </div>
+          {/* Hide vendedor/delegacion charts for comercial role */}
+          {role !== "comercial" && (
+            <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
+              <SalesChart data={filteredRows} groupBy="vendedor" title="Ventas por Vendedor" />
+              <SalesChart data={filteredRows} groupBy="delegacion" title="Ventas por Delegación" />
+            </div>
+          )}
 
-          <TopClientsChart data={rows} />
+          <TopClientsChart data={filteredRows} />
 
-          <SalesTable data={rows} />
+          <SalesTable data={filteredRows} />
         </>
       )}
     </div>
