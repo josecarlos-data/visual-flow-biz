@@ -22,8 +22,6 @@ const pct = (v: number | null) =>
   v != null ? `${(Number(v) * 100).toFixed(1)}%` : "—";
 
 export default function SalesTable({ data }: SalesTableProps) {
-  const isMobile = useIsMobile();
-  const fmt = isMobile ? fmtCompact : fmtFull;
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("ventas_2025");
   const [sortAsc, setSortAsc] = useState(false);
