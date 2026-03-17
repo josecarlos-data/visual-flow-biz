@@ -72,29 +72,33 @@ export default function MonthlyComparisonChart({ data, selectedYears, monthRange
         </Button>
       </CardHeader>
       <CardContent>
-        <div className="h-[280px] sm:h-[350px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData} margin={{ top: 5, right: isMobile ? 10 : 20, left: isMobile ? 0 : 10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-              <XAxis dataKey="name" className="fill-muted-foreground" tick={{ fontSize: isMobile ? 10 : 12 }} />
-              <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} className="fill-muted-foreground" width={isMobile ? 40 : 60} />
-              <Tooltip formatter={(v: number) => fmt(v)} />
-              <Legend verticalAlign="top" height={36} />
-              {selectedYears.map((year) => (
-                <Line
-                  key={year}
-                  type="monotone"
-                  dataKey={`ventas_${year}`}
-                  name={String(year)}
-                  stroke={YEAR_COLORS[year] || "hsl(0, 0%, 50%)"}
-                  strokeWidth={2}
-                  dot={{ r: isMobile ? 2 : 3 }}
-                  activeDot={{ r: isMobile ? 4 : 5 }}
-                />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
+        {showClientView ? (
+          <ClientSparklines data={data} />
+        ) : (
+          <div className="h-[280px] sm:h-[350px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ top: 5, right: isMobile ? 10 : 20, left: isMobile ? 0 : 10, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <XAxis dataKey="name" className="fill-muted-foreground" tick={{ fontSize: isMobile ? 10 : 12 }} />
+                <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} className="fill-muted-foreground" width={isMobile ? 40 : 60} />
+                <Tooltip formatter={(v: number) => fmt(v)} />
+                <Legend verticalAlign="top" height={36} />
+                {selectedYears.map((year) => (
+                  <Line
+                    key={year}
+                    type="monotone"
+                    dataKey={`ventas_${year}`}
+                    name={String(year)}
+                    stroke={YEAR_COLORS[year] || "hsl(0, 0%, 50%)"}
+                    strokeWidth={2}
+                    dot={{ r: isMobile ? 2 : 3 }}
+                    activeDot={{ r: isMobile ? 4 : 5 }}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
