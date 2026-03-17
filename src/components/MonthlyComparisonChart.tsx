@@ -26,6 +26,7 @@ const fmt = (v: number) =>
 
 export default function MonthlyComparisonChart({ data, selectedYears, monthRange }: MonthlyComparisonChartProps) {
   const isMobile = useIsMobile();
+  const [showClientView, setShowClientView] = useState(false);
 
   const chartData = useMemo(() => {
     const monthlyTotals = new Map<string, Record<string, number>>();
@@ -56,8 +57,19 @@ export default function MonthlyComparisonChart({ data, selectedYears, monthRange
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Comparativa Mensual por Año</CardTitle>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-base">
+          {showClientView ? "Evolución Mensual por Cliente" : "Comparativa Mensual por Año"}
+        </CardTitle>
+        <Button
+          variant={showClientView ? "default" : "outline"}
+          size="sm"
+          className="h-7 gap-1.5 text-xs"
+          onClick={() => setShowClientView((v) => !v)}
+        >
+          {showClientView ? <BarChart3 className="h-3.5 w-3.5" /> : <Users className="h-3.5 w-3.5" />}
+          {showClientView ? "Por año" : "Top 10"}
+        </Button>
       </CardHeader>
       <CardContent>
         <div className="h-[280px] sm:h-[350px]">
