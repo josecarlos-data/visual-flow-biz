@@ -1,99 +1,42 @@
 
-## Plan: Correccion de datos, filtrado por rol y mejoras visuales del Dashboard
 
-### Problemas identificados
+## Plan: Sparklines de Top 10 Clientes (comparativa mensual por cliente)
 
-1. **Datos incompletos**: La tabla `clientes` tiene 3.227 registros y `ventas_mensuales` tiene 29.708. Las consultas sin limite solo devuelven 1.000 filas (limite por defecto), por lo que faltan datos en el dashboard y los filtros salen incompletos.
+### Concepto
 
-2. **Comercial ve todos los clientes**: El usuario `josecarlosrimosa@gmail.com` (rol `comercial`, vendedor `J. Antonio Bautista`) ve todos los clientes en lugar de solo los suyos. El hook `useHistoricoData` no filtra automaticamente segun el vendedor asignado al perfil del usuario.
+Un botón toggle en la esquina superior del card "Comparativa Mensual por Año". Al activarlo, se reemplaza el gráfico de líneas por año con una cuadrícula de **10 mini-gráficos (sparklines)**, uno por cada top cliente (ordenados por ventas totales). Cada sparkline muestra dos líneas superpuestas: año anterior (punteada, gris) y año actual (sólida, color primario), permitiendo ver la evolución individual de cada cliente.
 
-3. **Leyenda superpuesta en graficos**: En `SalesChart`, la leyenda de Recharts se superpone con las etiquetas del eje X rotadas.
+### Implementación
 
-4. **Filtros limitados para admin**: `useVendedores` y `useDelegaciones` traen todos los registros de `clientes` (max 1000) y deduplicaban en el cliente. Al haber 3.227 registros, los resultados salen truncados.
+#### 1. Nuevo componente `src/components/ClientSparklines.tsx`
 
-5. **Nuevas funcionalidades solicitadas**: histograma comparativo mensual con lineas por anio, y filtros de anios/meses.
+- Recibe `data: ClienteConVentas[]` y calcula los top 10 clientes por ventas totales del año actual + anterior.
+- Determina automáticamente el año actual (`new Date().getFullYear()`) y el anterior.
+- Para cada cliente, genera datos mensuales (Ene-Dic) con las ventas de ambos años.
+- Renderiza una grid (`grid-cols-2 sm:grid-cols-5`) con 10 mini-cards, cada uno conteniendo:
+  - Nombre del cliente (truncado)
+  - Un `LineChart` pequeño (~80px alto) con dos líneas: sólida (actual) y punteada (anterior)
+  - Total del periodo debajo en texto pequeño
+- Usa `ResponsiveContainer` de Recharts para cada sparkline.
+- Sin ejes visibles, solo las líneas y un tooltip al hover.
 
----
+#### 2. Modificar `src/components/MonthlyComparisonChart.tsx`
 
-### Cambios planificados
+- Añadir un estado `showClientView: boolean` (default false).
+- En el `CardHeader`, junto al título, añadir un botón/toggle con icono `Users` que alterne entre la vista por año y la vista por cliente.
+- Cuando `showClientView === true`, renderizar `<ClientSparklines>` en lugar del `LineChart` actual.
+- El título cambia dinámicamente: "Comparativa Mensual por Año" / "Evolución Mensual por Cliente".
 
-#### 1. Corregir limite de 1000 filas en todas las consultas
+#### 3. Diferenciación visual año actual vs anterior
 
-**Archivo: `src/hooks/useHistoricoData.ts`**
+- Año anterior: línea punteada (`strokeDasharray="5 5"`), color gris (`hsl(210, 15%, 55%)`)
+- Año actual: línea sólida, color primario del tema (`hsl(174, 100%, 29%)`)
+- Leyenda simple: "2024" (punteada) / "2025" (sólida) en la parte superior
 
-- Modificar la consulta de `clientes` para paginar en bloques (igual que ya se hace con `ventas_mensuales`), asegurando que se traen los 3.227 registros completos.
-- Para `useVendedores` y `useDelegaciones`: crear una funcion RPC en la base de datos que devuelva valores distintos directamente, evitando traer miles de filas duplicadas.
+### Archivos
 
-**Migracion SQL**: Crear dos funciones de base de datos:
-```sql
-CREATE OR REPLACE FUNCTION get_distinct_vendedores()
-RETURNS TABLE(vendedor text) AS $$
-  SELECT DISTINCT vendedor FROM clientes 
-  WHERE vendedor IS NOT NULL ORDER BY vendedor;
-$$ LANGUAGE sql STABLE SECURITY DEFINER;
-
-CREATE OR REPLACE FUNCTION get_distinct_delegaciones()
-RETURNS TABLE(delegacion text) AS $$
-  SELECT DISTINCT delegacion FROM clientes 
-  WHERE delegacion IS NOT NULL ORDER BY delegacion;
-$$ LANGUAGE sql STABLE SECURITY DEFINER;
-```
-
-Actualizar `useVendedores` y `useDelegaciones` para llamar a estas funciones RPC.
-
-#### 2. Filtrado automatico por rol del usuario
-
-**Archivo: `src/hooks/useHistoricoData.ts`**
-
-- Aceptar parametros adicionales: `userVendedor` (el `employee_code` del perfil) y `userDelegacion`.
-- Si el rol es `comercial`, filtrar automaticamente por `vendedor = employee_code`.
-- Si el rol es `jefe_de_zona`, filtrar por `delegacion = profiles.delegacion`.
-
-**Archivo: `src/pages/Dashboard.tsx`**
-
-- Pasar el `employee_code` y `delegacion` del perfil del usuario al hook.
-- Ampliar `useAuth` para exponer `employeeCode` y `delegacion` del perfil (o hacer una consulta adicional en el Dashboard).
-
-**Archivo: `src/hooks/useAuth.tsx`**
-
-- Incluir `employee_code` y `delegacion` en `fetchUserData` para que esten disponibles en el contexto de autenticacion.
-
-#### 3. Corregir superposicion de leyenda en graficos
-
-**Archivo: `src/components/SalesChart.tsx`**
-
-- Aumentar el margen inferior del grafico (de 60 a 90).
-- Mover la leyenda a la parte superior del grafico con `<Legend verticalAlign="top" />`.
-
-#### 4. Nuevo histograma comparativo mensual (lineas por anio)
-
-**Nuevo archivo: `src/components/MonthlyComparisonChart.tsx`**
-
-- Grafico de lineas con eje X = meses (Ene-Dic) y una linea por cada anio (2024, 2025, 2026).
-- Agregar los datos mensuales de `ventas_mensuales` sumando todos los clientes filtrados por mes.
-- Usar `LineChart` de Recharts con colores diferenciados por anio.
-
-**Archivo: `src/pages/Dashboard.tsx`**
-
-- Integrar el nuevo componente debajo de los graficos existentes.
-
-#### 5. Filtros de anios y meses
-
-**Archivo: `src/pages/Dashboard.tsx`**
-
-- Anadir filtro de anios (2024, 2025, 2026) como checkboxes para seleccionar que anios mostrar en los graficos.
-- Anadir filtro de rango de meses (mes inicio - mes fin) para limitar el periodo visible.
-- Estos filtros afectaran al histograma mensual y opcionalmente a los graficos de barras existentes.
-
----
-
-### Resumen de archivos
-
-| Archivo | Accion |
+| Archivo | Cambio |
 |---|---|
-| Migracion SQL | Funciones RPC para vendedores/delegaciones distintos |
-| `src/hooks/useAuth.tsx` | Exponer `employeeCode` y `delegacion` del perfil |
-| `src/hooks/useHistoricoData.ts` | Paginar clientes, filtrar por rol, usar RPCs |
-| `src/pages/Dashboard.tsx` | Pasar filtros de rol, anadir filtros anio/mes, integrar histograma |
-| `src/components/SalesChart.tsx` | Mover leyenda arriba, aumentar margen |
-| `src/components/MonthlyComparisonChart.tsx` | Nuevo grafico de lineas mensual comparativo |
+| `src/components/ClientSparklines.tsx` | Crear: grid de sparklines top 10 clientes |
+| `src/components/MonthlyComparisonChart.tsx` | Añadir toggle para alternar entre vista año y vista cliente |
+
