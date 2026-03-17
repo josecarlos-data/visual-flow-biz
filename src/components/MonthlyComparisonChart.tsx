@@ -2,7 +2,10 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { ClienteConVentas } from "@/hooks/useHistoricoData";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { Users, BarChart3 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import ClientSparklines from "./ClientSparklines";
 
 interface MonthlyComparisonChartProps {
   data: ClienteConVentas[];
