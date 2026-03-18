@@ -1,99 +1,38 @@
 
-## Plan: Correccion de datos, filtrado por rol y mejoras visuales del Dashboard
 
-### Problemas identificados
+## Plan: Mejoras en Top 10 Clientes y KPIs
 
-1. **Datos incompletos**: La tabla `clientes` tiene 3.227 registros y `ventas_mensuales` tiene 29.708. Las consultas sin limite solo devuelven 1.000 filas (limite por defecto), por lo que faltan datos en el dashboard y los filtros salen incompletos.
+### 1. Top 10 Clientes — Selector de año con botones
 
-2. **Comercial ve todos los clientes**: El usuario `josecarlosrimosa@gmail.com` (rol `comercial`, vendedor `J. Antonio Bautista`) ve todos los clientes en lugar de solo los suyos. El hook `useHistoricoData` no filtra automaticamente segun el vendedor asignado al perfil del usuario.
+**Cambio en `TopClientsChart.tsx`:**
+- Añadir 3 botones (2024, 2025, 2026) junto al título, con el último año preseleccionado por defecto.
+- Al pulsar un año, el ranking se recalcula ordenando por `ventas_XXXX` del año seleccionado.
+- Las barras cambiarán de color según el año (reutilizando los colores de `YEAR_COLORS` ya definidos en el proyecto).
+- El título se actualiza dinámicamente: "Top 10 Clientes (2025)".
 
-3. **Leyenda superpuesta en graficos**: En `SalesChart`, la leyenda de Recharts se superpone con las etiquetas del eje X rotadas.
+**Componente necesita recibir prop adicional:** ninguno — ya tiene acceso a `ventas_2024`, `ventas_2025` y `ventas_2026` en los datos.
 
-4. **Filtros limitados para admin**: `useVendedores` y `useDelegaciones` traen todos los registros de `clientes` (max 1000) y deduplicaban en el cliente. Al haber 3.227 registros, los resultados salen truncados.
+### 2. KPIs — Reemplazar "Crecimiento" y "Proyección 2026" por métricas más dinámicas
 
-5. **Nuevas funcionalidades solicitadas**: histograma comparativo mensual con lineas por anio, y filtros de anios/meses.
+Los KPIs actuales "Proyección 2026" y "Crecimiento" son estáticos (datos precargados). Alternativas que aportan más valor real:
 
----
+| KPI actual | Propuesta | Qué muestra |
+|---|---|---|
+| **Proyección 2026** | **Ventas año anterior** | Total ventas 2024 en el rango seleccionado. Permite comparar directamente con 2025. |
+| **Crecimiento (fijo 24→25)** | **Crecimiento dinámico** | Compara los dos últimos años con datos según el rango de meses seleccionado (ej: si filtras Ene-Mar, compara solo Ene-Mar de cada año). La etiqueta se actualiza: "2024 vs 2025" o "2025 vs 2026". |
 
-### Cambios planificados
+Así los 4 KPIs quedarían:
+1. **Ventas [último año]** — total del año más reciente con datos
+2. **Ventas [año anterior]** — total del año previo (mismo rango de meses)
+3. **Clientes Activos** — con ventas en el último año
+4. **Crecimiento** — % variación entre los dos años, calculado dinámicamente según filtros
 
-#### 1. Corregir limite de 1000 filas en todas las consultas
+Todos se recalculan automáticamente según los filtros de meses y clientes activos.
 
-**Archivo: `src/hooks/useHistoricoData.ts`**
+### Archivos a modificar
 
-- Modificar la consulta de `clientes` para paginar en bloques (igual que ya se hace con `ventas_mensuales`), asegurando que se traen los 3.227 registros completos.
-- Para `useVendedores` y `useDelegaciones`: crear una funcion RPC en la base de datos que devuelva valores distintos directamente, evitando traer miles de filas duplicadas.
-
-**Migracion SQL**: Crear dos funciones de base de datos:
-```sql
-CREATE OR REPLACE FUNCTION get_distinct_vendedores()
-RETURNS TABLE(vendedor text) AS $$
-  SELECT DISTINCT vendedor FROM clientes 
-  WHERE vendedor IS NOT NULL ORDER BY vendedor;
-$$ LANGUAGE sql STABLE SECURITY DEFINER;
-
-CREATE OR REPLACE FUNCTION get_distinct_delegaciones()
-RETURNS TABLE(delegacion text) AS $$
-  SELECT DISTINCT delegacion FROM clientes 
-  WHERE delegacion IS NOT NULL ORDER BY delegacion;
-$$ LANGUAGE sql STABLE SECURITY DEFINER;
-```
-
-Actualizar `useVendedores` y `useDelegaciones` para llamar a estas funciones RPC.
-
-#### 2. Filtrado automatico por rol del usuario
-
-**Archivo: `src/hooks/useHistoricoData.ts`**
-
-- Aceptar parametros adicionales: `userVendedor` (el `employee_code` del perfil) y `userDelegacion`.
-- Si el rol es `comercial`, filtrar automaticamente por `vendedor = employee_code`.
-- Si el rol es `jefe_de_zona`, filtrar por `delegacion = profiles.delegacion`.
-
-**Archivo: `src/pages/Dashboard.tsx`**
-
-- Pasar el `employee_code` y `delegacion` del perfil del usuario al hook.
-- Ampliar `useAuth` para exponer `employeeCode` y `delegacion` del perfil (o hacer una consulta adicional en el Dashboard).
-
-**Archivo: `src/hooks/useAuth.tsx`**
-
-- Incluir `employee_code` y `delegacion` en `fetchUserData` para que esten disponibles en el contexto de autenticacion.
-
-#### 3. Corregir superposicion de leyenda en graficos
-
-**Archivo: `src/components/SalesChart.tsx`**
-
-- Aumentar el margen inferior del grafico (de 60 a 90).
-- Mover la leyenda a la parte superior del grafico con `<Legend verticalAlign="top" />`.
-
-#### 4. Nuevo histograma comparativo mensual (lineas por anio)
-
-**Nuevo archivo: `src/components/MonthlyComparisonChart.tsx`**
-
-- Grafico de lineas con eje X = meses (Ene-Dic) y una linea por cada anio (2024, 2025, 2026).
-- Agregar los datos mensuales de `ventas_mensuales` sumando todos los clientes filtrados por mes.
-- Usar `LineChart` de Recharts con colores diferenciados por anio.
-
-**Archivo: `src/pages/Dashboard.tsx`**
-
-- Integrar el nuevo componente debajo de los graficos existentes.
-
-#### 5. Filtros de anios y meses
-
-**Archivo: `src/pages/Dashboard.tsx`**
-
-- Anadir filtro de anios (2024, 2025, 2026) como checkboxes para seleccionar que anios mostrar en los graficos.
-- Anadir filtro de rango de meses (mes inicio - mes fin) para limitar el periodo visible.
-- Estos filtros afectaran al histograma mensual y opcionalmente a los graficos de barras existentes.
-
----
-
-### Resumen de archivos
-
-| Archivo | Accion |
+| Archivo | Cambio |
 |---|---|
-| Migracion SQL | Funciones RPC para vendedores/delegaciones distintos |
-| `src/hooks/useAuth.tsx` | Exponer `employeeCode` y `delegacion` del perfil |
-| `src/hooks/useHistoricoData.ts` | Paginar clientes, filtrar por rol, usar RPCs |
-| `src/pages/Dashboard.tsx` | Pasar filtros de rol, anadir filtros anio/mes, integrar histograma |
-| `src/components/SalesChart.tsx` | Mover leyenda arriba, aumentar margen |
-| `src/components/MonthlyComparisonChart.tsx` | Nuevo grafico de lineas mensual comparativo |
+| `src/components/TopClientsChart.tsx` | Añadir estado para año seleccionado + 3 botones toggle |
+| `src/pages/Dashboard.tsx` | Reemplazar KPIs de Proyección y Crecimiento por versiones dinámicas |
+
