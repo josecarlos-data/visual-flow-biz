@@ -248,7 +248,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent className="p-3 sm:p-6 pt-0">
               <div className="text-lg sm:text-2xl font-bold">{fmt(kpis.totalLatest)}</div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">{filteredRows.length} clientes</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">{kpis.clientesActivos} clientes activos</p>
             </CardContent>
           </Card>
           <Card>
