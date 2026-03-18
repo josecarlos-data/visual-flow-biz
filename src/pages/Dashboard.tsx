@@ -80,15 +80,19 @@ export default function Dashboard() {
   const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
   const rangeLabel = isPartialRange ? ` (${monthNames[monthStart - 1]}-${monthNames[monthEnd - 1]})` : "";
 
+  // Determine the two most recent years dynamically
+  const latestYear = Math.max(...selectedYears);
+  const prevYear = Math.max(...selectedYears.filter((y) => y < latestYear), latestYear - 1);
+
   const kpis = useMemo(() => {
     if (filteredRows.length === 0) return null;
-    const totalVentas2025 = filteredRows.reduce((s, r) => s + r.ventas_2025, 0);
-    const totalProyeccion = filteredRows.reduce((s, r) => s + (Number(r.proyeccion_2026) || 0), 0);
-    const totalVentas2024 = filteredRows.reduce((s, r) => s + r.ventas_2024, 0);
-    const crecimiento = totalVentas2024 > 0 ? ((totalVentas2025 - totalVentas2024) / totalVentas2024) * 100 : 0;
-    const clientesActivos = filteredRows.filter((r) => r.ventas_2025 > 0).length;
-    return { totalVentas2025, totalProyeccion, crecimiento, clientesActivos };
-  }, [filteredRows]);
+    const yearKey = (y: number) => `ventas_${y}` as keyof typeof filteredRows[0];
+    const totalLatest = filteredRows.reduce((s, r) => s + (Number(r[yearKey(latestYear)]) || 0), 0);
+    const totalPrev = filteredRows.reduce((s, r) => s + (Number(r[yearKey(prevYear)]) || 0), 0);
+    const crecimiento = totalPrev > 0 ? ((totalLatest - totalPrev) / totalPrev) * 100 : 0;
+    const clientesActivos = filteredRows.filter((r) => (Number(r[yearKey(latestYear)]) || 0) > 0).length;
+    return { totalLatest, totalPrev, crecimiento, clientesActivos, latestYear, prevYear };
+  }, [filteredRows, latestYear, prevYear]);
 
   const toggleYear = (year: number) => {
     setSelectedYears((prev) =>
