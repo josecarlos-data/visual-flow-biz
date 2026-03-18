@@ -91,7 +91,8 @@ export default function Dashboard() {
     const totalPrev = filteredRows.reduce((s, r) => s + (Number(r[yearKey(prevYear)]) || 0), 0);
     const crecimiento = totalPrev > 0 ? ((totalLatest - totalPrev) / totalPrev) * 100 : 0;
     const clientesActivos = filteredRows.filter((r) => (Number(r[yearKey(latestYear)]) || 0) > 0).length;
-    return { totalLatest, totalPrev, crecimiento, clientesActivos, latestYear, prevYear };
+    const ticketMedio = clientesActivos > 0 ? totalLatest / clientesActivos : 0;
+    return { totalLatest, totalPrev, crecimiento, clientesActivos, ticketMedio, latestYear, prevYear };
   }, [filteredRows, latestYear, prevYear]);
 
   const toggleYear = (year: number) => {
