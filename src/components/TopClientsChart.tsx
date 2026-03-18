@@ -58,12 +58,12 @@ export default function TopClientsChart({ data }: TopClientsChartProps) {
         </ToggleGroup>
       </CardHeader>
       <CardContent>
-        <div className="h-[300px] sm:h-[350px]">
+        <div className="h-[340px] sm:h-[400px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={top} layout="vertical" margin={{ top: 5, right: 10, left: isMobile ? 5 : 100, bottom: 5 }}>
+            <BarChart data={top} layout="vertical" margin={{ top: 5, right: 10, left: 5, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
               <XAxis type="number" tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} className="fill-muted-foreground" />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: isMobile ? 8 : 11 }} className="fill-muted-foreground" width={isMobile ? 50 : 95} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: isMobile ? 9 : 12 }} className="fill-muted-foreground" width={isMobile ? 60 : 140} />
               <Tooltip formatter={(v: number) => fmt(v)} />
               <Bar dataKey="value" name={`Ventas ${selectedYear}`} fill={YEAR_COLORS[selectedYear]} radius={[0, 4, 4, 0]} />
             </BarChart>

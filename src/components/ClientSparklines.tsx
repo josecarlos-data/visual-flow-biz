@@ -12,6 +12,8 @@ const fmt = (v: number) =>
 
 interface ClientSparklinesProps {
   data: ClienteConVentas[];
+  selectedYears: number[];
+  monthRange: [number, number];
 }
 
 interface SparkData {
@@ -21,18 +23,17 @@ interface SparkData {
   prev: number;
 }
 
-export default function ClientSparklines({ data }: ClientSparklinesProps) {
-  const currentYear = new Date().getFullYear();
-  const prevYear = currentYear - 1;
+export default function ClientSparklines({ data, selectedYears, monthRange }: ClientSparklinesProps) {
+  const currentYear = Math.max(...selectedYears);
+  const prevYear = Math.max(...selectedYears.filter((y) => y < currentYear), currentYear - 1);
 
   const topClients = useMemo(() => {
-    // Aggregate total sales for current + previous year per client
     const clientTotals = new Map<number, { name: string; total: number }>();
 
     for (const row of data) {
       let total = 0;
       for (const vm of row.ventas_mensuales) {
-        if (vm.anio === currentYear || vm.anio === prevYear) {
+        if ((vm.anio === currentYear || vm.anio === prevYear) && vm.mes >= monthRange[0] && vm.mes <= monthRange[1]) {
           total += vm.valor;
         }
       }
@@ -48,36 +49,40 @@ export default function ClientSparklines({ data }: ClientSparklinesProps) {
       .sort((a, b) => b[1].total - a[1].total)
       .slice(0, 10)
       .map(([cod, info]) => ({ cod_cliente: cod, cliente: info.name }));
-  }, [data, currentYear, prevYear]);
+  }, [data, currentYear, prevYear, monthRange]);
 
   const sparklineData = useMemo(() => {
     const result = new Map<number, SparkData[]>();
 
+    const months: number[] = [];
+    for (let m = monthRange[0]; m <= monthRange[1]; m++) months.push(m);
+
     for (const client of topClients) {
-      const months: SparkData[] = Array.from({ length: 12 }, (_, i) => ({
+      const sparkMonths: SparkData[] = months.map((m) => ({
         name: client.cliente,
-        mes: MONTH_NAMES[i],
+        mes: MONTH_NAMES[m - 1],
         current: 0,
         prev: 0,
       }));
-      result.set(client.cod_cliente, months);
+      result.set(client.cod_cliente, sparkMonths);
     }
 
     for (const row of data) {
-      const months = result.get(row.cod_cliente);
-      if (!months) continue;
+      const sparkMonths = result.get(row.cod_cliente);
+      if (!sparkMonths) continue;
       for (const vm of row.ventas_mensuales) {
-        if (vm.mes < 1 || vm.mes > 12) continue;
+        if (vm.mes < monthRange[0] || vm.mes > monthRange[1]) continue;
+        const idx = vm.mes - monthRange[0];
         if (vm.anio === currentYear) {
-          months[vm.mes - 1].current += vm.valor;
+          sparkMonths[idx].current += vm.valor;
         } else if (vm.anio === prevYear) {
-          months[vm.mes - 1].prev += vm.valor;
+          sparkMonths[idx].prev += vm.valor;
         }
       }
     }
 
     return result;
-  }, [data, topClients, currentYear, prevYear]);
+  }, [data, topClients, currentYear, prevYear, monthRange]);
 
   const clientTotals = useMemo(() => {
     const totals = new Map<number, { current: number; prev: number }>();

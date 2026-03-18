@@ -263,12 +263,12 @@ export default function Dashboard() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-1 sm:pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">Clientes Activos{rangeLabel}</CardTitle>
-              <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
+              <CardTitle className="text-xs sm:text-sm font-medium">Ticket Medio{rangeLabel}</CardTitle>
+              <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="p-3 sm:p-6 pt-0">
-              <div className="text-lg sm:text-2xl font-bold">{kpis.clientesActivos}</div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">Con ventas en {kpis.latestYear}</p>
+              <div className="text-lg sm:text-2xl font-bold">{fmt(kpis.ticketMedio)}</div>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">por cliente activo</p>
             </CardContent>
           </Card>
           <Card>
