@@ -80,15 +80,19 @@ export default function Dashboard() {
   const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
   const rangeLabel = isPartialRange ? ` (${monthNames[monthStart - 1]}-${monthNames[monthEnd - 1]})` : "";
 
+  // Determine the two most recent years dynamically
+  const latestYear = Math.max(...selectedYears);
+  const prevYear = Math.max(...selectedYears.filter((y) => y < latestYear), latestYear - 1);
+
   const kpis = useMemo(() => {
     if (filteredRows.length === 0) return null;
-    const totalVentas2025 = filteredRows.reduce((s, r) => s + r.ventas_2025, 0);
-    const totalProyeccion = filteredRows.reduce((s, r) => s + (Number(r.proyeccion_2026) || 0), 0);
-    const totalVentas2024 = filteredRows.reduce((s, r) => s + r.ventas_2024, 0);
-    const crecimiento = totalVentas2024 > 0 ? ((totalVentas2025 - totalVentas2024) / totalVentas2024) * 100 : 0;
-    const clientesActivos = filteredRows.filter((r) => r.ventas_2025 > 0).length;
-    return { totalVentas2025, totalProyeccion, crecimiento, clientesActivos };
-  }, [filteredRows]);
+    const yearKey = (y: number) => `ventas_${y}` as keyof typeof filteredRows[0];
+    const totalLatest = filteredRows.reduce((s, r) => s + (Number(r[yearKey(latestYear)]) || 0), 0);
+    const totalPrev = filteredRows.reduce((s, r) => s + (Number(r[yearKey(prevYear)]) || 0), 0);
+    const crecimiento = totalPrev > 0 ? ((totalLatest - totalPrev) / totalPrev) * 100 : 0;
+    const clientesActivos = filteredRows.filter((r) => (Number(r[yearKey(latestYear)]) || 0) > 0).length;
+    return { totalLatest, totalPrev, crecimiento, clientesActivos, latestYear, prevYear };
+  }, [filteredRows, latestYear, prevYear]);
 
   const toggleYear = (year: number) => {
     setSelectedYears((prev) =>
@@ -238,22 +242,22 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-1 sm:pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">Ventas 2025{rangeLabel}</CardTitle>
+              <CardTitle className="text-xs sm:text-sm font-medium">Ventas {kpis.latestYear}{rangeLabel}</CardTitle>
               <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="p-3 sm:p-6 pt-0">
-              <div className="text-lg sm:text-2xl font-bold">{fmt(kpis.totalVentas2025)}</div>
+              <div className="text-lg sm:text-2xl font-bold">{fmt(kpis.totalLatest)}</div>
               <p className="text-[10px] sm:text-xs text-muted-foreground">{filteredRows.length} clientes</p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-1 sm:pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">Proyección 2026</CardTitle>
+              <CardTitle className="text-xs sm:text-sm font-medium">Ventas {kpis.prevYear}{rangeLabel}</CardTitle>
               <Target className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="p-3 sm:p-6 pt-0">
-              <div className="text-lg sm:text-2xl font-bold">{fmt(kpis.totalProyeccion)}</div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">Estimación anual</p>
+              <div className="text-lg sm:text-2xl font-bold">{fmt(kpis.totalPrev)}</div>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">Mismo rango de meses</p>
             </CardContent>
           </Card>
           <Card>
@@ -263,7 +267,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent className="p-3 sm:p-6 pt-0">
               <div className="text-lg sm:text-2xl font-bold">{kpis.clientesActivos}</div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">Con ventas en 2025</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">Con ventas en {kpis.latestYear}</p>
             </CardContent>
           </Card>
           <Card>
@@ -275,7 +279,7 @@ export default function Dashboard() {
               <div className={`text-lg sm:text-2xl font-bold ${kpis.crecimiento >= 0 ? "text-primary" : "text-destructive"}`}>
                 {kpis.crecimiento >= 0 ? "+" : ""}{kpis.crecimiento.toFixed(1)}%
               </div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">2024 vs 2025</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">{kpis.prevYear} vs {kpis.latestYear}</p>
             </CardContent>
           </Card>
         </div>
