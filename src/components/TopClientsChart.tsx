@@ -23,8 +23,8 @@ const fmt = (v: number) =>
 export default function TopClientsChart({ data }: TopClientsChartProps) {
   const isMobile = useIsMobile();
   const [selectedYear, setSelectedYear] = useState<number>(2026);
-  const maxLen = isMobile ? 10 : 25;
-  const truncLen = isMobile ? 8 : 22;
+  const maxLen = isMobile ? 12 : 35;
+  const truncLen = isMobile ? 10 : 32;
 
   const yearKey = `ventas_${selectedYear}` as keyof ClienteConVentas;
 
