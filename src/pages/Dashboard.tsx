@@ -242,22 +242,22 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-1 sm:pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">Ventas 2025{rangeLabel}</CardTitle>
+              <CardTitle className="text-xs sm:text-sm font-medium">Ventas {kpis.latestYear}{rangeLabel}</CardTitle>
               <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="p-3 sm:p-6 pt-0">
-              <div className="text-lg sm:text-2xl font-bold">{fmt(kpis.totalVentas2025)}</div>
+              <div className="text-lg sm:text-2xl font-bold">{fmt(kpis.totalLatest)}</div>
               <p className="text-[10px] sm:text-xs text-muted-foreground">{filteredRows.length} clientes</p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-1 sm:pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium">Proyección 2026</CardTitle>
+              <CardTitle className="text-xs sm:text-sm font-medium">Ventas {kpis.prevYear}{rangeLabel}</CardTitle>
               <Target className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="p-3 sm:p-6 pt-0">
-              <div className="text-lg sm:text-2xl font-bold">{fmt(kpis.totalProyeccion)}</div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">Estimación anual</p>
+              <div className="text-lg sm:text-2xl font-bold">{fmt(kpis.totalPrev)}</div>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">Mismo rango de meses</p>
             </CardContent>
           </Card>
           <Card>
@@ -267,7 +267,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent className="p-3 sm:p-6 pt-0">
               <div className="text-lg sm:text-2xl font-bold">{kpis.clientesActivos}</div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">Con ventas en 2025</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">Con ventas en {kpis.latestYear}</p>
             </CardContent>
           </Card>
           <Card>
@@ -279,7 +279,7 @@ export default function Dashboard() {
               <div className={`text-lg sm:text-2xl font-bold ${kpis.crecimiento >= 0 ? "text-primary" : "text-destructive"}`}>
                 {kpis.crecimiento >= 0 ? "+" : ""}{kpis.crecimiento.toFixed(1)}%
               </div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">2024 vs 2025</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">{kpis.prevYear} vs {kpis.latestYear}</p>
             </CardContent>
           </Card>
         </div>
