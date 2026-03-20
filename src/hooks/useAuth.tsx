@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserData = async (userId: string) => {
     try {
-      console.log("[Auth] Fetching user data for:", userId);
+      if (import.meta.env.DEV) console.log("[Auth] Fetching user data for:", userId);
       
       const [profileRes, roleRes] = await Promise.all([
         supabase
@@ -53,8 +53,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .maybeSingle(),
       ]);
 
-      console.log("[Auth] Profile result:", JSON.stringify(profileRes));
-      console.log("[Auth] Role result:", JSON.stringify(roleRes));
+      if (import.meta.env.DEV) console.log("[Auth] Profile result:", JSON.stringify(profileRes));
+      if (import.meta.env.DEV) console.log("[Auth] Role result:", JSON.stringify(roleRes));
 
       if (profileRes.error) {
         console.error("[Auth] Error fetching profile:", profileRes.error);
@@ -86,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Get initial session first
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!mounted) return;
-      console.log("[Auth] Initial session:", session?.user?.id ?? "none");
+      if (import.meta.env.DEV) console.log("[Auth] Initial session:", session?.user?.id ?? "none");
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
@@ -101,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         if (!mounted) return;
-        console.log("[Auth] Auth state change:", _event, session?.user?.id ?? "none");
+        if (import.meta.env.DEV) console.log("[Auth] Auth state change:", _event, session?.user?.id ?? "none");
         setSession(session);
         setUser(session?.user ?? null);
 

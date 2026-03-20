@@ -245,6 +245,8 @@ export type Database = {
           vendedor: string
         }[]
       }
+      get_user_delegacion: { Args: { _user_id: string }; Returns: string }
+      get_user_employee_code: { Args: { _user_id: string }; Returns: string }
       get_user_zone_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
