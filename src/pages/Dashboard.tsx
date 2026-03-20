@@ -166,20 +166,18 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {/* Cliente filter */}
-              {clienteData.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium mb-2">Clientes</p>
-                  <ClienteFilter
-                    clientes={clienteData}
-                    selected={selectedClientes}
-                    onChange={setSelectedClientes}
-                  />
-                </div>
-              )}
-
-              {/* Period filters */}
+              {/* Period filters + Clientes in one row */}
               <div className="flex flex-col sm:flex-row sm:items-end gap-4">
+                {clienteData.length > 0 && (
+                  <div className="flex-1 min-w-[200px]">
+                    <p className="text-sm font-medium mb-2">Clientes</p>
+                    <ClienteFilter
+                      clientes={clienteData}
+                      selected={selectedClientes}
+                      onChange={setSelectedClientes}
+                    />
+                  </div>
+                )}
                 <div>
                   <p className="text-sm font-medium mb-2">Años</p>
                   <div className="flex gap-2">
