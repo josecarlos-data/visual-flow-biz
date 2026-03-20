@@ -50,7 +50,11 @@ export default function Dashboard() {
   const showFilter = role === "admin" || role === "director_comercial";
   const rows = allData ?? [];
 
-  // List of unique client names for the filter
+  // Determine the two most recent years dynamically
+  const latestYear = Math.max(...selectedYears);
+  const prevYear = Math.max(...selectedYears.filter((y) => y < latestYear), latestYear - 1);
+
+  // List of unique client names for the filter with prev year sales
   const clienteData = useMemo(() => {
     const yearKey = `ventas_${prevYear}` as keyof typeof rows[0];
     const map = new Map<string, number>();
@@ -88,10 +92,6 @@ export default function Dashboard() {
   const isPartialRange = monthStart !== 1 || monthEnd !== 12;
   const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
   const rangeLabel = isPartialRange ? ` (${monthNames[monthStart - 1]}-${monthNames[monthEnd - 1]})` : "";
-
-  // Determine the two most recent years dynamically
-  const latestYear = Math.max(...selectedYears);
-  const prevYear = Math.max(...selectedYears.filter((y) => y < latestYear), latestYear - 1);
 
   const kpis = useMemo(() => {
     if (filteredRows.length === 0) return null;
