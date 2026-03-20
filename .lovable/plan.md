@@ -1,99 +1,54 @@
 
-## Plan: Correccion de datos, filtrado por rol y mejoras visuales del Dashboard
 
-### Problemas identificados
+## Plan: 4 mejoras en Dashboard
 
-1. **Datos incompletos**: La tabla `clientes` tiene 3.227 registros y `ventas_mensuales` tiene 29.708. Las consultas sin limite solo devuelven 1.000 filas (limite por defecto), por lo que faltan datos en el dashboard y los filtros salen incompletos.
+### 1. Formato de miles — separador desde unidades de millar
 
-2. **Comercial ve todos los clientes**: El usuario `josecarlosrimosa@gmail.com` (rol `comercial`, vendedor `J. Antonio Bautista`) ve todos los clientes en lugar de solo los suyos. El hook `useHistoricoData` no filtra automaticamente segun el vendedor asignado al perfil del usuario.
+**Problema**: `Intl.NumberFormat("es-ES")` ya debería formatear `7859` como `7.859`, pero con `maximumFractionDigits: 0` puede omitir separadores en algunos casos. Revisaré todas las funciones `fmt` del proyecto.
 
-3. **Leyenda superpuesta en graficos**: En `SalesChart`, la leyenda de Recharts se superpone con las etiquetas del eje X rotadas.
+**Solución**: Verificar y corregir las funciones `fmt` en `Dashboard.tsx`, `SalesChart.tsx`, `MonthlyComparisonChart.tsx`, `ClientSparklines.tsx`, `TopClientsChart.tsx` y `SalesTable.tsx`. El formato `es-ES` con `useGrouping: true` (por defecto) debería funcionar. Si no, forzar `useGrouping: true` explícitamente.
 
-4. **Filtros limitados para admin**: `useVendedores` y `useDelegaciones` traen todos los registros de `clientes` (max 1000) y deduplicaban en el cliente. Al haber 3.227 registros, los resultados salen truncados.
+**Archivos**: Todos los que tengan funciones `fmt`.
 
-5. **Nuevas funcionalidades solicitadas**: histograma comparativo mensual con lineas por anio, y filtros de anios/meses.
+### 2. Sparklines tooltip — meses 1-12 en vez de 0-11
 
----
+**Problema**: El tooltip muestra el índice del array (0-11) en lugar del nombre del mes. El `labelFormatter` usa `label` directamente, que es el campo `mes` del data (un string de MONTH_NAMES, pero el tooltip muestra el índice).
 
-### Cambios planificados
+**Solución**: En `ClientSparklines.tsx`, el `Tooltip` usa `labelFormatter={(label) => label}` pero el `LineChart` no tiene `XAxis` visible, así que Recharts usa el índice. Cambiar para que use el campo `mes` de los datos como label: añadir `labelFormatter={(_, payload) => payload?.[0]?.payload?.mes || ""}`.
 
-#### 1. Corregir limite de 1000 filas en todas las consultas
+**Archivo**: `src/components/ClientSparklines.tsx`
 
-**Archivo: `src/hooks/useHistoricoData.ts`**
+### 3. Combinar gráficos Vendedor/Delegación con toggle
 
-- Modificar la consulta de `clientes` para paginar en bloques (igual que ya se hace con `ventas_mensuales`), asegurando que se traen los 3.227 registros completos.
-- Para `useVendedores` y `useDelegaciones`: crear una funcion RPC en la base de datos que devuelva valores distintos directamente, evitando traer miles de filas duplicadas.
+**Problema**: Actualmente son dos gráficos side-by-side que ocupan mucho espacio.
 
-**Migracion SQL**: Crear dos funciones de base de datos:
-```sql
-CREATE OR REPLACE FUNCTION get_distinct_vendedores()
-RETURNS TABLE(vendedor text) AS $$
-  SELECT DISTINCT vendedor FROM clientes 
-  WHERE vendedor IS NOT NULL ORDER BY vendedor;
-$$ LANGUAGE sql STABLE SECURITY DEFINER;
+**Solución**: Reemplazar los dos `SalesChart` en `Dashboard.tsx` por un único card con un toggle (botones "Vendedor" / "Delegación") similar al patrón de `MonthlyComparisonChart`. Refactorizar `SalesChart.tsx` para aceptar un modo interno conmutable, o bien manejar el estado desde Dashboard y renderizar un solo `SalesChart` cambiando `groupBy`.
 
-CREATE OR REPLACE FUNCTION get_distinct_delegaciones()
-RETURNS TABLE(delegacion text) AS $$
-  SELECT DISTINCT delegacion FROM clientes 
-  WHERE delegacion IS NOT NULL ORDER BY delegacion;
-$$ LANGUAGE sql STABLE SECURITY DEFINER;
-```
+**Implementación**: En `Dashboard.tsx`, añadir estado `salesGroupBy: "vendedor" | "delegacion"` y renderizar un solo `Card` con dos botones en el header + un `SalesChart` cuyo `groupBy` cambia dinámicamente.
 
-Actualizar `useVendedores` y `useDelegaciones` para llamar a estas funciones RPC.
+**Archivos**: `src/pages/Dashboard.tsx`
 
-#### 2. Filtrado automatico por rol del usuario
+### 4. Filtro de clientes — ordenación por importe + mostrar ventas
 
-**Archivo: `src/hooks/useHistoricoData.ts`**
+**Problema**: El dropdown de clientes solo muestra nombres en orden alfabético.
 
-- Aceptar parametros adicionales: `userVendedor` (el `employee_code` del perfil) y `userDelegacion`.
-- Si el rol es `comercial`, filtrar automaticamente por `vendedor = employee_code`.
-- Si el rol es `jefe_de_zona`, filtrar por `delegacion = profiles.delegacion`.
+**Solución**: 
+- Cambiar `ClienteFilter` para recibir datos con importes: `clientes: { name: string; ventas: number }[]` en lugar de `string[]`.
+- Añadir un mini-toggle (icono o botón) dentro del `Popover` para alternar entre orden alfabético (A-Z) y por importe (↓€).
+- Mostrar el importe del año anterior en texto pequeño a la derecha de cada nombre.
+- En `Dashboard.tsx`, construir el array de clientes con las ventas del `prevYear` desde `rows`.
 
-**Archivo: `src/pages/Dashboard.tsx`**
-
-- Pasar el `employee_code` y `delegacion` del perfil del usuario al hook.
-- Ampliar `useAuth` para exponer `employeeCode` y `delegacion` del perfil (o hacer una consulta adicional en el Dashboard).
-
-**Archivo: `src/hooks/useAuth.tsx`**
-
-- Incluir `employee_code` y `delegacion` en `fetchUserData` para que esten disponibles en el contexto de autenticacion.
-
-#### 3. Corregir superposicion de leyenda en graficos
-
-**Archivo: `src/components/SalesChart.tsx`**
-
-- Aumentar el margen inferior del grafico (de 60 a 90).
-- Mover la leyenda a la parte superior del grafico con `<Legend verticalAlign="top" />`.
-
-#### 4. Nuevo histograma comparativo mensual (lineas por anio)
-
-**Nuevo archivo: `src/components/MonthlyComparisonChart.tsx`**
-
-- Grafico de lineas con eje X = meses (Ene-Dic) y una linea por cada anio (2024, 2025, 2026).
-- Agregar los datos mensuales de `ventas_mensuales` sumando todos los clientes filtrados por mes.
-- Usar `LineChart` de Recharts con colores diferenciados por anio.
-
-**Archivo: `src/pages/Dashboard.tsx`**
-
-- Integrar el nuevo componente debajo de los graficos existentes.
-
-#### 5. Filtros de anios y meses
-
-**Archivo: `src/pages/Dashboard.tsx`**
-
-- Anadir filtro de anios (2024, 2025, 2026) como checkboxes para seleccionar que anios mostrar en los graficos.
-- Anadir filtro de rango de meses (mes inicio - mes fin) para limitar el periodo visible.
-- Estos filtros afectaran al histograma mensual y opcionalmente a los graficos de barras existentes.
-
----
+**Archivos**: `src/components/ClienteFilter.tsx`, `src/pages/Dashboard.tsx`
 
 ### Resumen de archivos
 
-| Archivo | Accion |
+| Archivo | Cambios |
 |---|---|
-| Migracion SQL | Funciones RPC para vendedores/delegaciones distintos |
-| `src/hooks/useAuth.tsx` | Exponer `employeeCode` y `delegacion` del perfil |
-| `src/hooks/useHistoricoData.ts` | Paginar clientes, filtrar por rol, usar RPCs |
-| `src/pages/Dashboard.tsx` | Pasar filtros de rol, anadir filtros anio/mes, integrar histograma |
-| `src/components/SalesChart.tsx` | Mover leyenda arriba, aumentar margen |
-| `src/components/MonthlyComparisonChart.tsx` | Nuevo grafico de lineas mensual comparativo |
+| `src/components/ClientSparklines.tsx` | Fix tooltip label (mes 1-12), verificar fmt |
+| `src/components/ClienteFilter.tsx` | Nueva prop con importes, toggle orden A-Z / €, mostrar importe |
+| `src/pages/Dashboard.tsx` | Combinar vendedor/delegación en toggle, pasar datos con importes al filtro |
+| `src/components/SalesChart.tsx` | Verificar fmt |
+| `src/components/MonthlyComparisonChart.tsx` | Verificar fmt |
+| `src/components/TopClientsChart.tsx` | Verificar fmt |
+| `src/components/SalesTable.tsx` | Verificar fmt |
+
