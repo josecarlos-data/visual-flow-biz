@@ -53,8 +53,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .maybeSingle(),
       ]);
 
-      console.log("[Auth] Profile result:", JSON.stringify(profileRes));
-      console.log("[Auth] Role result:", JSON.stringify(roleRes));
+      if (import.meta.env.DEV) console.log("[Auth] Profile result:", JSON.stringify(profileRes));
+      if (import.meta.env.DEV) console.log("[Auth] Role result:", JSON.stringify(roleRes));
 
       if (profileRes.error) {
         console.error("[Auth] Error fetching profile:", profileRes.error);
