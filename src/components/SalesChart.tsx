@@ -26,7 +26,7 @@ function aggregate(data: ClienteConVentas[], key: "vendedor" | "delegacion") {
 }
 
 const fmt = (v: number) =>
-  new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
+  new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0, useGrouping: true }).format(v);
 
 export default function SalesChart({ data, groupBy, title }: SalesChartProps) {
   const chartData = aggregate(data, groupBy);

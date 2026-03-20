@@ -140,7 +140,7 @@ export default function ClientSparklines({ data, selectedYears, monthRange }: Cl
                         fmt(value),
                         name === "current" ? String(currentYear) : String(prevYear),
                       ]}
-                      labelFormatter={(label) => label}
+                      labelFormatter={(_label, payload) => payload?.[0]?.payload?.mes || ""}
                     />
                     <Line
                       type="monotone"

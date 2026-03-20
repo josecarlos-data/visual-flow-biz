@@ -18,7 +18,7 @@ const YEAR_COLORS: Record<number, string> = {
 const AVAILABLE_YEARS = [2024, 2025, 2026];
 
 const fmt = (v: number) =>
-  new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
+  new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0, useGrouping: true }).format(v);
 
 export default function TopClientsChart({ data }: TopClientsChartProps) {
   const isMobile = useIsMobile();
