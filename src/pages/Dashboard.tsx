@@ -31,6 +31,7 @@ export default function Dashboard() {
   const [monthStart, setMonthStart] = useState(1);
   const [monthEnd, setMonthEnd] = useState(12);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [salesGroupBy, setSalesGroupBy] = useState<"vendedor" | "delegacion">("vendedor");
   const isMobile = useIsMobile();
 
   const userVendedor = role === "comercial" ? employeeCode : null;
