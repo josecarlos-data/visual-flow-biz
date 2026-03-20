@@ -167,11 +167,11 @@ export default function Dashboard() {
               )}
 
               {/* Cliente filter */}
-              {clienteNames.length > 0 && (
+              {clienteData.length > 0 && (
                 <div>
                   <p className="text-sm font-medium mb-2">Clientes</p>
                   <ClienteFilter
-                    clientes={clienteNames}
+                    clientes={clienteData}
                     selected={selectedClientes}
                     onChange={setSelectedClientes}
                   />
