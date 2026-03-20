@@ -305,10 +305,34 @@ export default function Dashboard() {
 
           {/* Hide vendedor/delegacion charts for comercial role */}
           {role !== "comercial" && (
-            <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
-              <SalesChart data={filteredRows} groupBy="vendedor" title="Ventas por Vendedor" />
-              <SalesChart data={filteredRows} groupBy="delegacion" title="Ventas por Delegación" />
-            </div>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-base">
+                  Ventas por {salesGroupBy === "vendedor" ? "Vendedor" : "Delegación"}
+                </CardTitle>
+                <div className="flex gap-1">
+                  <Button
+                    variant={salesGroupBy === "vendedor" ? "default" : "outline"}
+                    size="sm"
+                    className="h-7 text-xs px-2.5"
+                    onClick={() => setSalesGroupBy("vendedor")}
+                  >
+                    Vendedor
+                  </Button>
+                  <Button
+                    variant={salesGroupBy === "delegacion" ? "default" : "outline"}
+                    size="sm"
+                    className="h-7 text-xs px-2.5"
+                    onClick={() => setSalesGroupBy("delegacion")}
+                  >
+                    Delegación
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <SalesChart data={filteredRows} groupBy={salesGroupBy} title="" />
+              </CardContent>
+            </Card>
           )}
 
           <TopClientsChart data={filteredRows} />
