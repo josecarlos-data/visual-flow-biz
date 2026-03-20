@@ -15,7 +15,7 @@ type SortKey = "cliente" | "vendedor" | "ventas_2024" | "ventas_2025" | "ventas_
 
 const fmt = (v: number | null) =>
   v != null
-    ? new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v) + " €"
+    ? new Intl.NumberFormat("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: true }).format(v) + " €"
     : "—";
 
 const pct = (v: number | null) =>

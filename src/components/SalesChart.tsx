@@ -26,40 +26,44 @@ function aggregate(data: ClienteConVentas[], key: "vendedor" | "delegacion") {
 }
 
 const fmt = (v: number) =>
-  new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
+  new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0, useGrouping: true }).format(v);
 
 export default function SalesChart({ data, groupBy, title }: SalesChartProps) {
   const chartData = aggregate(data, groupBy);
   const isMobile = useIsMobile();
+
+  const chart = (
+    <div className="h-[280px] sm:h-[350px]">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={chartData} margin={{ top: 5, right: 10, left: isMobile ? 0 : 10, bottom: isMobile ? 50 : 90 }}>
+          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+          <XAxis
+            dataKey="name"
+            angle={isMobile ? -45 : -35}
+            textAnchor="end"
+            interval={isMobile ? "preserveStartEnd" : 0}
+            tick={{ fontSize: isMobile ? 10 : 11 }}
+            className="fill-muted-foreground"
+          />
+          <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} className="fill-muted-foreground" width={isMobile ? 40 : 60} />
+          <Tooltip formatter={(v: number) => fmt(v)} />
+          <Legend verticalAlign="top" height={36} />
+          <Bar dataKey="ventas_2024" name="2024" fill="hsl(210, 15%, 55%)" radius={[2, 2, 0, 0]} />
+          <Bar dataKey="ventas_2025" name="2025" fill="hsl(174, 100%, 29%)" radius={[2, 2, 0, 0]} />
+          <Bar dataKey="ventas_2026" name="2026" fill="hsl(174, 80%, 45%)" radius={[2, 2, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+
+  if (!title) return chart;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">{title}</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="h-[280px] sm:h-[350px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 5, right: 10, left: isMobile ? 0 : 10, bottom: isMobile ? 50 : 90 }}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-              <XAxis
-                dataKey="name"
-                angle={isMobile ? -45 : -35}
-                textAnchor="end"
-                interval={isMobile ? "preserveStartEnd" : 0}
-                tick={{ fontSize: isMobile ? 10 : 11 }}
-                className="fill-muted-foreground"
-              />
-              <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} className="fill-muted-foreground" width={isMobile ? 40 : 60} />
-              <Tooltip formatter={(v: number) => fmt(v)} />
-              <Legend verticalAlign="top" height={36} />
-              <Bar dataKey="ventas_2024" name="2024" fill="hsl(210, 15%, 55%)" radius={[2, 2, 0, 0]} />
-              <Bar dataKey="ventas_2025" name="2025" fill="hsl(174, 100%, 29%)" radius={[2, 2, 0, 0]} />
-              <Bar dataKey="ventas_2026" name="2026" fill="hsl(174, 80%, 45%)" radius={[2, 2, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </CardContent>
+      <CardContent>{chart}</CardContent>
     </Card>
   );
 }

@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { TrendingUp, Users, Target, DollarSign, BarChart3, Filter, ChevronDown } from "lucide-react";
 import { useHistoricoData, useVendedores, useDelegaciones } from "@/hooks/useHistoricoData";
 import DelegacionFilter from "@/components/DelegacionFilter";
@@ -18,7 +19,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const fmt = (v: number) =>
-  new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
+  new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0, useGrouping: true }).format(v);
 
 const AVAILABLE_YEARS = [2024, 2025, 2026];
 
@@ -31,6 +32,7 @@ export default function Dashboard() {
   const [monthStart, setMonthStart] = useState(1);
   const [monthEnd, setMonthEnd] = useState(12);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [salesGroupBy, setSalesGroupBy] = useState<"vendedor" | "delegacion">("vendedor");
   const isMobile = useIsMobile();
 
   const userVendedor = role === "comercial" ? employeeCode : null;
@@ -48,10 +50,21 @@ export default function Dashboard() {
   const showFilter = role === "admin" || role === "director_comercial";
   const rows = allData ?? [];
 
-  // List of unique client names for the filter
-  const clienteNames = useMemo(() => {
-    return [...new Set(rows.map((r) => r.cliente))].sort();
-  }, [rows]);
+  // Determine the two most recent years dynamically
+  const latestYear = Math.max(...selectedYears);
+  const prevYear = Math.max(...selectedYears.filter((y) => y < latestYear), latestYear - 1);
+
+  // List of unique client names for the filter with prev year sales
+  const clienteData = useMemo(() => {
+    const yearKey = `ventas_${prevYear}` as keyof typeof rows[0];
+    const map = new Map<string, number>();
+    for (const r of rows) {
+      map.set(r.cliente, (map.get(r.cliente) || 0) + (Number(r[yearKey]) || 0));
+    }
+    return Array.from(map.entries())
+      .map(([name, ventas]) => ({ name, ventas }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [rows, prevYear]);
 
   // Apply month range + client filter globally
   const filteredRows = useMemo(() => {
@@ -79,10 +92,6 @@ export default function Dashboard() {
   const isPartialRange = monthStart !== 1 || monthEnd !== 12;
   const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
   const rangeLabel = isPartialRange ? ` (${monthNames[monthStart - 1]}-${monthNames[monthEnd - 1]})` : "";
-
-  // Determine the two most recent years dynamically
-  const latestYear = Math.max(...selectedYears);
-  const prevYear = Math.max(...selectedYears.filter((y) => y < latestYear), latestYear - 1);
 
   const kpis = useMemo(() => {
     if (filteredRows.length === 0) return null;
@@ -158,11 +167,11 @@ export default function Dashboard() {
               )}
 
               {/* Cliente filter */}
-              {clienteNames.length > 0 && (
+              {clienteData.length > 0 && (
                 <div>
                   <p className="text-sm font-medium mb-2">Clientes</p>
                   <ClienteFilter
-                    clientes={clienteNames}
+                    clientes={clienteData}
                     selected={selectedClientes}
                     onChange={setSelectedClientes}
                   />
@@ -304,10 +313,34 @@ export default function Dashboard() {
 
           {/* Hide vendedor/delegacion charts for comercial role */}
           {role !== "comercial" && (
-            <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
-              <SalesChart data={filteredRows} groupBy="vendedor" title="Ventas por Vendedor" />
-              <SalesChart data={filteredRows} groupBy="delegacion" title="Ventas por Delegación" />
-            </div>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-base">
+                  Ventas por {salesGroupBy === "vendedor" ? "Vendedor" : "Delegación"}
+                </CardTitle>
+                <div className="flex gap-1">
+                  <Button
+                    variant={salesGroupBy === "vendedor" ? "default" : "outline"}
+                    size="sm"
+                    className="h-7 text-xs px-2.5"
+                    onClick={() => setSalesGroupBy("vendedor")}
+                  >
+                    Vendedor
+                  </Button>
+                  <Button
+                    variant={salesGroupBy === "delegacion" ? "default" : "outline"}
+                    size="sm"
+                    className="h-7 text-xs px-2.5"
+                    onClick={() => setSalesGroupBy("delegacion")}
+                  >
+                    Delegación
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <SalesChart data={filteredRows} groupBy={salesGroupBy} title="" />
+              </CardContent>
+            </Card>
           )}
 
           <TopClientsChart data={filteredRows} />
