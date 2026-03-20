@@ -8,7 +8,7 @@ const COLOR_CURRENT = "hsl(174, 100%, 29%)";
 const COLOR_PREV = "hsl(210, 15%, 55%)";
 
 const fmt = (v: number) =>
-  new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
+  new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0, useGrouping: true }).format(v);
 
 interface ClientSparklinesProps {
   data: ClienteConVentas[];
