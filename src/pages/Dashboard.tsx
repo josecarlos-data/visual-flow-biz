@@ -51,9 +51,16 @@ export default function Dashboard() {
   const rows = allData ?? [];
 
   // List of unique client names for the filter
-  const clienteNames = useMemo(() => {
-    return [...new Set(rows.map((r) => r.cliente))].sort();
-  }, [rows]);
+  const clienteData = useMemo(() => {
+    const yearKey = `ventas_${prevYear}` as keyof typeof rows[0];
+    const map = new Map<string, number>();
+    for (const r of rows) {
+      map.set(r.cliente, (map.get(r.cliente) || 0) + (Number(r[yearKey]) || 0));
+    }
+    return Array.from(map.entries())
+      .map(([name, ventas]) => ({ name, ventas }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [rows, prevYear]);
 
   // Apply month range + client filter globally
   const filteredRows = useMemo(() => {
