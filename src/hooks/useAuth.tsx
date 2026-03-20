@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserData = async (userId: string) => {
     try {
-      console.log("[Auth] Fetching user data for:", userId);
+      if (import.meta.env.DEV) console.log("[Auth] Fetching user data for:", userId);
       
       const [profileRes, roleRes] = await Promise.all([
         supabase
