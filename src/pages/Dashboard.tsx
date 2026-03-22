@@ -100,8 +100,10 @@ export default function Dashboard() {
     const totalPrev = filteredRows.reduce((s, r) => s + (Number(r[yearKey(prevYear)]) || 0), 0);
     const crecimiento = totalPrev > 0 ? ((totalLatest - totalPrev) / totalPrev) * 100 : 0;
     const clientesActivos = filteredRows.filter((r) => (Number(r[yearKey(latestYear)]) || 0) > 0).length;
+    const clientesActivosPrev = filteredRows.filter((r) => (Number(r[yearKey(prevYear)]) || 0) > 0).length;
     const ticketMedio = clientesActivos > 0 ? totalLatest / clientesActivos : 0;
-    return { totalLatest, totalPrev, crecimiento, clientesActivos, ticketMedio, latestYear, prevYear };
+    const ticketMedioPrev = clientesActivosPrev > 0 ? totalPrev / clientesActivosPrev : 0;
+    return { totalLatest, totalPrev, crecimiento, clientesActivos, clientesActivosPrev, ticketMedio, ticketMedioPrev, latestYear, prevYear };
   }, [filteredRows, latestYear, prevYear]);
 
   const toggleYear = (year: number) => {
