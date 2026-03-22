@@ -16,9 +16,9 @@ interface MonthlyComparisonChartProps {
 const MONTH_NAMES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
 const YEAR_COLORS: Record<number, string> = {
-  2024: "hsl(210, 15%, 55%)",
+  2024: "hsl(210, 20%, 60%)",
   2025: "hsl(174, 100%, 29%)",
-  2026: "hsl(174, 80%, 45%)",
+  2026: "hsl(45, 90%, 50%)",
 };
 
 const fmt = (v: number) =>

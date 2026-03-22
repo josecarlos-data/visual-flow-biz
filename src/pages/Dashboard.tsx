@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, Users, Target, DollarSign, BarChart3, Filter, ChevronDown } from "lucide-react";
+import { TrendingUp, Users, Target, DollarSign, BarChart3, Filter, ChevronDown, RotateCcw } from "lucide-react";
 import { useHistoricoData, useVendedores, useDelegaciones } from "@/hooks/useHistoricoData";
 import DelegacionFilter from "@/components/DelegacionFilter";
 import VendedorFilter from "@/components/VendedorFilter";
@@ -100,8 +100,10 @@ export default function Dashboard() {
     const totalPrev = filteredRows.reduce((s, r) => s + (Number(r[yearKey(prevYear)]) || 0), 0);
     const crecimiento = totalPrev > 0 ? ((totalLatest - totalPrev) / totalPrev) * 100 : 0;
     const clientesActivos = filteredRows.filter((r) => (Number(r[yearKey(latestYear)]) || 0) > 0).length;
+    const clientesActivosPrev = filteredRows.filter((r) => (Number(r[yearKey(prevYear)]) || 0) > 0).length;
     const ticketMedio = clientesActivos > 0 ? totalLatest / clientesActivos : 0;
-    return { totalLatest, totalPrev, crecimiento, clientesActivos, ticketMedio, latestYear, prevYear };
+    const ticketMedioPrev = clientesActivosPrev > 0 ? totalPrev / clientesActivosPrev : 0;
+    return { totalLatest, totalPrev, crecimiento, clientesActivos, clientesActivosPrev, ticketMedio, ticketMedioPrev, latestYear, prevYear };
   }, [filteredRows, latestYear, prevYear]);
 
   const toggleYear = (year: number) => {
@@ -111,6 +113,17 @@ export default function Dashboard() {
   };
 
   const activeFilterCount = selectedVendedores.length + selectedDelegaciones.length + selectedClientes.length;
+
+  const hasAnyFilter = activeFilterCount > 0 || monthStart !== 1 || monthEnd !== 12 || selectedYears.length !== AVAILABLE_YEARS.length;
+
+  const handleResetFilters = () => {
+    setSelectedVendedores([]);
+    setSelectedDelegaciones([]);
+    setSelectedClientes([]);
+    setSelectedYears([2024, 2025, 2026]);
+    setMonthStart(1);
+    setMonthEnd(12);
+  };
 
   return (
     <div className="space-y-4 sm:space-y-6 overflow-x-hidden">
@@ -135,6 +148,17 @@ export default function Dashboard() {
                 Filtros
                 {activeFilterCount > 0 && (
                   <Badge variant="secondary">{activeFilterCount} activos</Badge>
+                )}
+                {hasAnyFilter && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs px-2 gap-1 text-muted-foreground hover:text-foreground"
+                    onClick={(e) => { e.stopPropagation(); handleResetFilters(); }}
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Limpiar
+                  </Button>
                 )}
                 <ChevronDown className={`h-4 w-4 ml-auto transition-transform ${filtersOpen ? "rotate-180" : ""}`} />
               </CardTitle>
@@ -265,7 +289,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent className="p-3 sm:p-6 pt-0">
               <div className="text-lg sm:text-2xl font-bold">{fmt(kpis.totalPrev)}</div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">Mismo rango de meses</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">{kpis.clientesActivosPrev} clientes activos</p>
             </CardContent>
           </Card>
           <Card>
@@ -275,7 +299,12 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent className="p-3 sm:p-6 pt-0">
               <div className="text-lg sm:text-2xl font-bold">{fmt(kpis.ticketMedio)}</div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">por cliente activo</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">por cliente · {kpis.latestYear}</p>
+              {kpis.ticketMedioPrev > 0 && (
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
+                  {fmt(kpis.ticketMedioPrev)} · {kpis.prevYear}
+                </p>
+              )}
             </CardContent>
           </Card>
           <Card>
