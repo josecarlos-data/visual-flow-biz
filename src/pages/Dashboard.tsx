@@ -114,6 +114,17 @@ export default function Dashboard() {
 
   const activeFilterCount = selectedVendedores.length + selectedDelegaciones.length + selectedClientes.length;
 
+  const hasAnyFilter = activeFilterCount > 0 || monthStart !== 1 || monthEnd !== 12 || selectedYears.length !== AVAILABLE_YEARS.length;
+
+  const handleResetFilters = () => {
+    setSelectedVendedores([]);
+    setSelectedDelegaciones([]);
+    setSelectedClientes([]);
+    setSelectedYears([2024, 2025, 2026]);
+    setMonthStart(1);
+    setMonthEnd(12);
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6 overflow-x-hidden">
       <div>
