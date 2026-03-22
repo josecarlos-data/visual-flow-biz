@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { Users, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ClientSparklines from "./ClientSparklines";
+import { getYearColor } from "@/lib/yearColors";
 
 interface MonthlyComparisonChartProps {
   data: ClienteConVentas[];
@@ -15,18 +16,13 @@ interface MonthlyComparisonChartProps {
 
 const MONTH_NAMES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
-const YEAR_COLORS: Record<number, string> = {
-  2024: "hsl(210, 20%, 60%)",
-  2025: "hsl(174, 100%, 29%)",
-  2026: "hsl(45, 90%, 50%)",
-};
-
 const fmt = (v: number) =>
   new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0, useGrouping: true }).format(v);
 
 export default function MonthlyComparisonChart({ data, selectedYears, monthRange }: MonthlyComparisonChartProps) {
   const isMobile = useIsMobile();
   const [showClientView, setShowClientView] = useState(false);
+  const latestYear = Math.max(...selectedYears);
 
   const chartData = useMemo(() => {
     const monthlyTotals = new Map<string, Record<string, number>>();
@@ -89,8 +85,8 @@ export default function MonthlyComparisonChart({ data, selectedYears, monthRange
                     type="monotone"
                     dataKey={`ventas_${year}`}
                     name={String(year)}
-                    stroke={YEAR_COLORS[year] || "hsl(0, 0%, 50%)"}
-                    strokeWidth={2}
+                    stroke={getYearColor(year, latestYear)}
+                    strokeWidth={year === latestYear ? 2.5 : 2}
                     dot={{ r: isMobile ? 2 : 3 }}
                     activeDot={{ r: isMobile ? 4 : 5 }}
                   />

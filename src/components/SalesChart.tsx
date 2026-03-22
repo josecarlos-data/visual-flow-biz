@@ -2,6 +2,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { ClienteConVentas } from "@/hooks/useHistoricoData";
+import { getYearColor } from "@/lib/yearColors";
 
 interface SalesChartProps {
   data: ClienteConVentas[];
@@ -28,6 +29,8 @@ function aggregate(data: ClienteConVentas[], key: "vendedor" | "delegacion") {
 const fmt = (v: number) =>
   new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0, useGrouping: true }).format(v);
 
+const LATEST_YEAR = 2026;
+
 export default function SalesChart({ data, groupBy, title }: SalesChartProps) {
   const chartData = aggregate(data, groupBy);
   const isMobile = useIsMobile();
@@ -48,9 +51,9 @@ export default function SalesChart({ data, groupBy, title }: SalesChartProps) {
           <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} className="fill-muted-foreground" width={isMobile ? 40 : 60} />
           <Tooltip formatter={(v: number) => fmt(v)} />
           <Legend verticalAlign="top" height={36} />
-          <Bar dataKey="ventas_2024" name="2024" fill="hsl(210, 15%, 55%)" radius={[2, 2, 0, 0]} />
-          <Bar dataKey="ventas_2025" name="2025" fill="hsl(174, 100%, 29%)" radius={[2, 2, 0, 0]} />
-          <Bar dataKey="ventas_2026" name="2026" fill="hsl(174, 80%, 45%)" radius={[2, 2, 0, 0]} />
+          <Bar dataKey="ventas_2024" name="2024" fill={getYearColor(2024, LATEST_YEAR)} radius={[2, 2, 0, 0]} />
+          <Bar dataKey="ventas_2025" name="2025" fill={getYearColor(2025, LATEST_YEAR)} radius={[2, 2, 0, 0]} />
+          <Bar dataKey="ventas_2026" name="2026" fill={getYearColor(2026, LATEST_YEAR)} radius={[2, 2, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>

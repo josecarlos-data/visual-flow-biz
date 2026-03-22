@@ -1,4 +1,4 @@
-import { Users, Database, LayoutDashboard, LogOut } from "lucide-react";
+import { Users, Database, BarChart3, LogOut } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import logoRimosaIcon from "@/assets/logo_rimosa_icon.png";
@@ -20,7 +20,7 @@ export function AppSidebar() {
   const isAdmin = role === "admin";
 
   const mainItems = [
-    { title: "Dashboard", url: "/", icon: LayoutDashboard },
+    { title: "Ventas", url: "/", icon: BarChart3 },
   ];
 
   const adminItems = [

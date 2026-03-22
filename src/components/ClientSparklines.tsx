@@ -1,11 +1,9 @@
 import { useMemo } from "react";
 import { LineChart, Line, ResponsiveContainer, Tooltip } from "recharts";
 import type { ClienteConVentas } from "@/hooks/useHistoricoData";
+import { getYearColor } from "@/lib/yearColors";
 
 const MONTH_NAMES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-
-const COLOR_CURRENT = "hsl(174, 100%, 29%)";
-const COLOR_PREV = "hsl(210, 15%, 55%)";
 
 const fmt = (v: number) =>
   new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0, useGrouping: true }).format(v);
@@ -26,6 +24,9 @@ interface SparkData {
 export default function ClientSparklines({ data, selectedYears, monthRange }: ClientSparklinesProps) {
   const currentYear = Math.max(...selectedYears);
   const prevYear = Math.max(...selectedYears.filter((y) => y < currentYear), currentYear - 1);
+
+  const COLOR_CURRENT = getYearColor(currentYear, currentYear);
+  const COLOR_PREV = getYearColor(prevYear, currentYear);
 
   const topClients = useMemo(() => {
     const clientTotals = new Map<number, { name: string; total: number }>();
@@ -168,7 +169,7 @@ export default function ClientSparklines({ data, selectedYears, monthRange }: Cl
                 </span>
                 {change !== null && (
                   <span
-                    className={`text-[9px] font-semibold ${change >= 0 ? "text-green-600" : "text-red-500"}`}
+                    className={`text-[9px] font-semibold ${change >= 0 ? "text-primary" : "text-destructive"}`}
                   >
                     {change >= 0 ? "+" : ""}{change.toFixed(0)}%
                   </span>
