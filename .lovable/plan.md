@@ -1,30 +1,58 @@
 
 
-## Plan: Reorganizar filtros en una sola fila
+## Plan: 3 mejoras en Dashboard
 
-### Cambio
+### 1. Botón "Borrar filtros"
 
-Mover el filtro de **Clientes** a la misma fila que **Años**, **Mes inicio** y **Mes fin**, colocándolo a la izquierda. Esto reduce la altura del panel de filtros eliminando una fila completa.
+Añadir un botón en la cabecera de la card de Filtros (junto al badge de filtros activos) que resetee todo:
+- `selectedVendedores → []`
+- `selectedDelegaciones → []`
+- `selectedClientes → []`
+- `selectedYears → [2024, 2025, 2026]`
+- `monthStart → 1`, `monthEnd → 12`
 
-### Layout resultante
+Solo visible cuando hay algún filtro activo (clientes seleccionados, vendedores, meses parciales, etc.). Icono de `X` o `RotateCcw` con texto "Limpiar".
 
-Para admin/director (con Vendedores y Delegaciones):
-- Fila 1: Vendedores | Delegaciones (side by side)
-- Fila 2: Clientes | Años | Mes inicio | Mes fin (todo en una fila)
+**Archivo**: `src/pages/Dashboard.tsx`
 
-Para comercial (sin Vendedores/Delegaciones):
-- Fila única: Clientes | Años | Mes inicio | Mes fin
+### 2. Colores de años más diferenciados
 
-### Implementación en `src/pages/Dashboard.tsx`
+Los colores actuales son:
+- 2024: `hsl(210, 15%, 55%)` — gris azulado
+- 2025: `hsl(174, 100%, 29%)` — verde oscuro
+- 2026: `hsl(160, 60%, 45%)` — verde claro
 
-1. Mover el bloque de Clientes dentro del `div` de filtros de periodo (líneas 182-230).
-2. Cambiar el layout a `flex-row` con `items-end` para alinear todos los controles en la misma línea.
-3. El filtro de Clientes ocupará el espacio flexible (`flex-1 min-w-[200px]`) mientras Años y Meses mantienen su ancho fijo.
-4. En móvil, se apilará verticalmente con `flex-col sm:flex-row`.
+El problema es que 2025 y 2026 son ambos verdes y se confunden. Propuesta manteniendo la estética corporativa verde pero con más contraste:
 
-### Archivo
+- **2024**: `hsl(210, 20%, 60%)` — gris azulado (mantener, ya se diferencia bien)
+- **2025**: `hsl(174, 100%, 29%)` — verde corporativo intenso (mantener)
+- **2026**: `hsl(45, 90%, 50%)` — dorado/ámbar — se diferencia claramente del verde y aporta un acento cálido
 
-| Archivo | Cambio |
+Alternativa si no te gusta el dorado: `hsl(270, 50%, 55%)` (violeta suave). El objetivo es que ningún par de líneas se confunda.
+
+**Archivos**: `src/components/MonthlyComparisonChart.tsx`, `src/components/TopClientsChart.tsx`
+
+### 3. KPIs — subtítulos mejorados + ticket medio dual
+
+**KPI "Ventas año anterior"** (línea 268): Cambiar "Mismo rango de meses" por el conteo de clientes activos de ese año, igual que el primer KPI. Calcular `clientesActivosPrev` en el useMemo de kpis.
+
+**KPI "Ticket Medio"**: Actualmente se calcula sobre el `latestYear` (año más reciente seleccionado, ej: 2026). Propuesta:
+- Mantener el ticket medio del año actual (latestYear) como valor principal
+- Debajo, mostrar en pequeño el ticket medio del año anterior para comparar
+- Formato:
+  ```
+  822 €          ← ticket medio latestYear
+  2026 · prev: 750 € (2025)
+  ```
+- Se calcula: `ticketMedioPrev = totalPrev / clientesActivosPrev`
+
+**Archivo**: `src/pages/Dashboard.tsx`
+
+### Resumen de archivos
+
+| Archivo | Cambios |
 |---|---|
-| `src/pages/Dashboard.tsx` | Mover Clientes al lado de Años en la misma fila |
+| `src/pages/Dashboard.tsx` | Botón borrar filtros, KPI prev con clientes activos, ticket medio dual |
+| `src/components/MonthlyComparisonChart.tsx` | Color 2026 más diferenciado |
+| `src/components/TopClientsChart.tsx` | Color 2026 más diferenciado |
 
