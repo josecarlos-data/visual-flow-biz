@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, Users, Target, DollarSign, BarChart3, Filter, ChevronDown, RotateCcw } from "lucide-react";
+import { TrendingUp, Target, DollarSign, BarChart3, Filter, ChevronDown, RotateCcw } from "lucide-react";
 import { useHistoricoData, useVendedores, useDelegaciones } from "@/hooks/useHistoricoData";
 import DelegacionFilter from "@/components/DelegacionFilter";
 import VendedorFilter from "@/components/VendedorFilter";
@@ -49,6 +49,21 @@ export default function Dashboard() {
 
   const showFilter = role === "admin" || role === "director_comercial";
   const rows = allData ?? [];
+
+  // Filter vendedores by selected delegaciones
+  const filteredVendedoresList = useMemo(() => {
+    if (!vendedoresList) return [];
+    if (selectedDelegaciones.length === 0) return vendedoresList;
+    // Get vendedores that belong to selected delegaciones from rows data
+    const vendedoresInDelegaciones = new Set<string>();
+    for (const r of rows) {
+      if (r.delegacion && selectedDelegaciones.includes(r.delegacion) && r.vendedor) {
+        vendedoresInDelegaciones.add(r.vendedor);
+      }
+    }
+    // Also check allData (unfiltered by vendedor) - but rows already considers delegacion filter
+    return vendedoresList.filter((v) => vendedoresInDelegaciones.has(v));
+  }, [vendedoresList, selectedDelegaciones, rows]);
 
   // Determine the two most recent years dynamically
   const latestYear = Math.max(...selectedYears);
@@ -128,13 +143,13 @@ export default function Dashboard() {
   return (
     <div className="space-y-4 sm:space-y-6 overflow-x-hidden">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dashboard</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Ventas</h1>
         <p className="text-sm text-muted-foreground">
           {role === "admin" || role === "director_comercial"
             ? "Vista general de todas las ventas"
             : role === "jefe_de_zona"
             ? "Ventas de tu zona"
-            : "Tus ventas"}
+            : "Resumen de ventas"}
         </p>
       </div>
 
@@ -166,31 +181,33 @@ export default function Dashboard() {
           </CollapsibleTrigger>
           <CollapsibleContent>
             <CardContent className="space-y-4 pt-0">
-              {/* Vendedores dropdown */}
-              {showFilter && vendedoresList && vendedoresList.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium mb-2">Vendedores</p>
-                  <VendedorFilter
-                    vendedores={vendedoresList}
-                    selected={selectedVendedores}
-                    onChange={setSelectedVendedores}
-                  />
+              {/* Delegaciones + Vendedores in one row */}
+              {showFilter && (
+                <div className="flex flex-col sm:flex-row sm:items-end gap-4">
+                  {delegacionesList && delegacionesList.length > 0 && (
+                    <div className="flex-1 min-w-[180px]">
+                      <p className="text-sm font-medium mb-2">Delegaciones</p>
+                      <DelegacionFilter
+                        delegaciones={delegacionesList}
+                        selected={selectedDelegaciones}
+                        onChange={setSelectedDelegaciones}
+                      />
+                    </div>
+                  )}
+                  {vendedoresList && vendedoresList.length > 0 && (
+                    <div className="flex-1 min-w-[180px]">
+                      <p className="text-sm font-medium mb-2">Vendedores</p>
+                      <VendedorFilter
+                        vendedores={filteredVendedoresList}
+                        selected={selectedVendedores}
+                        onChange={setSelectedVendedores}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Delegaciones dropdown */}
-              {showFilter && delegacionesList && delegacionesList.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium mb-2">Delegaciones</p>
-                  <DelegacionFilter
-                    delegaciones={delegacionesList}
-                    selected={selectedDelegaciones}
-                    onChange={setSelectedDelegaciones}
-                  />
-                </div>
-              )}
-
-              {/* Period filters + Clientes in one row */}
+              {/* Clientes + Años + Meses in one row */}
               <div className="flex flex-col sm:flex-row sm:items-end gap-4">
                 {clienteData.length > 0 && (
                   <div className="flex-1 min-w-[200px]">
@@ -263,56 +280,60 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {[1, 2, 3, 4].map((i) => (
             <Card key={i}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-1 sm:pb-2">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-0 sm:pb-1">
                 <Skeleton className="h-4 w-16 sm:w-24" />
               </CardHeader>
-              <CardContent className="p-3 sm:p-6 pt-0"><Skeleton className="h-6 sm:h-8 w-20 sm:w-32" /></CardContent>
+              <CardContent className="p-3 sm:p-6 pt-1"><Skeleton className="h-6 sm:h-8 w-20 sm:w-32" /></CardContent>
             </Card>
           ))}
         </div>
       ) : kpis ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-1 sm:pb-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-0 sm:pb-1">
               <CardTitle className="text-xs sm:text-sm font-medium">Ventas {kpis.latestYear}{rangeLabel}</CardTitle>
               <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent className="p-3 sm:p-6 pt-0">
+            <CardContent className="p-3 sm:p-6 pt-1">
               <div className="text-lg sm:text-2xl font-bold">{fmt(kpis.totalLatest)}</div>
               <p className="text-[10px] sm:text-xs text-muted-foreground">{kpis.clientesActivos} clientes activos</p>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-1 sm:pb-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-0 sm:pb-1">
               <CardTitle className="text-xs sm:text-sm font-medium">Ventas {kpis.prevYear}{rangeLabel}</CardTitle>
               <Target className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent className="p-3 sm:p-6 pt-0">
+            <CardContent className="p-3 sm:p-6 pt-1">
               <div className="text-lg sm:text-2xl font-bold">{fmt(kpis.totalPrev)}</div>
               <p className="text-[10px] sm:text-xs text-muted-foreground">{kpis.clientesActivosPrev} clientes activos</p>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-1 sm:pb-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-0 sm:pb-1">
               <CardTitle className="text-xs sm:text-sm font-medium">Ticket Medio{rangeLabel}</CardTitle>
               <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent className="p-3 sm:p-6 pt-0">
-              <div className="text-lg sm:text-2xl font-bold">{fmt(kpis.ticketMedio)}</div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">por cliente · {kpis.latestYear}</p>
-              {kpis.ticketMedioPrev > 0 && (
-                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
-                  {fmt(kpis.ticketMedioPrev)} · {kpis.prevYear}
-                </p>
-              )}
+            <CardContent className="p-3 sm:p-6 pt-1">
+              <div className="flex items-baseline gap-2 flex-wrap">
+                <span className="text-lg sm:text-2xl font-bold">{fmt(kpis.ticketMedio)}</span>
+                <span className="text-[10px] sm:text-xs text-muted-foreground">{kpis.latestYear}</span>
+                {kpis.ticketMedioPrev > 0 && (
+                  <>
+                    <span className="text-[10px] text-muted-foreground">·</span>
+                    <span className="text-xs sm:text-sm font-semibold text-muted-foreground">{fmt(kpis.ticketMedioPrev)}</span>
+                    <span className="text-[10px] sm:text-xs text-muted-foreground">{kpis.prevYear}</span>
+                  </>
+                )}
+              </div>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-1 sm:pb-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-0 sm:pb-1">
               <CardTitle className="text-xs sm:text-sm font-medium">Crecimiento{rangeLabel}</CardTitle>
               <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent className="p-3 sm:p-6 pt-0">
+            <CardContent className="p-3 sm:p-6 pt-1">
               <div className={`text-lg sm:text-2xl font-bold ${kpis.crecimiento >= 0 ? "text-primary" : "text-destructive"}`}>
                 {kpis.crecimiento >= 0 ? "+" : ""}{kpis.crecimiento.toFixed(1)}%
               </div>
