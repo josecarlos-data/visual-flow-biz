@@ -299,7 +299,12 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent className="p-3 sm:p-6 pt-0">
               <div className="text-lg sm:text-2xl font-bold">{fmt(kpis.ticketMedio)}</div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">por cliente activo</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground">por cliente · {kpis.latestYear}</p>
+              {kpis.ticketMedioPrev > 0 && (
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
+                  {fmt(kpis.ticketMedioPrev)} · {kpis.prevYear}
+                </p>
+              )}
             </CardContent>
           </Card>
           <Card>
