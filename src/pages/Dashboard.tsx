@@ -149,6 +149,17 @@ export default function Dashboard() {
                 {activeFilterCount > 0 && (
                   <Badge variant="secondary">{activeFilterCount} activos</Badge>
                 )}
+                {hasAnyFilter && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs px-2 gap-1 text-muted-foreground hover:text-foreground"
+                    onClick={(e) => { e.stopPropagation(); handleResetFilters(); }}
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Limpiar
+                  </Button>
+                )}
                 <ChevronDown className={`h-4 w-4 ml-auto transition-transform ${filtersOpen ? "rotate-180" : ""}`} />
               </CardTitle>
             </CardHeader>
