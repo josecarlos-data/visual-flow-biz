@@ -23,7 +23,7 @@ const fmt = (v: number | null) =>
 const pct = (v: number | null) =>
   v != null ? `${(Number(v) * 100).toFixed(1)}%` : "—";
 
-export default function SalesTable({ data }: SalesTableProps) {
+export default function SalesTable({ data, hideVendedor = false }: SalesTableProps) {
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("ventas_2025");
