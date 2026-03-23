@@ -26,6 +26,7 @@ export function AppSidebar() {
   const adminItems = [
     { title: "Usuarios", url: "/admin/users", icon: Users },
     { title: "Datos", url: "/admin/data", icon: Database },
+    { title: "Funciones", url: "/admin/functions", icon: Settings },
   ];
 
   return (
