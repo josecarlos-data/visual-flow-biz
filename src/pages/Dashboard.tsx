@@ -310,7 +310,7 @@ export default function Dashboard() {
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-0 sm:pb-1">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-0 sm:pb-1">
               <CardTitle className="text-xs sm:text-sm font-medium">Ticket Medio{rangeLabel}</CardTitle>
               <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
