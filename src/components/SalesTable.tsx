@@ -10,6 +10,7 @@ import type { ClienteConVentas } from "@/hooks/useHistoricoData";
 
 interface SalesTableProps {
   data: ClienteConVentas[];
+  hideVendedor?: boolean;
 }
 
 type SortKey = "cliente" | "vendedor" | "ventas_2024" | "ventas_2025" | "ventas_2026" | "proyeccion_2026" | "delegacion";
