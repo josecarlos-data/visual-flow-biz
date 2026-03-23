@@ -86,7 +86,7 @@ export default function SalesTable({ data, hideVendedor = false }: SalesTablePro
                     )}
                   </div>
                 </TableHead>
-                <TableHead className="hidden md:table-cell"><SortHeader label="Vendedor" k="vendedor" /></TableHead>
+                {!hideVendedor && <TableHead className="hidden md:table-cell"><SortHeader label="Vendedor" k="vendedor" /></TableHead>}
                 <TableHead className="hidden md:table-cell"><SortHeader label="Delegación" k="delegacion" /></TableHead>
                 <TableHead className="text-right hidden sm:table-cell"><SortHeader label="2024" k="ventas_2024" /></TableHead>
                 <TableHead className="text-right"><SortHeader label="2025" k="ventas_2025" /></TableHead>
