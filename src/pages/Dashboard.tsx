@@ -334,7 +334,7 @@ export default function Dashboard() {
               <CardTitle className="text-xs sm:text-sm font-medium">Crecimiento{rangeLabel}</CardTitle>
               <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent className="p-3 sm:p-6 pt-1">
+            <CardContent className="p-3 sm:p-4 pt-1">
               <div className={`text-lg sm:text-2xl font-bold ${kpis.crecimiento >= 0 ? "text-primary" : "text-destructive"}`}>
                 {kpis.crecimiento >= 0 ? "+" : ""}{kpis.crecimiento.toFixed(1)}%
               </div>

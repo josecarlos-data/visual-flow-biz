@@ -134,7 +134,7 @@ export default function SalesTable({ data, hideVendedor = false }: SalesTablePro
               <div className="flex justify-between"><span className="text-muted-foreground">Ventas 2026</span><span className="font-medium">{fmt(selectedRow.ventas_2026)}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Ventas 2025</span><span className="font-medium">{fmt(selectedRow.ventas_2025)}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Ventas 2024</span><span className="font-medium">{fmt(selectedRow.ventas_2024)}</span></div>
-              {selectedRow.vendedor && <div className="flex justify-between"><span className="text-muted-foreground">Vendedor</span><span>{selectedRow.vendedor}</span></div>}
+              {!hideVendedor && selectedRow.vendedor && <div className="flex justify-between"><span className="text-muted-foreground">Vendedor</span><span>{selectedRow.vendedor}</span></div>}
               {selectedRow.delegacion && <div className="flex justify-between"><span className="text-muted-foreground">Delegación</span><span>{selectedRow.delegacion}</span></div>}
               {selectedRow.proyeccion_2026 != null && <div className="flex justify-between"><span className="text-muted-foreground">Proyección</span><span>{fmt(selectedRow.proyeccion_2026)}</span></div>}
               {selectedRow.crecimiento_previsto != null && <div className="flex justify-between"><span className="text-muted-foreground">Crecimiento</span><span>{pct(selectedRow.crecimiento_previsto)}</span></div>}
