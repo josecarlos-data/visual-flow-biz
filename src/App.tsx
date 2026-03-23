@@ -11,6 +11,7 @@ import PendingApproval from "./pages/PendingApproval";
 import Dashboard from "./pages/Dashboard";
 import AdminUsers from "./pages/AdminUsers";
 import AdminData from "./pages/AdminData";
+import AdminFunctions from "./pages/AdminFunctions";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
