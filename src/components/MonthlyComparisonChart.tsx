@@ -81,7 +81,7 @@ export default function MonthlyComparisonChart({ data, selectedYears, monthRange
     // Merge projection into chart data
     if (showProjection && projectionData) {
       for (const entry of result) {
-        const m = entry.mesNum as number;
+        const m = (entry as Record<string, unknown>).mesNum as number;
         const proj = projectionData.find((p) => p.mes === m);
         if (proj) {
           entry[`proy_${latestYear}`] = proj.valor;
