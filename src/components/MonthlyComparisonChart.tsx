@@ -151,7 +151,13 @@ export default function MonthlyComparisonChart({ data, selectedYears, monthRange
       </CardHeader>
       <CardContent>
         {showClientView ? (
-          <ClientSparklines data={data} selectedYears={selectedYears} monthRange={monthRange} />
+          <ClientSparklines
+            data={data}
+            selectedYears={selectedYears}
+            monthRange={monthRange}
+            cumulative={cumulative}
+            showProjection={showProjection}
+          />
         ) : (
           <div className="h-[280px] sm:h-[350px]">
             <ResponsiveContainer width="100%" height="100%">
