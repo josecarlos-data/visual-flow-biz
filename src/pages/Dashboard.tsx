@@ -394,7 +394,7 @@ export default function Dashboard() {
 
           <TopClientsChart data={filteredRows} />
 
-          <SalesTable data={filteredRows} />
+          <SalesTable data={filteredRows} hideVendedor={role === "comercial"} />
         </>
       )}
     </div>
