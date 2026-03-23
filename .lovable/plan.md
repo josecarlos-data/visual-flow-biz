@@ -1,53 +1,84 @@
 
 
-## Plan: 3 mejoras — KPI Ticket Medio, Acumulado mensual, Proyección
+## Plan: 5 mejoras — Configuración de fórmulas, vista comercial, sparklines y KPIs
 
-### 1. KPI Ticket Medio — salto de línea forzado
+### 1. Página de Configuración de Funciones (solo admin)
 
-Cambiar el layout actual (todo en `flex-wrap` horizontal con separador `·`) a dos líneas explícitas:
-- **Línea 1**: `822 €` (grande, bold) + `2026` (pequeño, muted) 
-- **Línea 2**: `750 €` (más pequeño, semibold, muted) + `2025` (pequeño, muted)
+Crear nueva página `src/pages/AdminFunctions.tsx` accesible desde el sidebar en "Administración → Funciones".
 
-Quitar el `·` separador. Usar `flex-col` en vez de `flex-wrap`.
+**Funcionalidad**:
+- Lista de funciones del sistema: Proyección, Crecimiento, Ticket Medio
+- Cada función se muestra como un `Collapsible` card. Al expandir, muestra la fórmula actual en modo **vista** (fondo gris, texto monoespaciado tipo Excel)
+- Botón ojo/lápiz en la esquina superior para alternar entre **vista** y **edición**
+- En modo **edición**: textarea editable con la fórmula, aparecen botones **Deshacer** (RotateCcw) y **Guardar** (Save)
+- Icono `?` (HelpCircle) que abre un popover/dialog con ejemplos de fórmulas en el formato del sistema:
+  - Fórmula actual del sistema (lista para copiar/pegar)
+  - La fórmula Excel original: `=((([@[Ventas 2025]]+([@[Ventas 2025]]/(12-Meses_restantes))*Meses_restantes+((([@[Ventas 2025]]/(12-Meses_restantes))*Meses_restantes*0.6/100)))))`
+  - Formato sistema equivalente: `(ventasActual + (ventasActual / (12 - mesesConDatos)) * mesesRestantes) + ((ventasActual / (12 - mesesConDatos)) * mesesRestantes * 0.006)`
+  - Una fórmula adicional de ejemplo
 
-**Archivo**: `src/pages/Dashboard.tsx` (líneas 317-328)
+**Al guardar**:
+1. Dialog de confirmación: "Este cambio afectará al sistema y sus cálculos. ¿Confirmar?"
+2. Si confirma → intenta validar la fórmula (parseo básico de variables conocidas)
+3. Si la fórmula es incompatible → propone corrección con botón que lleva de vuelta al editor con la fórmula corregida precargada
+4. Si no hay corrección posible → aviso de que se podría truncar, con confirmar/cancelar final
 
-### 2. Comparativa Mensual — modo acumulado
+**Nota**: En esta primera versión, las fórmulas se almacenarán en una tabla nueva `system_functions` (id, name, formula, description, updated_at). La ejecución real de fórmulas personalizadas requerirá un parser; por ahora el flujo de UI quedará completo y la fórmula guardada, pero la lógica de cálculo seguirá usando `projection.ts` hasta que se implemente el parser dinámico.
 
-Añadir un botón "Acumulado" / "Mensual" en el header del chart (junto a los botones existentes "Por año" / "Top 10"). Cuando se activa:
-- Los datos se transforman con `reduce` para que cada mes muestre la suma acumulada desde el mes de inicio hasta ese mes.
-- La línea resultante es ascendente, permitiendo ver la tendencia de acumulación entre años.
+**Tabla nueva** (migración):
+```sql
+CREATE TABLE public.system_functions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL UNIQUE,
+  formula text NOT NULL,
+  description text,
+  updated_at timestamptz DEFAULT now()
+);
+ALTER TABLE public.system_functions ENABLE ROW LEVEL SECURITY;
+-- Solo admin puede ver y modificar
+CREATE POLICY "Admins manage functions" ON public.system_functions FOR ALL TO authenticated
+  USING (is_admin(auth.uid())) WITH CHECK (is_admin(auth.uid()));
+```
 
-Estado: `const [cumulative, setCumulative] = useState(false)`.  
-Transformación: un segundo `useMemo` que, si `cumulative`, recorre `chartData` y acumula `ventas_XXXX` mes a mes.
+Se insertarán las 3 funciones iniciales (Proyección, Crecimiento, Ticket Medio) con sus fórmulas actuales.
 
-**Archivo**: `src/components/MonthlyComparisonChart.tsx`
+**Archivos**: `src/pages/AdminFunctions.tsx` (nuevo), `src/components/AppSidebar.tsx` (añadir enlace), `src/App.tsx` (añadir ruta)
 
-### 3. Proyección del año actual
+### 2. Vista comercial: ocultar columna Vendedor + subtítulo con nombre
 
-**Método de proyección**: Extrapolación lineal simple con ajuste estacional ligero.
-- Calcular la media mensual de los meses con datos reales del año actual.
-- Multiplicar por 12 para obtener la proyección anual.
-- Aplicar un factor de estacionalidad: usar la distribución mensual del año anterior como referencia. Si en el año anterior el mes M representó X% del total anual, escalar la proyección del mes M proporcionalmente. Si no hay datos del año anterior suficientes, usar distribución uniforme con un +3% de crecimiento tendencial en el segundo semestre (basado en patrones típicos de B2B industrial).
+**SalesTable**: Recibir prop `hideVendedor?: boolean`. Si true, ocultar la columna Vendedor del `<TableHead>` y `<TableCell>`, y del modal móvil.
 
-**Implementación**:
-- En `MonthlyComparisonChart`: nuevo estado `showProjection` (toggle/slider junto a la leyenda del año actual). Cuando activo, se añade una línea adicional `proyeccion_XXXX` con trazo discontinuo (`strokeDasharray="5 5"`). Los meses con datos reales mantienen el valor real; los meses sin datos muestran el valor proyectado.
-- En `SalesChart`: toggle similar "Real / Proyección" para el año actual. Se recalculan los totales por vendedor/delegación sumando la proyección de los meses faltantes.
-- La lógica de proyección se centraliza en una función util `calcularProyeccion(ventasMensuales, yearActual, yearPrevio)` en un nuevo archivo `src/lib/projection.ts`.
+**Dashboard**: Para rol `comercial`, pasar `hideVendedor={true}` a `SalesTable`. Cambiar el subtítulo de "Resumen de ventas" a "Resumen de ventas · [nombre vendedor]". El nombre del vendedor se obtiene de `rows[0]?.vendedor` (ya que todos los datos filtrados pertenecen al mismo comercial).
 
-**Detalle del cálculo** (en `projection.ts`):
-1. Identificar meses con datos reales del año actual (valor > 0).
-2. Obtener el perfil estacional del año anterior (% de cada mes sobre el total anual).
-3. Para cada mes sin datos: `proyeccion_mes = (total_real / suma_pesos_meses_reales) * peso_mes_objetivo`, donde `peso_mes` viene del perfil estacional.
-4. Si no hay año anterior completo, usar pesos uniformes (1/12) con un ligero sesgo ascendente (+0.5% mensual acumulativo en H2).
+**Archivos**: `src/components/SalesTable.tsx`, `src/pages/Dashboard.tsx`
 
-**Justificación**: Este método es superior a la simple regla de tres (`total/meses_reales * 12`) porque respeta la estacionalidad real del negocio. Si históricamente diciembre es un mes fuerte, la proyección lo refleja. Es simple, interpretable y no requiere modelos estadísticos complejos.
+### 3. ClientSparklines: acumulado, proyección y selector de años
 
-**Archivos**: 
+Cuando se muestra la vista "Top 10" (Evolución Mensual por Cliente) en `MonthlyComparisonChart`, actualmente los botones de Acumulado y Proyección se ocultan (`!showClientView`). Cambiar esto para que:
+
+- Los botones **Acumulado** y **Proyección** se muestren también en la vista de clientes
+- Pasar `cumulative` y `showProjection` como props a `ClientSparklines`
+- En `ClientSparklines`: si `cumulative`, acumular los valores mes a mes. Si `showProjection`, usar `calcularProyeccion` para cada cliente y mostrar la línea proyectada con trazo discontinuo
+- Añadir **selector de años** dentro del gráfico: checkboxes o botones pequeños para los años disponibles, permitiendo activar/desactivar años individualmente en la vista de sparklines
+
+**Archivos**: `src/components/MonthlyComparisonChart.tsx`, `src/components/ClientSparklines.tsx`
+
+### 4. KPIs: reducir espaciado en todas las vistas
+
+Actualmente los KPIs usan `p-3 sm:p-6` — el padding en desktop (`sm:p-6`) es grande. Reducir a `p-3 sm:p-4` tanto en `CardHeader` como en `CardContent` para todas las vistas. Esto hará las cards más compactas en tablet y desktop, igualando la densidad del móvil.
+
+**Archivo**: `src/pages/Dashboard.tsx` (líneas 282-344)
+
+### Resumen de archivos
+
 | Archivo | Cambios |
 |---|---|
-| `src/pages/Dashboard.tsx` | KPI ticket medio con `flex-col` |
-| `src/components/MonthlyComparisonChart.tsx` | Toggle acumulado + toggle proyección con línea discontinua |
-| `src/components/SalesChart.tsx` | Toggle proyección para año actual |
-| `src/lib/projection.ts` | Nuevo: función de proyección estacional |
+| `src/pages/AdminFunctions.tsx` | Nuevo: página de configuración de fórmulas |
+| `src/components/AppSidebar.tsx` | Añadir enlace "Funciones" en admin |
+| `src/App.tsx` | Añadir ruta `/admin/functions` |
+| `src/pages/Dashboard.tsx` | Subtítulo comercial, KPIs compactos, hideVendedor |
+| `src/components/SalesTable.tsx` | Prop `hideVendedor` para ocultar columna |
+| `src/components/MonthlyComparisonChart.tsx` | Mostrar botones acumulado/proyección en vista cliente |
+| `src/components/ClientSparklines.tsx` | Soporte acumulado, proyección y selector de años |
+| Migración SQL | Tabla `system_functions` |
 
