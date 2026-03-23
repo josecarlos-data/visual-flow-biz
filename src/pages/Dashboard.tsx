@@ -304,7 +304,7 @@ export default function Dashboard() {
               <CardTitle className="text-xs sm:text-sm font-medium">Ventas {kpis.prevYear}{rangeLabel}</CardTitle>
               <Target className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent className="p-3 sm:p-6 pt-1">
+            <CardContent className="p-3 sm:p-4 pt-1">
               <div className="text-lg sm:text-2xl font-bold">{fmt(kpis.totalPrev)}</div>
               <p className="text-[10px] sm:text-xs text-muted-foreground">{kpis.clientesActivosPrev} clientes activos</p>
             </CardContent>
