@@ -149,7 +149,7 @@ export default function Dashboard() {
             ? "Vista general de todas las ventas"
             : role === "jefe_de_zona"
             ? "Ventas de tu zona"
-            : "Resumen de ventas"}
+            : `Resumen de ventas · ${filteredRows[0]?.vendedor ?? ""}`}
         </p>
       </div>
 
