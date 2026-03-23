@@ -151,6 +151,30 @@ export type Database = {
           },
         ]
       }
+      system_functions: {
+        Row: {
+          description: string | null
+          formula: string
+          id: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          description?: string | null
+          formula: string
+          id?: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          description?: string | null
+          formula?: string
+          id?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string

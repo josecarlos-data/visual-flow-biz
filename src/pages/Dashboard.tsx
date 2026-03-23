@@ -149,7 +149,7 @@ export default function Dashboard() {
             ? "Vista general de todas las ventas"
             : role === "jefe_de_zona"
             ? "Ventas de tu zona"
-            : "Resumen de ventas"}
+            : `Resumen de ventas · ${filteredRows[0]?.vendedor ?? ""}`}
         </p>
       </div>
 
@@ -280,41 +280,41 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {[1, 2, 3, 4].map((i) => (
             <Card key={i}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-0 sm:pb-1">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-0 sm:pb-1">
                 <Skeleton className="h-4 w-16 sm:w-24" />
               </CardHeader>
-              <CardContent className="p-3 sm:p-6 pt-1"><Skeleton className="h-6 sm:h-8 w-20 sm:w-32" /></CardContent>
+              <CardContent className="p-3 sm:p-4 pt-1"><Skeleton className="h-6 sm:h-8 w-20 sm:w-32" /></CardContent>
             </Card>
           ))}
         </div>
       ) : kpis ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-0 sm:pb-1">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-0 sm:pb-1">
               <CardTitle className="text-xs sm:text-sm font-medium">Ventas {kpis.latestYear}{rangeLabel}</CardTitle>
               <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent className="p-3 sm:p-6 pt-1">
+            <CardContent className="p-3 sm:p-4 pt-1">
               <div className="text-lg sm:text-2xl font-bold">{fmt(kpis.totalLatest)}</div>
               <p className="text-[10px] sm:text-xs text-muted-foreground">{kpis.clientesActivos} clientes activos</p>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-0 sm:pb-1">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-0 sm:pb-1">
               <CardTitle className="text-xs sm:text-sm font-medium">Ventas {kpis.prevYear}{rangeLabel}</CardTitle>
               <Target className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent className="p-3 sm:p-6 pt-1">
+            <CardContent className="p-3 sm:p-4 pt-1">
               <div className="text-lg sm:text-2xl font-bold">{fmt(kpis.totalPrev)}</div>
               <p className="text-[10px] sm:text-xs text-muted-foreground">{kpis.clientesActivosPrev} clientes activos</p>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-0 sm:pb-1">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-0 sm:pb-1">
               <CardTitle className="text-xs sm:text-sm font-medium">Ticket Medio{rangeLabel}</CardTitle>
               <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent className="p-3 sm:p-6 pt-1">
+            <CardContent className="p-3 sm:p-4 pt-1">
               <div className="flex flex-col">
                 <div className="flex items-baseline gap-1.5">
                   <span className="text-lg sm:text-2xl font-bold">{fmt(kpis.ticketMedio)}</span>
@@ -330,11 +330,11 @@ export default function Dashboard() {
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-0 sm:pb-1">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-4 pb-0 sm:pb-1">
               <CardTitle className="text-xs sm:text-sm font-medium">Crecimiento{rangeLabel}</CardTitle>
               <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent className="p-3 sm:p-6 pt-1">
+            <CardContent className="p-3 sm:p-4 pt-1">
               <div className={`text-lg sm:text-2xl font-bold ${kpis.crecimiento >= 0 ? "text-primary" : "text-destructive"}`}>
                 {kpis.crecimiento >= 0 ? "+" : ""}{kpis.crecimiento.toFixed(1)}%
               </div>
@@ -394,7 +394,7 @@ export default function Dashboard() {
 
           <TopClientsChart data={filteredRows} />
 
-          <SalesTable data={filteredRows} />
+          <SalesTable data={filteredRows} hideVendedor={role === "comercial"} />
         </>
       )}
     </div>

@@ -10,6 +10,7 @@ import type { ClienteConVentas } from "@/hooks/useHistoricoData";
 
 interface SalesTableProps {
   data: ClienteConVentas[];
+  hideVendedor?: boolean;
 }
 
 type SortKey = "cliente" | "vendedor" | "ventas_2024" | "ventas_2025" | "ventas_2026" | "proyeccion_2026" | "delegacion";
@@ -22,7 +23,7 @@ const fmt = (v: number | null) =>
 const pct = (v: number | null) =>
   v != null ? `${(Number(v) * 100).toFixed(1)}%` : "—";
 
-export default function SalesTable({ data }: SalesTableProps) {
+export default function SalesTable({ data, hideVendedor = false }: SalesTableProps) {
   const [search, setSearch] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("ventas_2025");
@@ -85,7 +86,7 @@ export default function SalesTable({ data }: SalesTableProps) {
                     )}
                   </div>
                 </TableHead>
-                <TableHead className="hidden md:table-cell"><SortHeader label="Vendedor" k="vendedor" /></TableHead>
+                {!hideVendedor && <TableHead className="hidden md:table-cell"><SortHeader label="Vendedor" k="vendedor" /></TableHead>}
                 <TableHead className="hidden md:table-cell"><SortHeader label="Delegación" k="delegacion" /></TableHead>
                 <TableHead className="text-right hidden sm:table-cell"><SortHeader label="2024" k="ventas_2024" /></TableHead>
                 <TableHead className="text-right"><SortHeader label="2025" k="ventas_2025" /></TableHead>
@@ -102,7 +103,7 @@ export default function SalesTable({ data }: SalesTableProps) {
                   onClick={() => isMobile && setSelectedRow(r)}
                 >
                   <TableCell className="font-medium max-w-[120px] sm:max-w-[200px] truncate">{r.cliente}</TableCell>
-                  <TableCell className="hidden md:table-cell">{r.vendedor || "—"}</TableCell>
+                  {!hideVendedor && <TableCell className="hidden md:table-cell">{r.vendedor || "—"}</TableCell>}
                   <TableCell className="hidden md:table-cell">{r.delegacion || "—"}</TableCell>
                   <TableCell className="text-right hidden sm:table-cell">{fmt(r.ventas_2024)}</TableCell>
                   <TableCell className="text-right">{fmt(r.ventas_2025)}</TableCell>
@@ -112,7 +113,7 @@ export default function SalesTable({ data }: SalesTableProps) {
                 </TableRow>
               ))}
               {filtered.length === 0 && (
-                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Sin resultados</TableCell></TableRow>
+                <TableRow><TableCell colSpan={hideVendedor ? 7 : 8} className="text-center text-muted-foreground py-8">Sin resultados</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -133,7 +134,7 @@ export default function SalesTable({ data }: SalesTableProps) {
               <div className="flex justify-between"><span className="text-muted-foreground">Ventas 2026</span><span className="font-medium">{fmt(selectedRow.ventas_2026)}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Ventas 2025</span><span className="font-medium">{fmt(selectedRow.ventas_2025)}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Ventas 2024</span><span className="font-medium">{fmt(selectedRow.ventas_2024)}</span></div>
-              {selectedRow.vendedor && <div className="flex justify-between"><span className="text-muted-foreground">Vendedor</span><span>{selectedRow.vendedor}</span></div>}
+              {!hideVendedor && selectedRow.vendedor && <div className="flex justify-between"><span className="text-muted-foreground">Vendedor</span><span>{selectedRow.vendedor}</span></div>}
               {selectedRow.delegacion && <div className="flex justify-between"><span className="text-muted-foreground">Delegación</span><span>{selectedRow.delegacion}</span></div>}
               {selectedRow.proyeccion_2026 != null && <div className="flex justify-between"><span className="text-muted-foreground">Proyección</span><span>{fmt(selectedRow.proyeccion_2026)}</span></div>}
               {selectedRow.crecimiento_previsto != null && <div className="flex justify-between"><span className="text-muted-foreground">Crecimiento</span><span>{pct(selectedRow.crecimiento_previsto)}</span></div>}

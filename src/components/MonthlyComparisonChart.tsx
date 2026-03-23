@@ -120,28 +120,24 @@ export default function MonthlyComparisonChart({ data, selectedYears, monthRange
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-base">{chartTitle}</CardTitle>
         <div className="flex items-center gap-1">
-          {!showClientView && (
-            <>
-              <Button
-                variant={cumulative ? "default" : "outline"}
-                size="sm"
-                className="h-7 gap-1 text-xs"
-                onClick={() => setCumulative((v) => !v)}
-              >
-                <TrendingUp className="h-3.5 w-3.5" />
-                {isMobile ? "" : cumulative ? "Mensual" : "Acumulado"}
-              </Button>
-              <Button
-                variant={showProjection ? "default" : "outline"}
-                size="sm"
-                className="h-7 gap-1 text-xs"
-                onClick={() => setShowProjection((v) => !v)}
-              >
-                <Activity className="h-3.5 w-3.5" />
-                {isMobile ? "" : "Proyección"}
-              </Button>
-            </>
-          )}
+          <Button
+            variant={cumulative ? "default" : "outline"}
+            size="sm"
+            className="h-7 gap-1 text-xs"
+            onClick={() => setCumulative((v) => !v)}
+          >
+            <TrendingUp className="h-3.5 w-3.5" />
+            {isMobile ? "" : cumulative ? "Mensual" : "Acumulado"}
+          </Button>
+          <Button
+            variant={showProjection ? "default" : "outline"}
+            size="sm"
+            className="h-7 gap-1 text-xs"
+            onClick={() => setShowProjection((v) => !v)}
+          >
+            <Activity className="h-3.5 w-3.5" />
+            {isMobile ? "" : "Proyección"}
+          </Button>
           <Button
             variant={showClientView ? "default" : "outline"}
             size="sm"
@@ -155,7 +151,13 @@ export default function MonthlyComparisonChart({ data, selectedYears, monthRange
       </CardHeader>
       <CardContent>
         {showClientView ? (
-          <ClientSparklines data={data} selectedYears={selectedYears} monthRange={monthRange} />
+          <ClientSparklines
+            data={data}
+            selectedYears={selectedYears}
+            monthRange={monthRange}
+            cumulative={cumulative}
+            showProjection={showProjection}
+          />
         ) : (
           <div className="h-[280px] sm:h-[350px]">
             <ResponsiveContainer width="100%" height="100%">
