@@ -283,7 +283,7 @@ export default function Dashboard() {
               <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 sm:p-6 pb-0 sm:pb-1">
                 <Skeleton className="h-4 w-16 sm:w-24" />
               </CardHeader>
-              <CardContent className="p-3 sm:p-6 pt-1"><Skeleton className="h-6 sm:h-8 w-20 sm:w-32" /></CardContent>
+              <CardContent className="p-3 sm:p-4 pt-1"><Skeleton className="h-6 sm:h-8 w-20 sm:w-32" /></CardContent>
             </Card>
           ))}
         </div>
