@@ -103,7 +103,7 @@ export default function SalesTable({ data, hideVendedor = false }: SalesTablePro
                   onClick={() => isMobile && setSelectedRow(r)}
                 >
                   <TableCell className="font-medium max-w-[120px] sm:max-w-[200px] truncate">{r.cliente}</TableCell>
-                  <TableCell className="hidden md:table-cell">{r.vendedor || "—"}</TableCell>
+                  {!hideVendedor && <TableCell className="hidden md:table-cell">{r.vendedor || "—"}</TableCell>}
                   <TableCell className="hidden md:table-cell">{r.delegacion || "—"}</TableCell>
                   <TableCell className="text-right hidden sm:table-cell">{fmt(r.ventas_2024)}</TableCell>
                   <TableCell className="text-right">{fmt(r.ventas_2025)}</TableCell>
