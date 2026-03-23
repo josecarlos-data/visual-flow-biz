@@ -314,7 +314,7 @@ export default function Dashboard() {
               <CardTitle className="text-xs sm:text-sm font-medium">Ticket Medio{rangeLabel}</CardTitle>
               <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent className="p-3 sm:p-6 pt-1">
+            <CardContent className="p-3 sm:p-4 pt-1">
               <div className="flex flex-col">
                 <div className="flex items-baseline gap-1.5">
                   <span className="text-lg sm:text-2xl font-bold">{fmt(kpis.ticketMedio)}</span>
