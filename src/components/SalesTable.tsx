@@ -113,7 +113,7 @@ export default function SalesTable({ data, hideVendedor = false }: SalesTablePro
                 </TableRow>
               ))}
               {filtered.length === 0 && (
-                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">Sin resultados</TableCell></TableRow>
+                <TableRow><TableCell colSpan={hideVendedor ? 7 : 8} className="text-center text-muted-foreground py-8">Sin resultados</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
