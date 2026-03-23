@@ -315,15 +315,16 @@ export default function Dashboard() {
               <DollarSign className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="p-3 sm:p-6 pt-1">
-              <div className="flex items-baseline gap-2 flex-wrap">
-                <span className="text-lg sm:text-2xl font-bold">{fmt(kpis.ticketMedio)}</span>
-                <span className="text-[10px] sm:text-xs text-muted-foreground">{kpis.latestYear}</span>
+              <div className="flex flex-col">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-lg sm:text-2xl font-bold">{fmt(kpis.ticketMedio)}</span>
+                  <span className="text-[10px] sm:text-xs text-muted-foreground">{kpis.latestYear}</span>
+                </div>
                 {kpis.ticketMedioPrev > 0 && (
-                  <>
-                    <span className="text-[10px] text-muted-foreground">·</span>
+                  <div className="flex items-baseline gap-1.5">
                     <span className="text-xs sm:text-sm font-semibold text-muted-foreground">{fmt(kpis.ticketMedioPrev)}</span>
                     <span className="text-[10px] sm:text-xs text-muted-foreground">{kpis.prevYear}</span>
-                  </>
+                  </div>
                 )}
               </div>
             </CardContent>
