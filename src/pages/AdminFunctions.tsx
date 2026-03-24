@@ -269,62 +269,6 @@ function FunctionCard({ fn, onSave }: { fn: SystemFunction; onSave: (id: string,
   );
 }
 
-function HelpPopover({ functionName }: { functionName: string }) {
-  const content = getHelpContent(functionName);
-
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Ayuda">
-          <HelpCircle className="h-3.5 w-3.5" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[360px] sm:w-[420px] max-h-[480px] overflow-auto text-xs space-y-3" align="end">
-        <h4 className="font-semibold text-sm">ƒ {functionName}</h4>
-
-        <div>
-          <p className="font-medium text-primary mb-1">¿Qué calcula?</p>
-          <p className="text-muted-foreground">{content.whatItDoes}</p>
-        </div>
-
-        <div>
-          <p className="font-medium text-primary mb-1">¿Cómo funciona?</p>
-          <ol className="list-decimal list-inside text-muted-foreground space-y-1">
-            {content.steps.map((step, i) => (
-              <li key={i}>{step}</li>
-            ))}
-          </ol>
-        </div>
-
-        {content.importantNote && (
-          <div className="bg-accent/50 rounded p-2 text-muted-foreground border">
-            <p className="font-medium text-foreground text-[11px] mb-0.5">💡 Nota importante</p>
-            <p>{content.importantNote}</p>
-          </div>
-        )}
-
-        <div>
-          <p className="font-medium text-primary mb-1">Ejemplo numérico</p>
-          <div className="bg-muted/50 rounded p-2 space-y-1 font-mono text-[11px]">
-            {content.example.map((line, i) => (
-              <p key={i}>{line}</p>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <p className="font-medium text-primary mb-1">Variables utilizadas</p>
-          <ul className="text-muted-foreground space-y-0.5">
-            {content.variables.map((v, i) => (
-              <li key={i}><code className="text-foreground bg-muted px-1 rounded">{v.name}</code> — {v.desc}</li>
-            ))}
-          </ul>
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
 function getHelpContent(name: string) {
   const lower = name.toLowerCase();
 
@@ -418,35 +362,56 @@ function getHelpContent(name: string) {
   };
 }
 
+function HelpPopover({ functionName }: { functionName: string }) {
+  const content = getHelpContent(functionName);
 
-        <p className="text-muted-foreground">
-          Cada función tiene dos campos: la <strong>fórmula del sistema</strong> (lógica real) y el <strong>equivalente Excel</strong> (referencia visual).
-        </p>
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Ayuda">
+          <HelpCircle className="h-3.5 w-3.5" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[360px] sm:w-[420px] max-h-[480px] overflow-auto text-xs space-y-3" align="end">
+        <h4 className="font-semibold text-sm">ƒ {functionName}</h4>
 
-        <div className="space-y-1.5">
-          <p className="font-medium">Variables disponibles:</p>
-          <ul className="list-disc list-inside text-muted-foreground space-y-0.5">
-            <li><code className="text-foreground">ventasActual</code> — Total ventas año actual</li>
-            <li><code className="text-foreground">ventasPrevio</code> — Total ventas año anterior</li>
-            <li><code className="text-foreground">mesesConDatos</code> — Meses con datos reales</li>
-            <li><code className="text-foreground">mesesRestantes</code> — 12 - mesesConDatos</li>
-            <li><code className="text-foreground">clientesActivos</code> — Clientes con ventas &gt; 0</li>
-            <li><code className="text-foreground">totalReal</code> — Suma ventas meses reales</li>
-            <li><code className="text-foreground">peso_mes</code> — Peso estacional del mes</li>
-          </ul>
+        <div>
+          <p className="font-medium text-primary mb-1">¿Qué calcula?</p>
+          <p className="text-muted-foreground">{content.whatItDoes}</p>
         </div>
 
-        <div className="space-y-2">
-          <p className="font-medium">Ejemplos de fórmulas:</p>
-          {examples.map((ex, i) => (
-            <div key={i}>
-              <p className="text-muted-foreground mb-0.5">{ex.label}:</p>
-              <div className="flex items-start gap-1">
-                <code className="bg-muted p-1.5 rounded text-[11px] break-all flex-1">{ex.code}</code>
-                <CopyButton text={ex.code} />
-              </div>
-            </div>
-          ))}
+        <div>
+          <p className="font-medium text-primary mb-1">¿Cómo funciona?</p>
+          <ol className="list-decimal list-inside text-muted-foreground space-y-1">
+            {content.steps.map((step, i) => (
+              <li key={i}>{step}</li>
+            ))}
+          </ol>
+        </div>
+
+        {content.importantNote && (
+          <div className="bg-accent/50 rounded p-2 text-muted-foreground border">
+            <p className="font-medium text-foreground text-[11px] mb-0.5">💡 Nota importante</p>
+            <p>{content.importantNote}</p>
+          </div>
+        )}
+
+        <div>
+          <p className="font-medium text-primary mb-1">Ejemplo numérico</p>
+          <div className="bg-muted/50 rounded p-2 space-y-1 font-mono text-[11px]">
+            {content.example.map((line, i) => (
+              <p key={i}>{line}</p>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="font-medium text-primary mb-1">Variables utilizadas</p>
+          <ul className="text-muted-foreground space-y-0.5">
+            {content.variables.map((v, i) => (
+              <li key={i}><code className="text-foreground bg-muted px-1 rounded">{v.name}</code> — {v.desc}</li>
+            ))}
+          </ul>
         </div>
       </PopoverContent>
     </Popover>
