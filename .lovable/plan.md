@@ -1,51 +1,43 @@
 
 
-## Plan: Conectar AdminFunctions con las fórmulas reales del sistema
+## Plan: Ayuda contextual por función en AdminFunctions
 
-### Problema actual
-La página de Funciones muestra fórmulas genéricas almacenadas en `system_functions` que NO corresponden exactamente al código real ejecutado en `projection.ts` y `Dashboard.tsx`. El usuario quiere ver las fórmulas reales y su equivalente Excel.
+### Problema
+El botón de ayuda `?` es genérico y comparte el mismo popover para todas las funciones. El usuario quiere que cada función tenga su propia explicación detallada y comprensible.
 
-### Enfoque
+### Cambios
 
-**Cada función mostrará dos bloques:**
-1. **Bloque principal**: La fórmula real del sistema tal como se ejecuta en el código, en formato legible (pseudo-código matemático)
-2. **Bloque secundario pequeño**: La equivalencia en formato Excel, en un recuadro gris más pequeño con etiqueta "Equivalente Excel"
+**Archivo**: `src/pages/AdminFunctions.tsx`
 
-**Actualizar los datos en `system_functions`** para que reflejen las fórmulas REALES:
+1. **Mover el `HelpPopover` dentro de `FunctionCard`** y pasarle `fn.name` para renderizar contenido específico.
 
-| Función | Fórmula real (código) | Excel equivalente |
-|---|---|---|
-| **Proyección** | `Para cada mes sin datos: proyeccion_mes = (totalReal / Σ pesos_meses_reales) × peso_mes. Pesos = ventasPrevio[mes] / totalPrevio. Sin datos previos: peso = (1/12) × (1 + 0.005 × max(0, mes-6))` | `=((([@[Ventas 2025]]+([@[Ventas 2025]]/(12-Meses_restantes))*Meses_restantes+((([@[Ventas 2025]]/(12-Meses_restantes))*Meses_restantes*0.6/100)))))` |
-| **Crecimiento** | `((ventasActual - ventasPrevio) / ventasPrevio) × 100` | `=[@[Ventas 2026]]/[@[Ventas 2025]]-1` |
-| **Ticket Medio** | `ventasActual / clientesActivos` | `=[@[Total Ventas]]/[@[Clientes Activos]]` |
+2. **Contenido por función**:
 
-### Cambios en AdminFunctions.tsx
+   **Proyección**:
+   - Qué calcula: estima las ventas de los meses que aún no tienen datos para predecir el cierre del año.
+   - Cómo lo hace paso a paso:
+     1. Toma los meses con ventas reales del año actual (ej: enero y febrero = 1.500.000 €)
+     2. Consulta el año anterior para ver qué peso tuvo cada mes (ej: si enero representó el 7% y febrero el 8%, suman 15%)
+     3. Calcula el factor de escala: 1.500.000 / 0.15 = 10.000.000 € (proyección anual implícita)
+     4. Para cada mes sin datos, multiplica ese factor por el peso del mes: si marzo pesó 9%, marzo proyectado = 10.000.000 × 0.09 = 900.000 €
+     5. Si no hay datos del año anterior, usa pesos uniformes (1/12) con un ligero sesgo de +0,5% mensual acumulativo en el segundo semestre
+   - Factor de crecimiento: No aplica un % fijo. El crecimiento viene implícito en la diferencia entre las ventas reales actuales y las del año anterior. Si en los mismos meses vendes más que el año pasado, la proyección reflejará ese crecimiento proporcionalmente.
 
-1. **Añadir campo `excel_equivalent`** a la tabla `system_functions` (migración) para almacenar la fórmula Excel por separado
-2. **Rediseñar `FunctionCard`**:
-   - Bloque principal grande: fórmula del sistema (monoespaciada, fondo claro)
-   - Debajo, bloque secundario más pequeño con borde punteado: "📊 Excel: `=...`"
-   - En modo edición, ambos campos son editables
-3. **Actualizar los 3 registros existentes** con las fórmulas reales del código (`projection.ts` líneas 68-80 para Proyección, `Dashboard.tsx` línea 116 para Crecimiento, línea 119 para Ticket Medio)
-4. **Popover de ayuda**: actualizar para mostrar las variables reales usadas y la correspondencia código↔Excel
+   **Crecimiento**:
+   - Qué calcula: variación porcentual entre las ventas del año actual y el anterior.
+   - Fórmula: `((ventasActual - ventasPrevio) / ventasPrevio) × 100`
+   - Ejemplo: si 2025 = 8M y 2024 = 7.5M → ((8M - 7.5M) / 7.5M) × 100 = 6,67%
 
-### Cambios en la base de datos
+   **Ticket Medio**:
+   - Qué calcula: gasto medio por cliente activo.
+   - Fórmula: `ventasActual / clientesActivos`
+   - Ejemplo: 8.000.000 € / 350 clientes = 22.857 € por cliente
 
-**Migración**: Añadir columna `excel_equivalent text` a `system_functions`.
+3. **Formato**: Cada popover incluye secciones "Qué calcula", "Cómo funciona", "Ejemplo numérico" y las variables que usa.
 
-**Actualización de datos** (via insert tool):
-- Proyección: fórmula real = descripción del algoritmo estacional de `projection.ts`, excel = la fórmula original del usuario
-- Crecimiento: fórmula real = `((ventasActual - ventasPrevio) / ventasPrevio) * 100`, excel = `=[@[Ventas 2026]]/[@[Ventas 2025]]-1`
-- Ticket Medio: fórmula real = `ventasActual / clientesActivos`, excel = `=[@[Total Ventas]]/[@[Clientes Activos]]`
-
-### Resumen de archivos
+### Resumen
 
 | Archivo | Cambios |
 |---|---|
-| `src/pages/AdminFunctions.tsx` | Rediseñar FunctionCard con bloque dual (sistema + Excel), actualizar interfaz y popover de ayuda |
-| Migración SQL | Añadir columna `excel_equivalent` a `system_functions` |
-| Data update | Actualizar las 3 funciones con fórmulas reales del código |
-
-### Nota sobre edición dinámica
-Por ahora, editar la fórmula en la UI la guarda en BD pero NO cambia automáticamente el código de `projection.ts`. Esto requeriría un parser de fórmulas dinámico (fase futura). La página sirve como **documentación viva y editable** de las fórmulas, con el flujo de confirmación ya implementado.
+| `src/pages/AdminFunctions.tsx` | `HelpPopover` recibe `functionName`, renderiza explicación específica con ejemplos |
 
