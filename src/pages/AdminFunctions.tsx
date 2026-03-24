@@ -13,6 +13,7 @@ interface SystemFunction {
   id: string;
   name: string;
   formula: string;
+  excel_equivalent: string | null;
   description: string | null;
   updated_at: string;
 }
@@ -20,13 +21,13 @@ interface SystemFunction {
 const KNOWN_VARIABLES = [
   "ventasActual", "ventasPrevio", "mesesConDatos", "mesesRestantes",
   "clientesActivos", "clientesActivosPrev", "totalReal", "sumWeightsReal",
+  "peso_mes", "proyeccion_mes", "totalPrevio", "mes",
 ];
 
 function validateFormula(formula: string): { valid: boolean; suggestion?: string; warning?: string } {
   const trimmed = formula.trim();
   if (!trimmed) return { valid: false, warning: "La fórmula no puede estar vacía." };
 
-  // Check for balanced parentheses
   let depth = 0;
   for (const ch of trimmed) {
     if (ch === "(") depth++;
@@ -34,19 +35,10 @@ function validateFormula(formula: string): { valid: boolean; suggestion?: string
     if (depth < 0) break;
   }
   if (depth !== 0) {
-    // Try to fix by adding/removing parens
     if (depth > 0) {
       return { valid: false, suggestion: trimmed + ")".repeat(depth) };
     }
     return { valid: false, warning: "Paréntesis desbalanceados. Revisa la fórmula." };
-  }
-
-  // Check for unknown variables (extract word tokens)
-  const tokens = trimmed.match(/[a-zA-Z_][a-zA-Z0-9_]*/g) || [];
-  const operators = ["Math", "abs", "ceil", "floor", "round", "min", "max", "pow", "sqrt"];
-  const unknowns = tokens.filter((t) => !KNOWN_VARIABLES.includes(t) && !operators.includes(t));
-  if (unknowns.length > 0) {
-    return { valid: true, warning: `Variables no reconocidas: ${unknowns.join(", ")}. El cálculo podría no funcionar correctamente.` };
   }
 
   return { valid: true };
@@ -58,7 +50,7 @@ function CopyButton({ text }: { text: string }) {
     <Button
       variant="ghost"
       size="sm"
-      className="h-6 w-6 p-0"
+      className="h-6 w-6 p-0 shrink-0"
       onClick={() => {
         navigator.clipboard.writeText(text);
         setCopied(true);
@@ -70,11 +62,11 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function FunctionCard({ fn, onSave }: { fn: SystemFunction; onSave: (id: string, formula: string) => Promise<void> }) {
+function FunctionCard({ fn, onSave }: { fn: SystemFunction; onSave: (id: string, formula: string, excelEquiv: string) => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(fn.formula);
-  const [original] = useState(fn.formula);
+  const [draftFormula, setDraftFormula] = useState(fn.formula);
+  const [draftExcel, setDraftExcel] = useState(fn.excel_equivalent || "");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [warningOpen, setWarningOpen] = useState(false);
   const [warningMsg, setWarningMsg] = useState("");
@@ -82,7 +74,7 @@ function FunctionCard({ fn, onSave }: { fn: SystemFunction; onSave: (id: string,
   const [saving, setSaving] = useState(false);
 
   const handleSave = () => {
-    const result = validateFormula(draft);
+    const result = validateFormula(draftFormula);
     if (!result.valid && result.suggestion) {
       setSuggestionFormula(result.suggestion);
       setWarningMsg("La fórmula tiene paréntesis desbalanceados.");
@@ -107,13 +99,18 @@ function FunctionCard({ fn, onSave }: { fn: SystemFunction; onSave: (id: string,
   const doSave = async () => {
     setSaving(true);
     try {
-      await onSave(fn.id, draft);
+      await onSave(fn.id, draftFormula, draftExcel);
       setEditing(false);
       setConfirmOpen(false);
       setWarningOpen(false);
     } finally {
       setSaving(false);
     }
+  };
+
+  const resetDrafts = () => {
+    setDraftFormula(fn.formula);
+    setDraftExcel(fn.excel_equivalent || "");
   };
 
   return (
@@ -123,6 +120,7 @@ function FunctionCard({ fn, onSave }: { fn: SystemFunction; onSave: (id: string,
           <CollapsibleTrigger asChild>
             <CardHeader className="cursor-pointer hover:bg-accent/50 transition-colors pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
+                <span className="font-mono text-primary">ƒ</span>
                 {fn.name}
                 <span className="text-xs font-normal text-muted-foreground ml-auto mr-2">
                   {fn.description}
@@ -138,12 +136,12 @@ function FunctionCard({ fn, onSave }: { fn: SystemFunction; onSave: (id: string,
                   Última actualización: {new Date(fn.updated_at).toLocaleDateString("es-ES")}
                 </span>
                 <div className="flex items-center gap-1">
-                  <HelpPopover name={fn.name} />
+                  <HelpPopover />
                   <Button
                     variant="ghost"
                     size="sm"
                     className="h-7 w-7 p-0"
-                    onClick={() => { setEditing(!editing); setDraft(fn.formula); }}
+                    onClick={() => { setEditing(!editing); resetDrafts(); }}
                     title={editing ? "Ver" : "Editar"}
                   >
                     {editing ? <Eye className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
@@ -151,37 +149,66 @@ function FunctionCard({ fn, onSave }: { fn: SystemFunction; onSave: (id: string,
                 </div>
               </div>
 
-              {editing ? (
-                <>
+              {/* Main formula block */}
+              <div>
+                <p className="text-[11px] font-medium text-muted-foreground mb-1">Fórmula del sistema</p>
+                {editing ? (
                   <Textarea
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
+                    value={draftFormula}
+                    onChange={(e) => setDraftFormula(e.target.value)}
                     className="font-mono text-sm min-h-[80px] bg-muted/50"
-                    placeholder="Escribe la fórmula..."
+                    placeholder="Escribe la fórmula del sistema..."
                   />
-                  <div className="flex gap-2 justify-end">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 gap-1 text-xs"
-                      onClick={() => setDraft(original)}
-                    >
-                      <RotateCcw className="h-3 w-3" />
-                      Deshacer
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="h-7 gap-1 text-xs"
-                      onClick={handleSave}
-                    >
-                      <Save className="h-3 w-3" />
-                      Guardar
-                    </Button>
+                ) : (
+                  <div className="bg-muted/50 rounded-md p-3 font-mono text-sm whitespace-pre-wrap break-all border flex items-start gap-2">
+                    <span className="flex-1">{fn.formula}</span>
+                    <CopyButton text={fn.formula} />
                   </div>
-                </>
-              ) : (
-                <div className="bg-muted/50 rounded-md p-3 font-mono text-sm whitespace-pre-wrap break-all border">
-                  {fn.formula}
+                )}
+              </div>
+
+              {/* Excel equivalent block */}
+              {(fn.excel_equivalent || editing) && (
+                <div>
+                  <p className="text-[11px] font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                    📊 Equivalente Excel
+                  </p>
+                  {editing ? (
+                    <Textarea
+                      value={draftExcel}
+                      onChange={(e) => setDraftExcel(e.target.value)}
+                      className="font-mono text-xs min-h-[50px] bg-muted/30 border-dashed"
+                      placeholder="=fórmula en formato Excel..."
+                    />
+                  ) : (
+                    <div className="bg-muted/30 rounded p-2 font-mono text-xs whitespace-pre-wrap break-all border border-dashed flex items-start gap-2">
+                      <span className="flex-1">{fn.excel_equivalent}</span>
+                      <CopyButton text={fn.excel_equivalent || ""} />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Edit actions */}
+              {editing && (
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1 text-xs"
+                    onClick={resetDrafts}
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Deshacer
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="h-7 gap-1 text-xs"
+                    onClick={handleSave}
+                  >
+                    <Save className="h-3 w-3" />
+                    Guardar
+                  </Button>
                 </div>
               )}
             </CardContent>
@@ -223,7 +250,7 @@ function FunctionCard({ fn, onSave }: { fn: SystemFunction; onSave: (id: string,
               <div className="bg-muted/50 rounded p-2 font-mono text-xs break-all">{suggestionFormula}</div>
               <DialogFooter className="gap-2">
                 <Button variant="outline" size="sm" onClick={() => setWarningOpen(false)}>Cancelar</Button>
-                <Button size="sm" onClick={() => { setDraft(suggestionFormula); setWarningOpen(false); }}>
+                <Button size="sm" onClick={() => { setDraftFormula(suggestionFormula); setWarningOpen(false); }}>
                   Usar corrección
                 </Button>
               </DialogFooter>
@@ -242,10 +269,25 @@ function FunctionCard({ fn, onSave }: { fn: SystemFunction; onSave: (id: string,
   );
 }
 
-function HelpPopover({ name }: { name: string }) {
-  const excelFormula = `=((([@[Ventas 2025]]+([@[Ventas 2025]]/(12-Meses_restantes))*Meses_restantes+((([@[Ventas 2025]]/(12-Meses_restantes))*Meses_restantes*0.6/100)))))`;
-  const systemFormula = `(ventasActual + (ventasActual / (12 - mesesConDatos)) * mesesRestantes) + ((ventasActual / (12 - mesesConDatos)) * mesesRestantes * 0.006)`;
-  const growthFormula = `(ventasActual - ventasPrevio) / ventasPrevio`;
+function HelpPopover() {
+  const examples = [
+    {
+      label: "Proyección (sistema)",
+      code: "proyeccion_mes = (totalReal / Σ_pesos_meses_reales) × peso_mes",
+    },
+    {
+      label: "Proyección (Excel)",
+      code: "=((([@[Ventas 2025]]+([@[Ventas 2025]]/(12-Meses_restantes))*Meses_restantes+((([@[Ventas 2025]]/(12-Meses_restantes))*Meses_restantes*0.6/100)))))",
+    },
+    {
+      label: "Crecimiento (sistema)",
+      code: "((ventasActual - ventasPrevio) / ventasPrevio) × 100",
+    },
+    {
+      label: "Crecimiento simple (Excel)",
+      code: "=G3069/F3069*1.065",
+    },
+  ];
 
   return (
     <Popover>
@@ -254,45 +296,36 @@ function HelpPopover({ name }: { name: string }) {
           <HelpCircle className="h-3.5 w-3.5" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-96 max-h-[400px] overflow-auto text-xs space-y-3" align="end">
+      <PopoverContent className="w-96 max-h-[420px] overflow-auto text-xs space-y-3" align="end">
         <h4 className="font-semibold text-sm">Ayuda — Fórmulas del sistema</h4>
         <p className="text-muted-foreground">
-          Las fórmulas usan variables del sistema. Para copiar una fórmula, usa el icono de copiar.
+          Cada función tiene dos campos: la <strong>fórmula del sistema</strong> (lógica real) y el <strong>equivalente Excel</strong> (referencia visual).
         </p>
 
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <p className="font-medium">Variables disponibles:</p>
           <ul className="list-disc list-inside text-muted-foreground space-y-0.5">
-            <li><code className="text-foreground">ventasActual</code> — Total de ventas del año actual</li>
-            <li><code className="text-foreground">ventasPrevio</code> — Total de ventas del año anterior</li>
+            <li><code className="text-foreground">ventasActual</code> — Total ventas año actual</li>
+            <li><code className="text-foreground">ventasPrevio</code> — Total ventas año anterior</li>
             <li><code className="text-foreground">mesesConDatos</code> — Meses con datos reales</li>
-            <li><code className="text-foreground">mesesRestantes</code> — Meses sin datos (12 - mesesConDatos)</li>
+            <li><code className="text-foreground">mesesRestantes</code> — 12 - mesesConDatos</li>
             <li><code className="text-foreground">clientesActivos</code> — Clientes con ventas &gt; 0</li>
+            <li><code className="text-foreground">totalReal</code> — Suma ventas meses reales</li>
+            <li><code className="text-foreground">peso_mes</code> — Peso estacional del mes</li>
           </ul>
         </div>
 
         <div className="space-y-2">
-          <p className="font-medium">Fórmula Excel original ({name}):</p>
-          <div className="flex items-start gap-1">
-            <code className="bg-muted p-2 rounded text-[11px] break-all flex-1">{excelFormula}</code>
-            <CopyButton text={excelFormula} />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <p className="font-medium">Formato sistema (copiar y pegar):</p>
-          <div className="flex items-start gap-1">
-            <code className="bg-muted p-2 rounded text-[11px] break-all flex-1">{systemFormula}</code>
-            <CopyButton text={systemFormula} />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <p className="font-medium">Ejemplo adicional — Crecimiento:</p>
-          <div className="flex items-start gap-1">
-            <code className="bg-muted p-2 rounded text-[11px] break-all flex-1">{growthFormula}</code>
-            <CopyButton text={growthFormula} />
-          </div>
+          <p className="font-medium">Ejemplos de fórmulas:</p>
+          {examples.map((ex, i) => (
+            <div key={i}>
+              <p className="text-muted-foreground mb-0.5">{ex.label}:</p>
+              <div className="flex items-start gap-1">
+                <code className="bg-muted p-1.5 rounded text-[11px] break-all flex-1">{ex.code}</code>
+                <CopyButton text={ex.code} />
+              </div>
+            </div>
+          ))}
         </div>
       </PopoverContent>
     </Popover>
@@ -316,15 +349,15 @@ export default function AdminFunctions() {
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      setFunctions(data || []);
+      setFunctions((data as SystemFunction[]) || []);
     }
     setLoading(false);
   };
 
-  const handleSave = async (id: string, formula: string) => {
+  const handleSave = async (id: string, formula: string, excelEquiv: string) => {
     const { error } = await supabase
       .from("system_functions")
-      .update({ formula, updated_at: new Date().toISOString() })
+      .update({ formula, excel_equivalent: excelEquiv, updated_at: new Date().toISOString() } as any)
       .eq("id", id);
     if (error) {
       toast({ title: "Error al guardar", description: error.message, variant: "destructive" });

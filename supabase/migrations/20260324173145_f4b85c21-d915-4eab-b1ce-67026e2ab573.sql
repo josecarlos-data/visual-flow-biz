@@ -1,0 +1,1 @@
+ALTER TABLE public.system_functions ADD COLUMN excel_equivalent text;
