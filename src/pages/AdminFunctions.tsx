@@ -418,10 +418,6 @@ function getHelpContent(name: string) {
   };
 }
     {
-      label: "Proyección (Excel)",
-      code: "=((([@[Ventas 2025]]+([@[Ventas 2025]]/(12-Meses_restantes))*Meses_restantes+((([@[Ventas 2025]]/(12-Meses_restantes))*Meses_restantes*0.6/100)))))",
-    },
-    {
       label: "Crecimiento (sistema)",
       code: "((ventasActual - ventasPrevio) / ventasPrevio) × 100",
     },
