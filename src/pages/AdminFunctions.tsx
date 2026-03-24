@@ -136,7 +136,7 @@ function FunctionCard({ fn, onSave }: { fn: SystemFunction; onSave: (id: string,
                   Última actualización: {new Date(fn.updated_at).toLocaleDateString("es-ES")}
                 </span>
                 <div className="flex items-center gap-1">
-                  <HelpPopover />
+                  <HelpPopover functionName={fn.name} />
                   <Button
                     variant="ghost"
                     size="sm"
@@ -269,25 +269,101 @@ function FunctionCard({ fn, onSave }: { fn: SystemFunction; onSave: (id: string,
   );
 }
 
-function HelpPopover() {
-  const examples = [
-    {
-      label: "Proyección (sistema)",
-      code: "proyeccion_mes = (totalReal / Σ_pesos_meses_reales) × peso_mes",
-    },
-    {
-      label: "Proyección (Excel)",
-      code: "=((([@[Ventas 2025]]+([@[Ventas 2025]]/(12-Meses_restantes))*Meses_restantes+((([@[Ventas 2025]]/(12-Meses_restantes))*Meses_restantes*0.6/100)))))",
-    },
-    {
-      label: "Crecimiento (sistema)",
-      code: "((ventasActual - ventasPrevio) / ventasPrevio) × 100",
-    },
-    {
-      label: "Crecimiento simple (Excel)",
-      code: "=G3069/F3069*1.065",
-    },
-  ];
+function getHelpContent(name: string) {
+  const lower = name.toLowerCase();
+
+  if (lower.includes("proyecci")) {
+    return {
+      whatItDoes: "Estima las ventas de los meses que aún no tienen datos reales para predecir el cierre del año. No aplica un porcentaje fijo de crecimiento: el crecimiento viene implícito en la diferencia entre las ventas reales actuales y las del año anterior.",
+      steps: [
+        "Identifica los meses del año actual que ya tienen ventas reales (ej: enero-febrero = 1.500.000 €).",
+        "Consulta el año anterior para calcular qué peso (%) tuvo cada mes sobre el total anual (ej: enero = 7%, febrero = 8%).",
+        "Suma los pesos de los meses con datos reales: 7% + 8% = 15% (0,15).",
+        "Calcula el factor de escala: 1.500.000 / 0,15 = 10.000.000 € (proyección anual implícita).",
+        "Para cada mes sin datos, multiplica el factor por el peso de ese mes: si marzo pesó 9% → 10.000.000 × 0,09 = 900.000 €.",
+        "Si no hay datos del año anterior, usa pesos uniformes (1/12 ≈ 8,33%) con un ligero sesgo de +0,5% mensual acumulativo a partir de julio (segundo semestre).",
+      ],
+      importantNote: "No se aplica un porcentaje fijo de crecimiento (ej: 5%). Si en los mismos meses vendes un 10% más que el año pasado, la proyección reflejará ese +10% proporcionalmente en todos los meses futuros. El sesgo del segundo semestre (+0,5%/mes) solo se activa cuando no hay datos históricos del año anterior.",
+      example: [
+        "Ventas reales ene-feb 2026: 1.500.000 €",
+        "Peso ene+feb en 2025: 15% del total anual",
+        "Factor escala: 1.500.000 / 0,15 = 10.000.000 €",
+        "Marzo (peso 9%): 10.000.000 × 0,09 = 900.000 €",
+        "Abril (peso 8%): 10.000.000 × 0,08 = 800.000 €",
+        "...",
+        "Total proyectado anual: ~10.000.000 €",
+      ],
+      variables: [
+        { name: "totalReal", desc: "Suma de ventas de los meses con datos reales" },
+        { name: "peso_mes", desc: "Proporción de cada mes sobre el total del año anterior" },
+        { name: "totalPrevio", desc: "Total de ventas del año anterior (para calcular pesos)" },
+        { name: "mesesConDatos", desc: "Cantidad de meses con ventas reales en el año actual" },
+        { name: "mesesRestantes", desc: "12 − mesesConDatos" },
+        { name: "sumWeightsReal", desc: "Suma de los pesos de los meses con datos reales" },
+        { name: "proyeccion_mes", desc: "Valor proyectado para un mes sin datos" },
+      ],
+    };
+  }
+
+  if (lower.includes("crecimiento")) {
+    return {
+      whatItDoes: "Calcula la variación porcentual entre las ventas del año actual y las del año anterior. Un valor positivo indica crecimiento, uno negativo indica descenso.",
+      steps: [
+        "Toma el total de ventas del año actual (ventasActual).",
+        "Toma el total de ventas del año anterior (ventasPrevio).",
+        "Resta: ventasActual − ventasPrevio = diferencia.",
+        "Divide la diferencia entre ventasPrevio.",
+        "Multiplica por 100 para obtener el porcentaje.",
+      ],
+      importantNote: null,
+      example: [
+        "Ventas 2026: 8.000.000 €",
+        "Ventas 2025: 7.500.000 €",
+        "Diferencia: 8.000.000 − 7.500.000 = 500.000 €",
+        "Crecimiento: (500.000 / 7.500.000) × 100 = 6,67%",
+      ],
+      variables: [
+        { name: "ventasActual", desc: "Total ventas del año actual (o proyectado)" },
+        { name: "ventasPrevio", desc: "Total ventas del año anterior" },
+      ],
+    };
+  }
+
+  if (lower.includes("ticket")) {
+    return {
+      whatItDoes: "Calcula el gasto medio por cliente activo. Indica cuánto factura de media cada cliente que ha comprado al menos una vez en el período.",
+      steps: [
+        "Toma el total de ventas del período (ventasActual).",
+        "Cuenta los clientes activos: aquellos con al menos una venta > 0 en el año.",
+        "Divide el total entre el número de clientes activos.",
+      ],
+      importantNote: null,
+      example: [
+        "Ventas totales: 8.000.000 €",
+        "Clientes activos: 350",
+        "Ticket medio: 8.000.000 / 350 = 22.857 €/cliente",
+      ],
+      variables: [
+        { name: "ventasActual", desc: "Total de ventas del período" },
+        { name: "clientesActivos", desc: "Número de clientes con ventas > 0" },
+      ],
+    };
+  }
+
+  return {
+    whatItDoes: "Función de cálculo del sistema.",
+    steps: ["Consulta la fórmula mostrada para ver la lógica aplicada."],
+    importantNote: null,
+    example: ["Sin ejemplo específico disponible."],
+    variables: [
+      { name: "ventasActual", desc: "Total ventas año actual" },
+      { name: "ventasPrevio", desc: "Total ventas año anterior" },
+    ],
+  };
+}
+
+function HelpPopover({ functionName }: { functionName: string }) {
+  const content = getHelpContent(functionName);
 
   return (
     <Popover>
@@ -296,36 +372,46 @@ function HelpPopover() {
           <HelpCircle className="h-3.5 w-3.5" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-96 max-h-[420px] overflow-auto text-xs space-y-3" align="end">
-        <h4 className="font-semibold text-sm">Ayuda — Fórmulas del sistema</h4>
-        <p className="text-muted-foreground">
-          Cada función tiene dos campos: la <strong>fórmula del sistema</strong> (lógica real) y el <strong>equivalente Excel</strong> (referencia visual).
-        </p>
+      <PopoverContent className="w-[360px] sm:w-[420px] max-h-[480px] overflow-auto text-xs space-y-3" align="end">
+        <h4 className="font-semibold text-sm">ƒ {functionName}</h4>
 
-        <div className="space-y-1.5">
-          <p className="font-medium">Variables disponibles:</p>
-          <ul className="list-disc list-inside text-muted-foreground space-y-0.5">
-            <li><code className="text-foreground">ventasActual</code> — Total ventas año actual</li>
-            <li><code className="text-foreground">ventasPrevio</code> — Total ventas año anterior</li>
-            <li><code className="text-foreground">mesesConDatos</code> — Meses con datos reales</li>
-            <li><code className="text-foreground">mesesRestantes</code> — 12 - mesesConDatos</li>
-            <li><code className="text-foreground">clientesActivos</code> — Clientes con ventas &gt; 0</li>
-            <li><code className="text-foreground">totalReal</code> — Suma ventas meses reales</li>
-            <li><code className="text-foreground">peso_mes</code> — Peso estacional del mes</li>
-          </ul>
+        <div>
+          <p className="font-medium text-primary mb-1">¿Qué calcula?</p>
+          <p className="text-muted-foreground">{content.whatItDoes}</p>
         </div>
 
-        <div className="space-y-2">
-          <p className="font-medium">Ejemplos de fórmulas:</p>
-          {examples.map((ex, i) => (
-            <div key={i}>
-              <p className="text-muted-foreground mb-0.5">{ex.label}:</p>
-              <div className="flex items-start gap-1">
-                <code className="bg-muted p-1.5 rounded text-[11px] break-all flex-1">{ex.code}</code>
-                <CopyButton text={ex.code} />
-              </div>
-            </div>
-          ))}
+        <div>
+          <p className="font-medium text-primary mb-1">¿Cómo funciona?</p>
+          <ol className="list-decimal list-inside text-muted-foreground space-y-1">
+            {content.steps.map((step, i) => (
+              <li key={i}>{step}</li>
+            ))}
+          </ol>
+        </div>
+
+        {content.importantNote && (
+          <div className="bg-accent/50 rounded p-2 text-muted-foreground border">
+            <p className="font-medium text-foreground text-[11px] mb-0.5">💡 Nota importante</p>
+            <p>{content.importantNote}</p>
+          </div>
+        )}
+
+        <div>
+          <p className="font-medium text-primary mb-1">Ejemplo numérico</p>
+          <div className="bg-muted/50 rounded p-2 space-y-1 font-mono text-[11px]">
+            {content.example.map((line, i) => (
+              <p key={i}>{line}</p>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="font-medium text-primary mb-1">Variables utilizadas</p>
+          <ul className="text-muted-foreground space-y-0.5">
+            {content.variables.map((v, i) => (
+              <li key={i}><code className="text-foreground bg-muted px-1 rounded">{v.name}</code> — {v.desc}</li>
+            ))}
+          </ul>
         </div>
       </PopoverContent>
     </Popover>
