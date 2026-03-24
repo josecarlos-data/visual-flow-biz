@@ -154,6 +154,7 @@ export type Database = {
       system_functions: {
         Row: {
           description: string | null
+          excel_equivalent: string | null
           formula: string
           id: string
           name: string
@@ -161,6 +162,7 @@ export type Database = {
         }
         Insert: {
           description?: string | null
+          excel_equivalent?: string | null
           formula: string
           id?: string
           name: string
@@ -168,6 +170,7 @@ export type Database = {
         }
         Update: {
           description?: string | null
+          excel_equivalent?: string | null
           formula?: string
           id?: string
           name?: string
