@@ -417,18 +417,8 @@ function getHelpContent(name: string) {
     ],
   };
 }
-    {
-      label: "Crecimiento (sistema)",
-      code: "((ventasActual - ventasPrevio) / ventasPrevio) × 100",
-    },
-    {
-      label: "Crecimiento simple (Excel)",
-      code: "=G3069/F3069*1.065",
-    },
-  ];
 
-  return (
-    <Popover>
+
       <PopoverTrigger asChild>
         <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Ayuda">
           <HelpCircle className="h-3.5 w-3.5" />
