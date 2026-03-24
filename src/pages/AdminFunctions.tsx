@@ -419,8 +419,6 @@ function getHelpContent(name: string) {
 }
 
 
-      <PopoverContent className="w-96 max-h-[420px] overflow-auto text-xs space-y-3" align="end">
-        <h4 className="font-semibold text-sm">Ayuda — Fórmulas del sistema</h4>
         <p className="text-muted-foreground">
           Cada función tiene dos campos: la <strong>fórmula del sistema</strong> (lógica real) y el <strong>equivalente Excel</strong> (referencia visual).
         </p>
