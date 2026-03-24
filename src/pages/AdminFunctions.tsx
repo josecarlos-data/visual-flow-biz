@@ -419,11 +419,6 @@ function getHelpContent(name: string) {
 }
 
 
-      <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Ayuda">
-          <HelpCircle className="h-3.5 w-3.5" />
-        </Button>
-      </PopoverTrigger>
       <PopoverContent className="w-96 max-h-[420px] overflow-auto text-xs space-y-3" align="end">
         <h4 className="font-semibold text-sm">Ayuda — Fórmulas del sistema</h4>
         <p className="text-muted-foreground">
