@@ -136,7 +136,7 @@ function FunctionCard({ fn, onSave }: { fn: SystemFunction; onSave: (id: string,
                   Última actualización: {new Date(fn.updated_at).toLocaleDateString("es-ES")}
                 </span>
                 <div className="flex items-center gap-1">
-                  <HelpPopover />
+                  <HelpPopover functionName={fn.name} />
                   <Button
                     variant="ghost"
                     size="sm"
