@@ -254,6 +254,7 @@ export default function AdminUsers() {
                   <TableHead>Vendedor</TableHead>
                   <TableHead>Rol</TableHead>
                   <TableHead>Delegación</TableHead>
+                  <TableHead>Dashboards</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -299,6 +300,38 @@ export default function AdminUsers() {
                           ))}
                         </SelectContent>
                       </Select>
+                    </TableCell>
+                    <TableCell>
+                      {u.role === "admin" ? (
+                        <div className="flex flex-wrap gap-1">
+                          {dashboardCatalog.map((d) => (
+                            <Badge key={d.key} variant="secondary" className="opacity-70">
+                              {d.name}
+                            </Badge>
+                          ))}
+                          <span className="text-xs text-muted-foreground self-center ml-1">(acceso total)</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {dashboardCatalog.length === 0 && (
+                            <span className="text-xs text-muted-foreground">Sin dashboards configurados</span>
+                          )}
+                          {dashboardCatalog.map((d) => {
+                            const has = u.dashboardKeys.includes(d.key);
+                            return (
+                              <Badge
+                                key={d.key}
+                                variant={has ? "default" : "outline"}
+                                className="cursor-pointer select-none"
+                                onClick={() => toggleDashboard(u.user_id, d.key, has)}
+                              >
+                                {has ? <Check className="mr-1 h-3 w-3" /> : null}
+                                {d.name}
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
