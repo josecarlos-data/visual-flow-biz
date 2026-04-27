@@ -129,7 +129,23 @@ export default function AdminUsers() {
     else { toast({ title: "Delegación asignada" }); fetchData(); }
   };
 
-  const startEdit = (userId: string, currentValue: string | null) => {
+  const toggleDashboard = async (userId: string, dashboardKey: string, currentlyHas: boolean) => {
+    if (currentlyHas) {
+      const { error } = await supabase
+        .from("user_dashboard_access" as any)
+        .delete()
+        .eq("user_id", userId)
+        .eq("dashboard_key", dashboardKey);
+      if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+      else { toast({ title: "Acceso retirado" }); fetchData(); }
+    } else {
+      const { error } = await supabase
+        .from("user_dashboard_access" as any)
+        .insert({ user_id: userId, dashboard_key: dashboardKey } as any);
+      if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+      else { toast({ title: "Acceso concedido" }); fetchData(); }
+    }
+  };
     setEditingField({ userId, field: "full_name" });
     setEditValue(currentValue ?? "");
   };
