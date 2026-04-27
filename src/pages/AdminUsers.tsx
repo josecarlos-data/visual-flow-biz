@@ -146,6 +146,8 @@ export default function AdminUsers() {
       else { toast({ title: "Acceso concedido" }); fetchData(); }
     }
   };
+
+  const startEdit = (userId: string, currentValue: string | null) => {
     setEditingField({ userId, field: "full_name" });
     setEditValue(currentValue ?? "");
   };
