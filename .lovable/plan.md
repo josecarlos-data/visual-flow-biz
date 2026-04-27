@@ -1,57 +1,93 @@
+## Plan: Permisos granulares por Dashboard
 
+### Objetivo
 
-## Plan: Ajuste de facturación quincenal en la proyección
+Permitir que el administrador asigne a cada usuario qué dashboards puede ver. Inicialmente: **Ventas** (existente) y **Compras** (nuevo, ficticio para pulir). El sistema queda preparado para añadir más (Fichaje, etc.) sin tocar la lógica de permisos, solo registrando el nuevo módulo.
 
-### Contexto
+Importante: esto es ortogonal al **rol** (admin / director / jefe de zona / comercial). El rol seguirá controlando *qué datos* ve dentro de un dashboard (filtrado por delegación/vendedor). El nuevo permiso controla *a qué dashboards* tiene acceso.
 
-La facturación es quincenal: la primera quincena se carga entre el 16-18 del mes, la segunda quincena entre el 1-3 del mes siguiente. Esto significa que el **mes en curso** probablemente solo tenga datos parciales (una quincena), lo que distorsiona la proyección al tratarlo como un mes completo.
+Regla por defecto:
+- **Admin**: acceso a todos los dashboards siempre (implícito, no se gestiona).
+- **Resto de usuarios**: sin acceso por defecto; el admin marca explícitamente qué dashboards puede ver cada uno.
 
-### Solución
+---
 
-Modificar `src/lib/projection.ts` para detectar el mes parcial y asignarle **peso 0.5** en lugar de 1.0.
+### Cambios en base de datos
 
-**Lógica de detección** (sin depender de comparaciones con el año anterior, que son frágiles):
-1. Obtener la fecha actual (`new Date()`)
-2. El mes actual del año en curso es potencialmente parcial:
-   - Si estamos entre el día 1-15: el mes actual no tiene datos aún (la 1ª quincena se carga el 16-18). El mes anterior podría ser parcial si la 2ª quincena aún no se cargó (día 1-3)
-   - Si estamos entre el día 16-31: el mes actual tiene solo la 1ª quincena → **mes parcial**
-3. Para el mes parcial: usar solo el 50% de su peso en `sumWeightsReal`, y duplicar su valor real para estimar el mes completo antes de usarlo en el factor de escala
-
-**Implementación concreta**:
-- Añadir parámetro opcional `currentDate?: Date` a `calcularProyeccion` (para testabilidad)
-- Identificar el mes parcial del año actual
-- Para ese mes: en vez de contar su peso completo, contar `peso × 0.5` en `sumWeightsReal` y ajustar `totalReal` sumando `valor × 2` (estimación de mes completo)
-- El resultado final para ese mes seguirá mostrando el valor real (parcial), marcado como `isProjected: false` pero con una nueva flag `isPartial: true`
-
-### Detalle técnico
+Nueva tabla `user_dashboard_access` y catálogo de dashboards:
 
 ```text
-Hoy = 23 mayo 2026
-Mes parcial = mayo (mes 5) → solo tiene 1ª quincena
+dashboards (catálogo)
+├─ key (text, PK)        ej. "ventas", "compras", "fichaje"
+├─ name (text)           ej. "Ventas", "Compras"
+├─ description (text)
+├─ icon (text)           nombre del icono lucide
+├─ route (text)          ej. "/", "/compras"
+├─ sort_order (int)
+└─ is_active (bool)
 
-Antes:  totalReal incluye mayo completo como si fuera mes cerrado
-        sumWeightsReal incluye peso_mayo × 1.0
-        → scaleFactor infraestimado
-
-Ahora:  totalReal usa mayo × 2 (estima mes completo)
-        sumWeightsReal incluye peso_mayo × 1.0 (mes "completo estimado")
-        → scaleFactor correcto
+user_dashboard_access
+├─ id (uuid, PK)
+├─ user_id (uuid → auth.users)
+├─ dashboard_key (text → dashboards.key)
+└─ UNIQUE(user_id, dashboard_key)
 ```
 
-### Interfaz actualizada
+Seed inicial del catálogo:
+- `ventas` → "Ventas", ruta `/`
+- `compras` → "Compras", ruta `/compras`
 
-```typescript
-export interface ProjectionResult {
-  mes: number;
-  valor: number;
-  isProjected: boolean;
-  isPartial?: boolean;  // true si el mes tiene datos parciales (1 quincena)
-}
+**Función helper** (security definer) para evitar recursión en RLS y simplificar checks en el frontend:
+
+```sql
+has_dashboard_access(_user_id uuid, _dashboard_key text) returns boolean
+-- true si is_admin OR existe fila en user_dashboard_access
 ```
 
-### Archivos
+**RLS**:
+- `dashboards`: SELECT permitido a usuarios aprobados; ALL a admins.
+- `user_dashboard_access`: SELECT propio + admins ven todo; INSERT/UPDATE/DELETE solo admins.
 
-| Archivo | Cambios |
+---
+
+### Cambios en frontend
+
+**1. Hook `useAuth`** — añadir `dashboards: string[]` (lista de keys a las que el usuario tiene acceso) cargado junto al perfil. Para admins, devolver todas las keys activas.
+
+**2. `AppSidebar`** — sustituir `mainItems` hardcodeado por una lista dinámica construida desde el catálogo `dashboards` filtrado por `dashboards` del usuario. Cada entrada renderiza icono + nombre + link a `route`.
+
+**3. `App.tsx` / `ProtectedRoute`** — añadir prop `dashboardKey?: string`. Si está presente y el usuario no la tiene en su lista, redirigir a `/`. Mantener `adminOnly` como hasta ahora.
+
+**4. Nueva página `src/pages/Compras.tsx`** — placeholder ficticio: header "Compras", tarjetas con KPIs inventados (total compras mes, nº proveedores, etc.) y un gráfico de ejemplo. Sirve para validar el sistema de permisos.
+
+**5. Nueva ruta** `/compras` en `App.tsx`:
+```tsx
+<Route path="/compras" element={
+  <ProtectedRoute dashboardKey="compras"><Compras /></ProtectedRoute>
+} />
+```
+La ruta `/` (Dashboard ventas) pasa a usar `dashboardKey="ventas"`.
+
+**6. AdminUsers** — nueva columna **"Dashboards"** en la tabla de usuarios aprobados con un control multi-selección (checkboxes o badges togglables) que muestra todos los dashboards del catálogo y permite marcar/desmarcar cada uno. Cambios se persisten en `user_dashboard_access` (insert/delete según toggle). Para admins, mostrar badges deshabilitados con todos marcados ("acceso total").
+
+---
+
+### Flujo final de uso
+
+1. Admin entra en `/admin/users`.
+2. Para cada usuario aprobado ve checkboxes: ☐ Ventas ☐ Compras.
+3. Marca los que correspondan; al recargar el usuario, su sidebar solo muestra esos dashboards y solo puede acceder a esas rutas.
+4. Cuando se cree un nuevo dashboard (ej. Fichaje), basta con: insertar fila en `dashboards`, crear página + ruta, y aparecerá automáticamente como opción asignable en AdminUsers.
+
+---
+
+### Archivos afectados
+
+| Archivo | Cambio |
 |---|---|
-| `src/lib/projection.ts` | Detectar mes parcial, ajustar peso y valor en el cálculo del scaleFactor |
-
+| migración SQL | Crear `dashboards`, `user_dashboard_access`, `has_dashboard_access`, RLS, seed |
+| `src/hooks/useAuth.tsx` | Cargar y exponer `dashboards: string[]` |
+| `src/App.tsx` | `ProtectedRoute` con `dashboardKey`, ruta `/compras`, marcar `/` con `dashboardKey="ventas"` |
+| `src/components/AppSidebar.tsx` | Items dinámicos desde catálogo + permisos |
+| `src/pages/Compras.tsx` | Nueva página placeholder |
+| `src/pages/AdminUsers.tsx` | Nueva columna "Dashboards" con asignación multi |

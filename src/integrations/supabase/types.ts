@@ -71,6 +71,42 @@ export type Database = {
         }
         Relationships: []
       }
+      dashboards: {
+        Row: {
+          created_at: string
+          description: string | null
+          icon: string | null
+          is_active: boolean
+          key: string
+          name: string
+          route: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          is_active?: boolean
+          key: string
+          name: string
+          route: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          is_active?: boolean
+          key?: string
+          name?: string
+          route?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       detalle_ventas: {
         Row: {
           cod_cliente: number
@@ -178,6 +214,35 @@ export type Database = {
         }
         Relationships: []
       }
+      user_dashboard_access: {
+        Row: {
+          created_at: string
+          dashboard_key: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          dashboard_key: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          dashboard_key?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_dashboard_access_dashboard_key_fkey"
+            columns: ["dashboard_key"]
+            isOneToOne: false
+            referencedRelation: "dashboards"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -275,6 +340,10 @@ export type Database = {
       get_user_delegacion: { Args: { _user_id: string }; Returns: string }
       get_user_employee_code: { Args: { _user_id: string }; Returns: string }
       get_user_zone_id: { Args: { _user_id: string }; Returns: string }
+      has_dashboard_access: {
+        Args: { _dashboard_key: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
