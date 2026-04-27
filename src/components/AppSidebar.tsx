@@ -46,7 +46,7 @@ export function AppSidebar() {
               {mainItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <NavLink to={item.url} end activeClassName="bg-accent text-accent-foreground font-medium">
+                    <NavLink to={item.url} end={item.end} activeClassName="bg-accent text-accent-foreground font-medium">
                       <item.icon className="mr-2 h-4 w-4" />
                       <span>{item.title}</span>
                     </NavLink>
