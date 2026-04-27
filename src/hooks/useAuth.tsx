@@ -48,6 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [employeeCode, setEmployeeCode] = useState<string | null>(null);
   const [delegacion, setDelegacion] = useState<string | null>(null);
+  const [dashboards, setDashboards] = useState<DashboardItem[]>([]);
 
   const fetchUserData = async (userId: string) => {
     try {
@@ -86,10 +87,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setRole((roleRes.data?.role as AppRole) ?? null);
       }
+
+      // Fetch dashboards: catalog + user assignments
+      const userRole = (roleRes.data?.role as AppRole) ?? null;
+      const [catalogRes, accessRes] = await Promise.all([
+        supabase
+          .from("dashboards" as any)
+          .select("key, name, description, icon, route, sort_order, is_active")
+          .eq("is_active", true)
+          .order("sort_order", { ascending: true }),
+        userRole === "admin"
+          ? Promise.resolve({ data: null, error: null })
+          : supabase
+              .from("user_dashboard_access" as any)
+              .select("dashboard_key")
+              .eq("user_id", userId),
+      ]);
+
+      const catalog = ((catalogRes.data as any[]) ?? []) as DashboardItem[];
+      if (userRole === "admin") {
+        setDashboards(catalog);
+      } else {
+        const allowed = new Set(((accessRes.data as any[]) ?? []).map((r) => r.dashboard_key));
+        setDashboards(catalog.filter((d) => allowed.has(d.key)));
+      }
     } catch (err) {
       console.error("[Auth] Error fetching user data:", err);
       setIsApproved(false);
       setRole(null);
+      setDashboards([]);
     }
   };
 
@@ -158,12 +184,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setRole(null);
       setIsApproved(false);
+      setDashboards([]);
       setIsLoading(false);
     }
   };
 
+  const hasDashboard = (key: string) => role === "admin" || dashboards.some((d) => d.key === key);
+
   return (
-    <AuthContext.Provider value={{ session, user, role, isApproved, isLoading, employeeCode, delegacion, signOut }}>
+    <AuthContext.Provider value={{ session, user, role, isApproved, isLoading, employeeCode, delegacion, dashboards, hasDashboard, signOut }}>
       {children}
     </AuthContext.Provider>
   );
