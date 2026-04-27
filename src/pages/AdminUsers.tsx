@@ -12,6 +12,11 @@ import type { Database } from "@/integrations/supabase/types";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
+interface DashboardCatalogItem {
+  key: string;
+  name: string;
+}
+
 interface UserRow {
   user_id: string;
   full_name: string | null;
@@ -20,25 +25,37 @@ interface UserRow {
   is_approved: boolean;
   delegacion: string | null;
   role: AppRole | null;
+  dashboardKeys: string[];
 }
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [vendedores, setVendedores] = useState<string[]>([]);
   const [delegaciones, setDelegaciones] = useState<string[]>([]);
+  const [dashboardCatalog, setDashboardCatalog] = useState<DashboardCatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingField, setEditingField] = useState<{ userId: string; field: "full_name" } | null>(null);
   const [editValue, setEditValue] = useState("");
 
   const fetchData = async () => {
     setLoading(true);
-    const [profilesRes, clientesRes] = await Promise.all([
+    const [profilesRes, clientesRes, dashboardsRes] = await Promise.all([
       supabase.from("profiles").select("user_id, full_name, email, employee_code, is_approved, delegacion"),
       supabase.from("clientes").select("vendedor, delegacion"),
+      supabase
+        .from("dashboards" as any)
+        .select("key, name, sort_order, is_active")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true }),
     ]);
 
     const profiles = profilesRes.data ?? [];
     const clientes = clientesRes.data ?? [];
+    const catalog = (((dashboardsRes.data as any[]) ?? []) as DashboardCatalogItem[]).map((d) => ({
+      key: d.key,
+      name: d.name,
+    }));
+    setDashboardCatalog(catalog);
 
     // Extract unique vendedores and delegaciones
     const uniqueVendedores = [...new Set(clientes.map((c) => c.vendedor).filter(Boolean) as string[])].sort();
@@ -47,9 +64,20 @@ export default function AdminUsers() {
     setDelegaciones(uniqueDelegaciones);
 
     const userIds = profiles.map((p) => p.user_id);
-    const rolesRes = await supabase.from("user_roles").select("user_id, role").in("user_id", userIds);
+    const [rolesRes, accessRes] = await Promise.all([
+      supabase.from("user_roles").select("user_id, role").in("user_id", userIds),
+      supabase.from("user_dashboard_access" as any).select("user_id, dashboard_key").in("user_id", userIds),
+    ]);
+
     const rolesMap = new Map<string, AppRole>();
     (rolesRes.data ?? []).forEach((r) => rolesMap.set(r.user_id, r.role as AppRole));
+
+    const accessMap = new Map<string, string[]>();
+    (((accessRes.data as any[]) ?? []) as { user_id: string; dashboard_key: string }[]).forEach((a) => {
+      const arr = accessMap.get(a.user_id) ?? [];
+      arr.push(a.dashboard_key);
+      accessMap.set(a.user_id, arr);
+    });
 
     setUsers(
       profiles.map((p) => ({
@@ -60,6 +88,7 @@ export default function AdminUsers() {
         is_approved: p.is_approved,
         delegacion: (p as any).delegacion ?? null,
         role: rolesMap.get(p.user_id) ?? null,
+        dashboardKeys: accessMap.get(p.user_id) ?? [],
       }))
     );
     setLoading(false);
