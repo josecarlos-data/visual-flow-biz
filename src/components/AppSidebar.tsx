@@ -1,3 +1,4 @@
+import * as Icons from "lucide-react";
 import { Users, Database, BarChart3, LogOut, Settings } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
@@ -16,12 +17,13 @@ import {
 import { Button } from "@/components/ui/button";
 
 export function AppSidebar() {
-  const { role, user, signOut } = useAuth();
+  const { role, user, signOut, dashboards } = useAuth();
   const isAdmin = role === "admin";
 
-  const mainItems = [
-    { title: "Ventas", url: "/", icon: BarChart3 },
-  ];
+  const mainItems = dashboards.map((d) => {
+    const IconComp = (d.icon && (Icons as any)[d.icon]) || BarChart3;
+    return { title: d.name, url: d.route, icon: IconComp, end: d.route === "/" };
+  });
 
   const adminItems = [
     { title: "Usuarios", url: "/admin/users", icon: Users },
@@ -44,7 +46,7 @@ export function AppSidebar() {
               {mainItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <NavLink to={item.url} end activeClassName="bg-accent text-accent-foreground font-medium">
+                    <NavLink to={item.url} end={item.end} activeClassName="bg-accent text-accent-foreground font-medium">
                       <item.icon className="mr-2 h-4 w-4" />
                       <span>{item.title}</span>
                     </NavLink>
