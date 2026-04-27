@@ -5,6 +5,15 @@ import type { Database } from "@/integrations/supabase/types";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 
+export interface DashboardItem {
+  key: string;
+  name: string;
+  description: string | null;
+  icon: string | null;
+  route: string;
+  sort_order: number;
+}
+
 interface AuthContextType {
   session: Session | null;
   user: User | null;
@@ -13,6 +22,8 @@ interface AuthContextType {
   isLoading: boolean;
   employeeCode: string | null;
   delegacion: string | null;
+  dashboards: DashboardItem[];
+  hasDashboard: (key: string) => boolean;
   signOut: () => Promise<void>;
 }
 
@@ -24,6 +35,8 @@ const AuthContext = createContext<AuthContextType>({
   isLoading: true,
   employeeCode: null,
   delegacion: null,
+  dashboards: [],
+  hasDashboard: () => false,
   signOut: async () => {},
 });
 
