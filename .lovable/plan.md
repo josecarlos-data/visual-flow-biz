@@ -1,93 +1,73 @@
-## Plan: Permisos granulares por Dashboard
+## Objetivo
 
-### Objetivo
+Hoy la página `/admin/data` solo permite cargar el Excel de **Ventas** (clientes + ventas mensuales). Hay que convertirla en una página **multi-fuente**, donde el admin elige qué conjunto de datos quiere subir (Ventas, Compras, y los que vengan en el futuro como Fichaje), con un parser y un destino diferente para cada uno.
 
-Permitir que el administrador asigne a cada usuario qué dashboards puede ver. Inicialmente: **Ventas** (existente) y **Compras** (nuevo, ficticio para pulir). El sistema queda preparado para añadir más (Fichaje, etc.) sin tocar la lógica de permisos, solo registrando el nuevo módulo.
+## Cambios propuestos
 
-Importante: esto es ortogonal al **rol** (admin / director / jefe de zona / comercial). El rol seguirá controlando *qué datos* ve dentro de un dashboard (filtrado por delegación/vendedor). El nuevo permiso controla *a qué dashboards* tiene acceso.
+### 1. Selector de fuente de datos en `/admin/data`
 
-Regla por defecto:
-- **Admin**: acceso a todos los dashboards siempre (implícito, no se gestiona).
-- **Resto de usuarios**: sin acceso por defecto; el admin marca explícitamente qué dashboards puede ver cada uno.
+En la parte superior de la página, añadir un **selector de tipo de dataset** (tarjetas o tabs) con las opciones disponibles. Inicialmente:
 
----
+- **Ventas** (operativa actual: parsea `Cod.`, `Cliente`, `Año`, `MesNumero`, `Valor`… y vuelca a `clientes` + `ventas_mensuales`).
+- **Compras** (nueva, ficticia por ahora: parsea un Excel con `Proveedor`, `Referencia`, `Importe`, `Fecha`… y vuelca a una tabla `compras`).
 
-### Cambios en base de datos
+El selector controla:
+- Qué parser usa el `FileReader`.
+- Qué columnas se muestran en la vista previa.
+- A qué tablas se hace el upsert.
+- Qué queries de React Query se invalidan al terminar.
 
-Nueva tabla `user_dashboard_access` y catálogo de dashboards:
+Cada fuente se describe con metadatos: `key`, `nombre`, `icono`, `descripción corta`, `columnas esperadas` (para mostrar al usuario qué cabeceras debe tener su Excel).
+
+### 2. Refactor del código de `AdminData.tsx`
+
+- Extraer la lógica actual de Ventas a un módulo `src/lib/datasets/ventas.ts` con: `parse(buffer)`, `preview(data)`, `upload(data, supabase)`, `invalidateKeys`.
+- Crear un módulo análogo `src/lib/datasets/compras.ts` con un parser sencillo para el Excel ficticio de compras.
+- Crear un registro `src/lib/datasets/index.ts` que exporte un array `DATASETS` con todas las fuentes disponibles.
+- `AdminData.tsx` queda como un orquestador: muestra el selector, renderiza la zona de upload + vista previa según el dataset elegido y delega parse/upload al módulo correspondiente.
+
+### 3. Nueva tabla `compras` (placeholder real)
+
+Para que el flujo de Compras sea funcional de extremo a extremo (no solo UI), crear en BD:
+
+- Tabla `public.compras` con columnas: `id uuid pk`, `proveedor text`, `referencia text`, `importe numeric`, `fecha date`, `categoria text null`, `created_at`, `updated_at`.
+- RLS:
+  - SELECT: usuarios aprobados con `has_dashboard_access(auth.uid(), 'compras')`.
+  - INSERT/UPDATE/DELETE: solo `is_admin(auth.uid())`.
+- Índice por `fecha` para consultas futuras.
+
+La página `/compras` seguirá mostrando datos de ejemplo por ahora (tal como está), pero los datos cargados quedarán persistidos para cuando se conecte el dashboard real.
+
+### 4. UX de la página
 
 ```text
-dashboards (catálogo)
-├─ key (text, PK)        ej. "ventas", "compras", "fichaje"
-├─ name (text)           ej. "Ventas", "Compras"
-├─ description (text)
-├─ icon (text)           nombre del icono lucide
-├─ route (text)          ej. "/", "/compras"
-├─ sort_order (int)
-└─ is_active (bool)
-
-user_dashboard_access
-├─ id (uuid, PK)
-├─ user_id (uuid → auth.users)
-├─ dashboard_key (text → dashboards.key)
-└─ UNIQUE(user_id, dashboard_key)
+┌────────────────────────────────────────────────────────┐
+│ Gestión de Datos                                       │
+│ Selecciona qué tipo de información vas a cargar       │
+├────────────────────────────────────────────────────────┤
+│ [ Ventas ✓ ]  [ Compras ]   ( ...futuros: Fichaje )   │
+├────────────────────────────────────────────────────────┤
+│ Ventas — clientes + ventas mensuales                   │
+│ Columnas esperadas: Cod., Cliente, Delegación, Año... │
+│                                                        │
+│ [ 📄 Seleccionar archivo Excel ]   [ Subir N filas ]  │
+│                                                        │
+│ Vista previa (20 filas) ...                            │
+└────────────────────────────────────────────────────────┘
 ```
 
-Seed inicial del catálogo:
-- `ventas` → "Ventas", ruta `/`
-- `compras` → "Compras", ruta `/compras`
+Al cambiar de dataset se resetea el archivo cargado y los resultados.
 
-**Función helper** (security definer) para evitar recursión en RLS y simplificar checks en el frontend:
+## Archivos afectados
 
-```sql
-has_dashboard_access(_user_id uuid, _dashboard_key text) returns boolean
--- true si is_admin OR existe fila en user_dashboard_access
-```
+- `src/pages/AdminData.tsx` — refactor a orquestador con selector.
+- `src/lib/datasets/ventas.ts` — nuevo (extrae lógica actual).
+- `src/lib/datasets/compras.ts` — nuevo (parser Excel ficticio).
+- `src/lib/datasets/index.ts` — nuevo (registro de datasets).
+- Migración SQL — crea `public.compras` + RLS + índice.
 
-**RLS**:
-- `dashboards`: SELECT permitido a usuarios aprobados; ALL a admins.
-- `user_dashboard_access`: SELECT propio + admins ven todo; INSERT/UPDATE/DELETE solo admins.
+## Notas
 
----
-
-### Cambios en frontend
-
-**1. Hook `useAuth`** — añadir `dashboards: string[]` (lista de keys a las que el usuario tiene acceso) cargado junto al perfil. Para admins, devolver todas las keys activas.
-
-**2. `AppSidebar`** — sustituir `mainItems` hardcodeado por una lista dinámica construida desde el catálogo `dashboards` filtrado por `dashboards` del usuario. Cada entrada renderiza icono + nombre + link a `route`.
-
-**3. `App.tsx` / `ProtectedRoute`** — añadir prop `dashboardKey?: string`. Si está presente y el usuario no la tiene en su lista, redirigir a `/`. Mantener `adminOnly` como hasta ahora.
-
-**4. Nueva página `src/pages/Compras.tsx`** — placeholder ficticio: header "Compras", tarjetas con KPIs inventados (total compras mes, nº proveedores, etc.) y un gráfico de ejemplo. Sirve para validar el sistema de permisos.
-
-**5. Nueva ruta** `/compras` en `App.tsx`:
-```tsx
-<Route path="/compras" element={
-  <ProtectedRoute dashboardKey="compras"><Compras /></ProtectedRoute>
-} />
-```
-La ruta `/` (Dashboard ventas) pasa a usar `dashboardKey="ventas"`.
-
-**6. AdminUsers** — nueva columna **"Dashboards"** en la tabla de usuarios aprobados con un control multi-selección (checkboxes o badges togglables) que muestra todos los dashboards del catálogo y permite marcar/desmarcar cada uno. Cambios se persisten en `user_dashboard_access` (insert/delete según toggle). Para admins, mostrar badges deshabilitados con todos marcados ("acceso total").
-
----
-
-### Flujo final de uso
-
-1. Admin entra en `/admin/users`.
-2. Para cada usuario aprobado ve checkboxes: ☐ Ventas ☐ Compras.
-3. Marca los que correspondan; al recargar el usuario, su sidebar solo muestra esos dashboards y solo puede acceder a esas rutas.
-4. Cuando se cree un nuevo dashboard (ej. Fichaje), basta con: insertar fila en `dashboards`, crear página + ruta, y aparecerá automáticamente como opción asignable en AdminUsers.
-
----
-
-### Archivos afectados
-
-| Archivo | Cambio |
-|---|---|
-| migración SQL | Crear `dashboards`, `user_dashboard_access`, `has_dashboard_access`, RLS, seed |
-| `src/hooks/useAuth.tsx` | Cargar y exponer `dashboards: string[]` |
-| `src/App.tsx` | `ProtectedRoute` con `dashboardKey`, ruta `/compras`, marcar `/` con `dashboardKey="ventas"` |
-| `src/components/AppSidebar.tsx` | Items dinámicos desde catálogo + permisos |
-| `src/pages/Compras.tsx` | Nueva página placeholder |
-| `src/pages/AdminUsers.tsx` | Nueva columna "Dashboards" con asignación multi |
+- No se toca el sidebar, autenticación ni el sistema de permisos por dashboard ya implementado.
+- El esquema de Compras es preliminar; cuando llegue el Excel real se ajustarán columnas con una nueva migración.
+- Añadir un nuevo dataset en el futuro (p.ej. Fichaje) requerirá: 1 archivo en `src/lib/datasets/` + registrarlo en `index.ts` + migración para su tabla. Cero cambios en `AdminData.tsx`.

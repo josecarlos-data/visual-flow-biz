@@ -1,261 +1,199 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Database as DbIcon, Upload, FileSpreadsheet, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
-import * as XLSX from "xlsx";
-
-interface ParsedCliente {
-  cod_cliente: number;
-  cliente: string;
-  delegacion: string | null;
-  localidad: string | null;
-  vendedor: string | null;
-  tipo_cliente: string | null;
-  observaciones: string | null;
-  transporte: number | null;
-  proyeccion_2026: number | null;
-  crecimiento_previsto: number | null;
-  top_truck: string | null;
-  gsmart_delegacion: string | null;
-  gsmart_comercial: string | null;
-}
-
-interface ParsedVenta {
-  cod_cliente: number;
-  anio: number;
-  mes: number;
-  valor: number;
-}
-
-interface ParsedData {
-  clientes: ParsedCliente[];
-  ventas: ParsedVenta[];
-}
-
-function parseExcel(buffer: ArrayBuffer): ParsedData {
-  const wb = XLSX.read(buffer, { type: "array" });
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const raw: Record<string, unknown>[] = XLSX.utils.sheet_to_json(ws, { defval: null });
-
-  const clientesMap = new Map<number, ParsedCliente>();
-  const ventas: ParsedVenta[] = [];
-
-  for (const row of raw) {
-    const cod = Number(row["Cod."] ?? row["Cod"] ?? row["cod_cliente"]);
-    if (!cod || isNaN(cod)) continue;
-
-    const cliente = String(row["Cliente"] ?? row["cliente"] ?? "");
-    if (!cliente) continue;
-
-    // Upsert client master data
-    if (!clientesMap.has(cod)) {
-      clientesMap.set(cod, {
-        cod_cliente: cod,
-        cliente,
-        delegacion: row["Delegación"] as string ?? row["Delegacion"] as string ?? null,
-        localidad: row["Localidad"] as string ?? null,
-        vendedor: row["Vendedor"] as string ?? null,
-        tipo_cliente: row["Tip cli"] as string ?? null,
-        observaciones: row["Observaciones"] as string ?? null,
-        transporte: row["Transport."] != null ? Number(row["Transport."]) : null,
-        proyeccion_2026: row["Proyección 2026"] != null ? Number(row["Proyección 2026"]) : (row["Proyeccion 2026"] != null ? Number(row["Proyeccion 2026"]) : null),
-        crecimiento_previsto: row["Crecimiento Previsto"] != null ? Number(row["Crecimiento Previsto"]) : null,
-        top_truck: row["Top Truck"] as string ?? null,
-        gsmart_delegacion: row["GSmart.DELEGACIÓN"] as string ?? row["GSmart.DELEGACION"] as string ?? null,
-        gsmart_comercial: row["GSmart.COMERCIAL"] as string ?? null,
-      });
-    }
-
-    // Parse monthly sales
-    const anio = Number(row["Año"] ?? row["Ano"]);
-    const mes = Number(row["MesNumero"]);
-    const valor = Number(row["Valor"] ?? 0);
-
-    if (anio && mes && !isNaN(anio) && !isNaN(mes)) {
-      ventas.push({ cod_cliente: cod, anio, mes, valor });
-    }
-  }
-
-  return {
-    clientes: Array.from(clientesMap.values()),
-    ventas,
-  };
-}
+import { cn } from "@/lib/utils";
+import { DATASETS, type DatasetModule } from "@/lib/datasets";
 
 export default function AdminData() {
-  const [parsedData, setParsedData] = useState<ParsedData | null>(null);
+  const [activeKey, setActiveKey] = useState<string>(DATASETS[0]?.key ?? "");
+  const [parsedData, setParsedData] = useState<unknown>(null);
   const [fileName, setFileName] = useState<string>("");
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<{ success: number; errors: number } | null>(null);
   const queryClient = useQueryClient();
 
-  const handleFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setFileName(file.name);
-    setUploadResult(null);
+  const dataset = useMemo(
+    () => DATASETS.find((d) => d.key === activeKey) as DatasetModule<unknown> | undefined,
+    [activeKey],
+  );
 
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const data = parseExcel(ev.target!.result as ArrayBuffer);
-        setParsedData(data);
-        toast({
-          title: `${data.clientes.length} clientes y ${data.ventas.length} registros de ventas detectados`,
-          description: `Archivo: ${file.name}`,
-        });
-      } catch {
-        toast({ title: "Error al leer el archivo", description: "Asegúrate de que es un archivo Excel válido.", variant: "destructive" });
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  }, []);
+  const resetState = () => {
+    setParsedData(null);
+    setFileName("");
+    setUploadResult(null);
+  };
+
+  const handleSelectDataset = (key: string) => {
+    if (key === activeKey) return;
+    setActiveKey(key);
+    resetState();
+  };
+
+  const handleFile = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file || !dataset) return;
+      setFileName(file.name);
+      setUploadResult(null);
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = dataset.parse(ev.target!.result as ArrayBuffer);
+          setParsedData(data);
+          toast({
+            title: dataset.countLabel(data),
+            description: `Archivo: ${file.name}`,
+          });
+        } catch (err) {
+          console.error("Parse error:", err);
+          toast({
+            title: "Error al leer el archivo",
+            description: "Asegúrate de que es un archivo Excel válido y con las columnas esperadas.",
+            variant: "destructive",
+          });
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    },
+    [dataset],
+  );
 
   const handleUpload = async () => {
-    if (!parsedData || parsedData.clientes.length === 0) return;
+    if (!dataset || !parsedData || dataset.rowCount(parsedData) === 0) return;
     setUploading(true);
     setUploadResult(null);
 
-    let success = 0;
-    let errors = 0;
-    const BATCH = 200;
-
-    // 1. Delete existing data
-    await supabase.from("ventas_mensuales").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    await supabase.from("clientes").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-
-    // 2. Upsert clientes
-    for (let i = 0; i < parsedData.clientes.length; i += BATCH) {
-      const batch = parsedData.clientes.slice(i, i + BATCH).map((c) => ({
-        cod_cliente: c.cod_cliente,
-        cliente: c.cliente,
-        delegacion: c.delegacion,
-        localidad: c.localidad,
-        vendedor: c.vendedor,
-        tipo_cliente: c.tipo_cliente,
-        observaciones: c.observaciones,
-        transporte: c.transporte,
-        proyeccion_2026: c.proyeccion_2026,
-        crecimiento_previsto: c.crecimiento_previsto,
-        top_truck: c.top_truck,
-        gsmart_delegacion: c.gsmart_delegacion,
-        gsmart_comercial: c.gsmart_comercial,
-      }));
-
-      const { error } = await supabase.from("clientes").upsert(batch, { onConflict: "cod_cliente" });
-      if (error) {
-        errors += batch.length;
-        console.error("Clientes upsert error:", error);
-      } else {
-        success += batch.length;
-      }
-    }
-
-    // 3. Insert ventas mensuales
-    let ventasSuccess = 0;
-    let ventasErrors = 0;
-    for (let i = 0; i < parsedData.ventas.length; i += BATCH) {
-      const batch = parsedData.ventas.slice(i, i + BATCH).map((v) => ({
-        cod_cliente: v.cod_cliente,
-        anio: v.anio,
-        mes: v.mes,
-        valor: v.valor,
-      }));
-
-      const { error } = await supabase.from("ventas_mensuales").upsert(batch, { onConflict: "cod_cliente,anio,mes" });
-      if (error) {
-        ventasErrors += batch.length;
-        console.error("Ventas upsert error:", error);
-      } else {
-        ventasSuccess += batch.length;
-      }
-    }
-
-    const totalErrors = errors + ventasErrors;
-    setUploadResult({ success: success + ventasSuccess, errors: totalErrors });
+    const result = await dataset.upload(parsedData);
+    setUploadResult(result);
     setUploading(false);
-    queryClient.invalidateQueries({ queryKey: ["historico_data"] });
-    queryClient.invalidateQueries({ queryKey: ["vendedores_list"] });
-    queryClient.invalidateQueries({ queryKey: ["delegaciones_list"] });
+    dataset.invalidate(queryClient);
 
     toast({
-      title: totalErrors === 0 ? "Carga completada" : "Carga con errores",
-      description: `${success} clientes, ${ventasSuccess} ventas cargadas. ${totalErrors} errores.`,
-      variant: totalErrors > 0 ? "destructive" : "default",
+      title: result.errors === 0 ? "Carga completada" : "Carga con errores",
+      description: `${result.success} registros cargados. ${result.errors} errores.`,
+      variant: result.errors > 0 ? "destructive" : "default",
     });
   };
 
-  const fmt = (v: unknown) =>
-    v != null
-      ? new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(Number(v))
-      : "—";
+  const previewRows = dataset && parsedData ? dataset.previewRows(parsedData, 20) : [];
+  const totalRows = dataset && parsedData ? dataset.rowCount(parsedData) : 0;
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Gestión de Datos</h1>
-        <p className="text-muted-foreground">Carga y gestiona los datos de ventas mensuales por cliente</p>
+        <p className="text-muted-foreground">Selecciona qué tipo de información vas a cargar</p>
       </div>
 
-      {/* Upload section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Upload className="h-5 w-5" />
-            Cargar Datos de Ventas
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-4">
-            <label className="cursor-pointer">
-              <Input type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} className="hidden" />
-              <div className="flex items-center gap-2 rounded-md border border-dashed border-input px-4 py-3 text-sm transition-colors hover:bg-accent">
-                <FileSpreadsheet className="h-5 w-5 text-muted-foreground" />
-                <span>{fileName || "Seleccionar archivo Excel"}</span>
+      {/* Dataset selector */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {DATASETS.map((d) => {
+          const Icon = d.icon;
+          const isActive = d.key === activeKey;
+          return (
+            <button
+              key={d.key}
+              type="button"
+              onClick={() => handleSelectDataset(d.key)}
+              className={cn(
+                "group flex items-start gap-3 rounded-lg border p-4 text-left transition-colors",
+                isActive
+                  ? "border-primary bg-primary/5 ring-1 ring-primary"
+                  : "border-input hover:bg-accent",
+              )}
+            >
+              <div
+                className={cn(
+                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-md",
+                  isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+                )}
+              >
+                <Icon className="h-5 w-5" />
               </div>
-            </label>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">{d.name}</span>
+                  {isActive && <Badge variant="secondary" className="text-xs">Seleccionado</Badge>}
+                </div>
+                <p className="mt-0.5 text-xs text-muted-foreground">{d.description}</p>
+              </div>
+            </button>
+          );
+        })}
+      </div>
 
-            {parsedData && parsedData.clientes.length > 0 && (
-              <Button onClick={handleUpload} disabled={uploading}>
-                {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-                Subir {parsedData.clientes.length} clientes
-              </Button>
-            )}
-          </div>
+      {dataset && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Upload className="h-5 w-5" />
+              Cargar archivo de {dataset.name}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">Columnas esperadas: </span>
+              {dataset.expectedColumns.join(" · ")}
+            </div>
 
-          {uploadResult && (
-            <div className="flex items-center gap-2 text-sm">
-              {uploadResult.errors === 0 ? (
-                <>
-                  <CheckCircle2 className="h-4 w-4 text-primary" />
-                  <span>{uploadResult.success} registros cargados correctamente</span>
-                </>
-              ) : (
-                <>
-                  <AlertCircle className="h-4 w-4 text-destructive" />
-                  <span>{uploadResult.success} éxitos, {uploadResult.errors} errores</span>
-                </>
+            <div className="flex flex-wrap items-center gap-4">
+              <label className="cursor-pointer">
+                <Input
+                  key={activeKey}
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleFile}
+                  className="hidden"
+                />
+                <div className="flex items-center gap-2 rounded-md border border-dashed border-input px-4 py-3 text-sm transition-colors hover:bg-accent">
+                  <FileSpreadsheet className="h-5 w-5 text-muted-foreground" />
+                  <span>{fileName || "Seleccionar archivo Excel"}</span>
+                </div>
+              </label>
+
+              {totalRows > 0 && (
+                <Button onClick={handleUpload} disabled={uploading}>
+                  {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                  Subir {totalRows} registros
+                </Button>
               )}
             </div>
-          )}
-        </CardContent>
-      </Card>
 
-      {/* Preview */}
-      {parsedData && parsedData.clientes.length > 0 && (
+            {uploadResult && (
+              <div className="flex items-center gap-2 text-sm">
+                {uploadResult.errors === 0 ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 text-primary" />
+                    <span>{uploadResult.success} registros cargados correctamente</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="h-4 w-4 text-destructive" />
+                    <span>
+                      {uploadResult.success} éxitos, {uploadResult.errors} errores
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {dataset && parsedData && totalRows > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <DbIcon className="h-5 w-5" />
               Vista previa
-              <Badge variant="secondary">{parsedData.clientes.length} clientes</Badge>
-              <Badge variant="outline">{parsedData.ventas.length} registros mensuales</Badge>
+              <Badge variant="secondary">{dataset.countLabel(parsedData)}</Badge>
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -263,34 +201,35 @@ export default function AdminData() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Cod.</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Vendedor</TableHead>
-                    <TableHead>Delegación</TableHead>
-                    <TableHead>Localidad</TableHead>
-                    <TableHead className="text-right">Proyección 2026</TableHead>
-                    <TableHead className="text-right">Meses datos</TableHead>
+                    {dataset.previewColumns.map((c) => (
+                      <TableHead key={c.key} className={c.align === "right" ? "text-right" : undefined}>
+                        {c.label}
+                      </TableHead>
+                    ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {parsedData.clientes.slice(0, 20).map((c, i) => (
+                  {previewRows.map((row, i) => (
                     <TableRow key={i}>
-                      <TableCell>{c.cod_cliente}</TableCell>
-                      <TableCell className="max-w-[180px] truncate">{c.cliente}</TableCell>
-                      <TableCell>{c.vendedor || "—"}</TableCell>
-                      <TableCell>{c.delegacion || "—"}</TableCell>
-                      <TableCell>{c.localidad || "—"}</TableCell>
-                      <TableCell className="text-right">{fmt(c.proyeccion_2026)}</TableCell>
-                      <TableCell className="text-right">
-                        {parsedData.ventas.filter((v) => v.cod_cliente === c.cod_cliente).length}
-                      </TableCell>
+                      {dataset.previewColumns.map((c) => {
+                        const v = row[c.key];
+                        const display = c.format ? c.format(v) : v != null ? String(v) : "—";
+                        return (
+                          <TableCell
+                            key={c.key}
+                            className={cn(c.align === "right" ? "text-right" : "", "max-w-[220px] truncate")}
+                          >
+                            {display}
+                          </TableCell>
+                        );
+                      })}
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </div>
-            {parsedData.clientes.length > 20 && (
-              <p className="text-xs text-muted-foreground p-3">Mostrando 20 de {parsedData.clientes.length} clientes</p>
+            {totalRows > 20 && (
+              <p className="text-xs text-muted-foreground p-3">Mostrando 20 de {totalRows} registros</p>
             )}
           </CardContent>
         </Card>
