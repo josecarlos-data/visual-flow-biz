@@ -1,4 +1,4 @@
-import * as XLSX from "xlsx";
+import * as XLSX from "@e965/xlsx";
 import { Truck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import type { DatasetModule } from "./types";
