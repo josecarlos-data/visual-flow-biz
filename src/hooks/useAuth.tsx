@@ -118,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (err) {
       console.error("[Auth] Error fetching user data:", err);
+      setAuthError(err instanceof Error ? err.message : "Error de conexión");
       setIsApproved(false);
       setRole(null);
       setDashboards([]);
