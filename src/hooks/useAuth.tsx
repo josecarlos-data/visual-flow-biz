@@ -75,10 +75,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (profileRes.error) {
         console.error("[Auth] Error fetching profile:", profileRes.error);
+        setAuthError(profileRes.error.message);
         setIsApproved(false);
         setEmployeeCode(null);
         setDelegacion(null);
       } else {
+        setAuthError(null);
         setIsApproved(profileRes.data?.is_approved ?? false);
         setEmployeeCode(profileRes.data?.employee_code ?? null);
         setDelegacion(profileRes.data?.delegacion ?? null);
