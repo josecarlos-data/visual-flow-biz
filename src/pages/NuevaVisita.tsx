@@ -114,7 +114,7 @@ export default function NuevaVisita() {
       motivo_key: motivo.key,
       fecha,
       user_id: user?.id ?? null,
-      vendedor: profile?.employee_code ?? null,
+      vendedor: employeeCode ?? null,
       transcripcion: transcripcion || null,
       observaciones: observaciones || null,
       campos: valores,
