@@ -34,6 +34,7 @@ const AuthContext = createContext<AuthContextType>({
   role: null,
   isApproved: false,
   isLoading: true,
+  authError: null,
   employeeCode: null,
   delegacion: null,
   dashboards: [],
@@ -47,6 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<AppRole | null>(null);
   const [isApproved, setIsApproved] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [employeeCode, setEmployeeCode] = useState<string | null>(null);
   const [delegacion, setDelegacion] = useState<string | null>(null);
   const [dashboards, setDashboards] = useState<DashboardItem[]>([]);
