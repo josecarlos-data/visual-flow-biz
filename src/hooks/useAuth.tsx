@@ -20,6 +20,7 @@ interface AuthContextType {
   role: AppRole | null;
   isApproved: boolean;
   isLoading: boolean;
+  authError: string | null;
   employeeCode: string | null;
   delegacion: string | null;
   dashboards: DashboardItem[];
