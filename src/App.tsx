@@ -22,6 +22,31 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+function AuthErrorScreen({ message, onSignOut }: { message: string; onSignOut: () => void }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center px-4">
+      <div className="w-full max-w-md rounded-lg border p-6 text-center">
+        <h1 className="mb-2 text-lg font-semibold">No se pudo cargar tu perfil</h1>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Ha ocurrido un error de conexión o de permisos al validar tu cuenta. No es un problema de aprobación.
+        </p>
+        <p className="mb-4 break-words rounded bg-muted p-2 text-xs text-muted-foreground">{message}</p>
+        <div className="flex justify-center gap-2">
+          <button
+            className="rounded-md border px-3 py-2 text-sm"
+            onClick={() => window.location.reload()}
+          >
+            Reintentar
+          </button>
+          <button className="rounded-md border px-3 py-2 text-sm" onClick={onSignOut}>
+            Cerrar sesión
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ProtectedRoute({
   children,
   adminOnly = false,
@@ -31,12 +56,13 @@ function ProtectedRoute({
   adminOnly?: boolean;
   dashboardKey?: string;
 }) {
-  const { user, isApproved, role, isLoading, hasDashboard, dashboards } = useAuth();
+  const { user, isApproved, role, isLoading, hasDashboard, dashboards, authError, signOut } = useAuth();
 
   if (isLoading) {
     return <LoadingScreen />;
   }
   if (!user) return <Navigate to="/auth" replace />;
+  if (authError) return <AuthErrorScreen message={authError} onSignOut={signOut} />;
   if (!isApproved) return <Navigate to="/pending" replace />;
   if (adminOnly && role !== "admin") return <Navigate to="/" replace />;
   if (dashboardKey && !hasDashboard(dashboardKey)) {
