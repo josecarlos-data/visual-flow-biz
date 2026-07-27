@@ -18,7 +18,7 @@ import { useClientes, useMotivos, hoyISO } from "@/hooks/useCrm";
 export default function NuevaVisita() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { user, profile } = useAuth();
+  const { user, employeeCode } = useAuth();
   const { data: clientes } = useClientes();
   const { data: motivos } = useMotivos();
 
