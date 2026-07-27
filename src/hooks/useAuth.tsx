@@ -20,6 +20,7 @@ interface AuthContextType {
   role: AppRole | null;
   isApproved: boolean;
   isLoading: boolean;
+  authError: string | null;
   employeeCode: string | null;
   delegacion: string | null;
   dashboards: DashboardItem[];
@@ -33,6 +34,7 @@ const AuthContext = createContext<AuthContextType>({
   role: null,
   isApproved: false,
   isLoading: true,
+  authError: null,
   employeeCode: null,
   delegacion: null,
   dashboards: [],
@@ -46,6 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<AppRole | null>(null);
   const [isApproved, setIsApproved] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [employeeCode, setEmployeeCode] = useState<string | null>(null);
   const [delegacion, setDelegacion] = useState<string | null>(null);
   const [dashboards, setDashboards] = useState<DashboardItem[]>([]);
@@ -72,10 +75,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (profileRes.error) {
         console.error("[Auth] Error fetching profile:", profileRes.error);
+        setAuthError(profileRes.error.message);
         setIsApproved(false);
         setEmployeeCode(null);
         setDelegacion(null);
       } else {
+        setAuthError(null);
         setIsApproved(profileRes.data?.is_approved ?? false);
         setEmployeeCode(profileRes.data?.employee_code ?? null);
         setDelegacion(profileRes.data?.delegacion ?? null);
@@ -113,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (err) {
       console.error("[Auth] Error fetching user data:", err);
+      setAuthError(err instanceof Error ? err.message : "Error de conexión");
       setIsApproved(false);
       setRole(null);
       setDashboards([]);
@@ -192,7 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasDashboard = (key: string) => role === "admin" || dashboards.some((d) => d.key === key);
 
   return (
-    <AuthContext.Provider value={{ session, user, role, isApproved, isLoading, employeeCode, delegacion, dashboards, hasDashboard, signOut }}>
+    <AuthContext.Provider value={{ session, user, role, isApproved, isLoading, authError, employeeCode, delegacion, dashboards, hasDashboard, signOut }}>
       {children}
     </AuthContext.Provider>
   );
