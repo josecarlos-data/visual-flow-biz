@@ -14,6 +14,84 @@ export type Database = {
   }
   public: {
     Tables: {
+      cliente_insights: {
+        Row: {
+          alertas: Json
+          argumentario: Json
+          cod_cliente: number
+          created_at: string
+          generado_en: string
+          id: string
+          oportunidades: Json
+          resumen: string | null
+          updated_at: string
+        }
+        Insert: {
+          alertas?: Json
+          argumentario?: Json
+          cod_cliente: number
+          created_at?: string
+          generado_en?: string
+          id?: string
+          oportunidades?: Json
+          resumen?: string | null
+          updated_at?: string
+        }
+        Update: {
+          alertas?: Json
+          argumentario?: Json
+          cod_cliente?: number
+          created_at?: string
+          generado_en?: string
+          id?: string
+          oportunidades?: Json
+          resumen?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      cliente_productos: {
+        Row: {
+          anio: number | null
+          cod_cliente: number
+          created_at: string
+          descripcion: string | null
+          familia: string | null
+          id: string
+          importe: number
+          referencia: string
+          ultima_compra: string | null
+          unidades: number
+          updated_at: string
+        }
+        Insert: {
+          anio?: number | null
+          cod_cliente: number
+          created_at?: string
+          descripcion?: string | null
+          familia?: string | null
+          id?: string
+          importe?: number
+          referencia: string
+          ultima_compra?: string | null
+          unidades?: number
+          updated_at?: string
+        }
+        Update: {
+          anio?: number | null
+          cod_cliente?: number
+          created_at?: string
+          descripcion?: string | null
+          familia?: string | null
+          id?: string
+          importe?: number
+          referencia?: string
+          ultima_compra?: string | null
+          unidades?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       clientes: {
         Row: {
           cliente: string
@@ -21,12 +99,17 @@ export type Database = {
           created_at: string
           crecimiento_previsto: number | null
           delegacion: string | null
+          direccion: string | null
+          email: string | null
           gsmart_comercial: string | null
           gsmart_delegacion: string | null
           id: string
           localidad: string | null
           observaciones: string | null
+          provincia: string | null
           proyeccion_2026: number | null
+          ruta: string | null
+          telefono: string | null
           tipo_cliente: string | null
           top_truck: string | null
           transporte: number | null
@@ -39,12 +122,17 @@ export type Database = {
           created_at?: string
           crecimiento_previsto?: number | null
           delegacion?: string | null
+          direccion?: string | null
+          email?: string | null
           gsmart_comercial?: string | null
           gsmart_delegacion?: string | null
           id?: string
           localidad?: string | null
           observaciones?: string | null
+          provincia?: string | null
           proyeccion_2026?: number | null
+          ruta?: string | null
+          telefono?: string | null
           tipo_cliente?: string | null
           top_truck?: string | null
           transporte?: number | null
@@ -57,12 +145,17 @@ export type Database = {
           created_at?: string
           crecimiento_previsto?: number | null
           delegacion?: string | null
+          direccion?: string | null
+          email?: string | null
           gsmart_comercial?: string | null
           gsmart_delegacion?: string | null
           id?: string
           localidad?: string | null
           observaciones?: string | null
+          provincia?: string | null
           proyeccion_2026?: number | null
+          ruta?: string | null
+          telefono?: string | null
           tipo_cliente?: string | null
           top_truck?: string | null
           transporte?: number | null
@@ -173,6 +266,119 @@ export type Database = {
         }
         Relationships: []
       }
+      motivo_campos: {
+        Row: {
+          ayuda: string | null
+          campo_key: string
+          created_at: string
+          id: string
+          is_required: boolean
+          label: string
+          motivo_key: string
+          sort_order: number
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          ayuda?: string | null
+          campo_key: string
+          created_at?: string
+          id?: string
+          is_required?: boolean
+          label: string
+          motivo_key: string
+          sort_order?: number
+          tipo?: string
+          updated_at?: string
+        }
+        Update: {
+          ayuda?: string | null
+          campo_key?: string
+          created_at?: string
+          id?: string
+          is_required?: boolean
+          label?: string
+          motivo_key?: string
+          sort_order?: number
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "motivo_campos_motivo_key_fkey"
+            columns: ["motivo_key"]
+            isOneToOne: false
+            referencedRelation: "motivos_visita"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
+      motivos_visita: {
+        Row: {
+          color: string | null
+          created_at: string
+          descripcion: string | null
+          is_active: boolean
+          key: string
+          nombre: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          descripcion?: string | null
+          is_active?: boolean
+          key: string
+          nombre: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          descripcion?: string | null
+          is_active?: boolean
+          key?: string
+          nombre?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      productos: {
+        Row: {
+          created_at: string
+          descripcion: string | null
+          familia: string | null
+          id: string
+          marca: string | null
+          precio: number | null
+          referencia: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          descripcion?: string | null
+          familia?: string | null
+          id?: string
+          marca?: string | null
+          precio?: number | null
+          referencia: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          descripcion?: string | null
+          familia?: string | null
+          id?: string
+          marca?: string | null
+          precio?: number | null
+          referencia?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -219,6 +425,102 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      rutas: {
+        Row: {
+          codigo: string
+          created_at: string
+          delegacion: string | null
+          id: string
+          nombre: string
+          updated_at: string
+          vendedor: string | null
+        }
+        Insert: {
+          codigo: string
+          created_at?: string
+          delegacion?: string | null
+          id?: string
+          nombre: string
+          updated_at?: string
+          vendedor?: string | null
+        }
+        Update: {
+          codigo?: string
+          created_at?: string
+          delegacion?: string | null
+          id?: string
+          nombre?: string
+          updated_at?: string
+          vendedor?: string | null
+        }
+        Relationships: []
+      }
+      sync_config: {
+        Row: {
+          created_at: string
+          dataset_key: string
+          file_url: string | null
+          id: string
+          is_active: boolean
+          last_sync_at: string | null
+          last_sync_message: string | null
+          last_sync_status: string | null
+          sheet_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          dataset_key: string
+          file_url?: string | null
+          id?: string
+          is_active?: boolean
+          last_sync_at?: string | null
+          last_sync_message?: string | null
+          last_sync_status?: string | null
+          sheet_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          dataset_key?: string
+          file_url?: string | null
+          id?: string
+          is_active?: boolean
+          last_sync_at?: string | null
+          last_sync_message?: string | null
+          last_sync_status?: string | null
+          sheet_name?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      sync_log: {
+        Row: {
+          created_at: string
+          dataset_key: string
+          id: string
+          message: string | null
+          rows_processed: number
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          dataset_key: string
+          id?: string
+          message?: string | null
+          rows_processed?: number
+          status: string
+        }
+        Update: {
+          created_at?: string
+          dataset_key?: string
+          id?: string
+          message?: string | null
+          rows_processed?: number
+          status?: string
+        }
+        Relationships: []
       }
       system_functions: {
         Row: {
@@ -329,6 +631,101 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clientes"
             referencedColumns: ["cod_cliente"]
+          },
+        ]
+      }
+      visitas: {
+        Row: {
+          campos: Json
+          cod_cliente: number
+          created_at: string
+          estado: string
+          fecha: string
+          id: string
+          motivo_key: string | null
+          observaciones: string | null
+          origen: string
+          transcripcion: string | null
+          updated_at: string
+          user_id: string | null
+          vendedor: string | null
+        }
+        Insert: {
+          campos?: Json
+          cod_cliente: number
+          created_at?: string
+          estado?: string
+          fecha?: string
+          id?: string
+          motivo_key?: string | null
+          observaciones?: string | null
+          origen?: string
+          transcripcion?: string | null
+          updated_at?: string
+          user_id?: string | null
+          vendedor?: string | null
+        }
+        Update: {
+          campos?: Json
+          cod_cliente?: number
+          created_at?: string
+          estado?: string
+          fecha?: string
+          id?: string
+          motivo_key?: string | null
+          observaciones?: string | null
+          origen?: string
+          transcripcion?: string | null
+          updated_at?: string
+          user_id?: string | null
+          vendedor?: string | null
+        }
+        Relationships: []
+      }
+      visitas_planificadas: {
+        Row: {
+          cod_cliente: number
+          created_at: string
+          estado: string
+          fecha: string
+          id: string
+          notas: string | null
+          orden: number
+          updated_at: string
+          user_id: string
+          visita_id: string | null
+        }
+        Insert: {
+          cod_cliente: number
+          created_at?: string
+          estado?: string
+          fecha: string
+          id?: string
+          notas?: string | null
+          orden?: number
+          updated_at?: string
+          user_id: string
+          visita_id?: string | null
+        }
+        Update: {
+          cod_cliente?: number
+          created_at?: string
+          estado?: string
+          fecha?: string
+          id?: string
+          notas?: string | null
+          orden?: number
+          updated_at?: string
+          user_id?: string
+          visita_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visitas_planificadas_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "visitas"
+            referencedColumns: ["id"]
           },
         ]
       }

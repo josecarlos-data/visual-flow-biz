@@ -10,6 +10,11 @@ import Auth from "./pages/Auth";
 import PendingApproval from "./pages/PendingApproval";
 import Dashboard from "./pages/Dashboard";
 import Compras from "./pages/Compras";
+import Clientes from "./pages/Clientes";
+import ClienteDetalle from "./pages/ClienteDetalle";
+import Visitas from "./pages/Visitas";
+import NuevaVisita from "./pages/NuevaVisita";
+import Agenda from "./pages/Agenda";
 import AdminUsers from "./pages/AdminUsers";
 import AdminData from "./pages/AdminData";
 import AdminFunctions from "./pages/AdminFunctions";
@@ -75,6 +80,11 @@ const App = () => (
             <Route path="/pending" element={<PendingRoute><PendingApproval /></PendingRoute>} />
             <Route path="/" element={<ProtectedRoute dashboardKey="ventas"><Dashboard /></ProtectedRoute>} />
             <Route path="/compras" element={<ProtectedRoute dashboardKey="compras"><Compras /></ProtectedRoute>} />
+            <Route path="/clientes" element={<ProtectedRoute dashboardKey="clientes"><Clientes /></ProtectedRoute>} />
+            <Route path="/clientes/:cod" element={<ProtectedRoute dashboardKey="clientes"><ClienteDetalle /></ProtectedRoute>} />
+            <Route path="/visitas" element={<ProtectedRoute dashboardKey="visitas"><Visitas /></ProtectedRoute>} />
+            <Route path="/visitas/nueva" element={<ProtectedRoute dashboardKey="visitas"><NuevaVisita /></ProtectedRoute>} />
+            <Route path="/agenda" element={<ProtectedRoute dashboardKey="agenda"><Agenda /></ProtectedRoute>} />
             <Route path="/admin/users" element={<ProtectedRoute adminOnly><AdminUsers /></ProtectedRoute>} />
             <Route path="/admin/data" element={<ProtectedRoute adminOnly><AdminData /></ProtectedRoute>} />
             <Route path="/admin/functions" element={<ProtectedRoute adminOnly><AdminFunctions /></ProtectedRoute>} />
