@@ -1,40 +1,62 @@
-## Qué he comprobado
+## Lo que hay en el fichero
 
-He intentado descargar el enlace que me has pasado sin autenticación: la API pública de OneDrive responde `User migrated / generalException` y el enlace directo devuelve la página de login. Es decir, **al ser un archivo de SharePoint corporativo protegido con contraseña, no se puede leer con un simple enlace**: hace falta autenticación real contra Microsoft. La contraseña del enlace sirve para un navegador humano, no para la app.
-
-La solución correcta es conectar la cuenta de Microsoft de RIMOSA mediante el conector oficial (OAuth), que da acceso al archivo sin exponer credenciales y refresca los tokens solo.
+- **Hechos_Diarios**: 402.527 líneas diarias (02/01/2024 → 24/07/2026) con cliente, referencia, marca, familia, fecha, unidades, **importe y margen**. Incluye abonos (negativos).
+- **Dim_Cliente**: 11.588 clientes (solo 3.419 con ventas), con vendedor y código de vendedor.
+- **Dim_Referencia**: 68.401 referencias, 357 marcas, 168 familias (8.908 sin descripción).
+- **TopTruck**: 13 clientes marcados.
+- Falta la delegación (la añadirás al origen), y no hay localidad, teléfono ni ruta.
 
 ## Plan
 
-### 1. Conexión a Microsoft (OneDrive / SharePoint)
-- Lanzar el conector de Microsoft OneDrive y hacer login con la cuenta que tiene el archivo (info3@rimosa.com) o con una cuenta que lo tenga compartido. Es un OAuth de Microsoft: la app solo recibe permiso de lectura de archivos, no la contraseña.
-- Una vez conectado, listar los archivos, localizar el Excel y guardar su identificador.
+### 1. Nuevo modelo de datos
+- `ventas_diarias`: detalle línea a línea (cliente, referencia, marca, familia, fecha, unidades, importe, margen).
+- `productos`: ampliada con marca y familia_marca desde Dim_Referencia.
+- `clientes`: se alimenta de Dim_Cliente (razón social, vendedor, código de vendedor, Top Truck). El CIF **no se carga** — no aporta nada al análisis y evita el debate de protección de datos.
+- Tablas resumen recalculadas en la propia base de datos tras cada carga:
+  - resumen mes × cliente (importe, margen, unidades),
+  - resumen año × cliente × familia y × marca,
+  - ficha rápida por cliente (última compra, días sin comprar, nº de referencias, margen %).
+- La `delegacion` queda preparada: en cuanto añadas la columna al Excel se rellena sola; mientras tanto la seguridad por rol funciona por vendedor.
 
-### 2. Inspección real del Excel
-- Leer las hojas del libro (nombres, cabeceras y una muestra de filas) para saber exactamente qué campos hay: ventas, clientes, productos y visitas.
-- Con eso te presento un resumen de la información disponible antes de tocar nada más — ahí decidimos cómo rediseñar el panel de ventas.
+### 2. Carga de los datos reales (ahora)
+- Se sube el maestro a un almacén privado de la aplicación y una función de servidor lo procesa por bloques (el volumen es demasiado grande para el navegador).
+- Pantalla "Gestión de datos" rehecha: subir maestro, ver progreso, filas cargadas por hoja, errores y fecha de la última carga.
+- Cuando haya acceso a OneDrive, esa misma función leerá el fichero directamente sin cambiar nada más.
 
-### 3. Sincronización automática
-- Reescribir la función `sync-onedrive` para que lea el fichero a través del conector (Microsoft Graph) en lugar de por enlace público, mapeando cada hoja a su tabla (`clientes`, `ventas_mensuales`, `productos`, `visitas`).
-- Pantalla de administración con: archivo/hoja configurados, botón "Sincronizar ahora", fecha y resultado de la última sincronización, y registro de errores.
-- Programar la sincronización diaria automática.
-- La carga manual por Excel se mantiene como respaldo.
+### 3. Permiso de margen configurable
+- Nuevo permiso por usuario, gestionado desde Administración → Usuarios, igual que los dashboards.
+- Sin permiso, la aplicación no muestra margen en ningún panel, ficha, gráfico ni respuesta de la IA (bloqueado también en el servidor, no solo en pantalla).
 
-### 4. Accesos por perfil
-- Dejar **Compras** fuera del alcance de los comerciales: por defecto, un usuario nuevo con rol comercial recibirá acceso a Ventas, Clientes, Agenda y Visitas; Compras queda solo para administración.
-- Aplicar esa asignación a las cuentas de comercial existentes desde la pantalla de Administración → Usuarios.
+### 4. Panel de ventas rediseñado
+- KPIs: facturación, margen € y %, unidades, nº de clientes activos, ticket medio — con comparativa contra el mismo periodo del año anterior.
+- Evolución mensual con margen superpuesto y selector de año.
+- Rankings: top clientes por facturación y por margen, top familias y top marcas.
+- **Cuadro de alertas**, lo más valioso de estos datos:
+  - clientes que caen respecto al año anterior,
+  - clientes con muchos días sin comprar (fuga),
+  - clientes de alta facturación y margen bajo,
+  - familias que un cliente ha dejado de comprar,
+  - cartera dormida: los ~8.000 clientes sin ventas, filtrados por vendedor.
 
-### 5. Asistente IA
-- Icono flotante presente en toda la app que abre un panel de chat.
-- Consciente del contexto: si estás en la ficha de un cliente, responde sobre ese cliente (ventas, productos, visitas); si no, responde sobre la cartera visible según los permisos del usuario.
-- Funciona sobre los datos que el usuario puede ver (respeta el filtro por rol/delegación).
+### 5. Ficha de cliente 360 ampliada
+- Recencia y frecuencia de compra, evolución mensual, mix por familia y marca, referencias top y referencias abandonadas, margen (si tiene permiso), histórico de visitas.
+
+### 6. Asistente IA
+- Icono flotante en toda la app; en la ficha de un cliente responde sobre ese cliente, y en el panel sobre la cartera visible.
+- Respeta rol, vendedor, delegación y el permiso de margen.
+
+### 7. Accesos por perfil
+- Comerciales: Ventas, Clientes, Agenda y Visitas. Compras se queda solo para administración.
 
 ## Detalles técnicos
 
-- Conector: `microsoft_onedrive` (gateway de Lovable, tokens OAuth renovados automáticamente). Llamadas solo desde funciones de servidor, nunca desde el navegador.
-- Lectura del libro con Microsoft Graph (`/me/drive/items/{id}/workbook/...`), paginando rangos para evitar timeouts en hojas grandes.
-- Nuevo edge function `crm-assistant` usando la IA de Lovable, con las consultas a la base de datos ejecutadas bajo la sesión del usuario para respetar RLS.
+- Ingesta con edge function + almacenamiento privado, lectura por streaming en bloques de 2.000 filas y `upsert` idempotente; los resúmenes se recalculan con SQL al terminar.
+- Índices por `cod_cliente`, `fecha`, `familia` y `marca`; los paneles leen de las tablas resumen, nunca del detalle completo.
+- RLS sobre `ventas_diarias` y resúmenes reutilizando `is_admin` / vendedor / delegación ya existentes.
 
-## Siguiente paso
+## Orden de trabajo
 
-Al aprobar, lo primero será abrirte la tarjeta de conexión de Microsoft para que autorices la cuenta; sin ese paso no puedo leer el Excel.
+1. Estructura de datos + permiso de margen.
+2. Carga del maestro real y verificación de cifras (14,6 M€ 2024 / 15,0 M€ 2025 / 7,9 M€ 2026).
+3. Panel de ventas y alertas.
+4. Ficha de cliente y asistente IA.
