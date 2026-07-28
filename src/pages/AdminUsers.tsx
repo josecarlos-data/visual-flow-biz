@@ -23,6 +23,7 @@ interface UserRow {
   email: string | null;
   employee_code: string | null;
   is_approved: boolean;
+  ver_margen: boolean;
   delegacion: string | null;
   role: AppRole | null;
   dashboardKeys: string[];
@@ -40,7 +41,7 @@ export default function AdminUsers() {
   const fetchData = async () => {
     setLoading(true);
     const [profilesRes, clientesRes, dashboardsRes] = await Promise.all([
-      supabase.from("profiles").select("user_id, full_name, email, employee_code, is_approved, delegacion"),
+      supabase.from("profiles").select("user_id, full_name, email, employee_code, is_approved, delegacion, ver_margen"),
       supabase.from("clientes").select("vendedor, delegacion"),
       supabase
         .from("dashboards" as any)
@@ -86,6 +87,7 @@ export default function AdminUsers() {
         email: p.email ?? null,
         employee_code: p.employee_code ?? null,
         is_approved: p.is_approved,
+        ver_margen: (p as any).ver_margen ?? false,
         delegacion: (p as any).delegacion ?? null,
         role: rolesMap.get(p.user_id) ?? null,
         dashboardKeys: accessMap.get(p.user_id) ?? [],
@@ -127,6 +129,12 @@ export default function AdminUsers() {
     const { error } = await supabase.from("profiles").update({ delegacion: value } as any).eq("user_id", userId);
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
     else { toast({ title: "Delegación asignada" }); fetchData(); }
+  };
+
+  const toggleMargen = async (userId: string, current: boolean) => {
+    const { error } = await supabase.from("profiles").update({ ver_margen: !current } as any).eq("user_id", userId);
+    if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
+    else { toast({ title: !current ? "Margen visible" : "Margen oculto" }); fetchData(); }
   };
 
   const toggleDashboard = async (userId: string, dashboardKey: string, currentlyHas: boolean) => {
@@ -254,6 +262,7 @@ export default function AdminUsers() {
                   <TableHead>Vendedor</TableHead>
                   <TableHead>Rol</TableHead>
                   <TableHead>Delegación</TableHead>
+                  <TableHead>Margen</TableHead>
                   <TableHead>Dashboards</TableHead>
                 </TableRow>
               </TableHeader>
@@ -300,6 +309,20 @@ export default function AdminUsers() {
                           ))}
                         </SelectContent>
                       </Select>
+                    </TableCell>
+                    <TableCell>
+                      {u.role === "admin" ? (
+                        <Badge variant="secondary" className="opacity-70">Siempre</Badge>
+                      ) : (
+                        <Badge
+                          variant={u.ver_margen ? "default" : "outline"}
+                          className="cursor-pointer select-none"
+                          onClick={() => toggleMargen(u.user_id, u.ver_margen)}
+                        >
+                          {u.ver_margen ? <Check className="mr-1 h-3 w-3" /> : null}
+                          {u.ver_margen ? "Ve margen" : "Sin margen"}
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell>
                       {u.role === "admin" ? (
