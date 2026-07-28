@@ -971,10 +971,18 @@ export type Database = {
         }
         Returns: boolean
       }
+      insertar_ventas_diarias: {
+        Args: { _reset?: boolean; _rows: Json }
+        Returns: number
+      }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_approved: { Args: { _user_id: string }; Returns: boolean }
+      marcar_top_truck: { Args: { _cods: Json }; Returns: number }
       puede_ver_margen: { Args: { _user_id: string }; Returns: boolean }
+      refrescar_resumenes_admin: { Args: never; Returns: undefined }
       refrescar_resumenes_ventas: { Args: never; Returns: undefined }
+      upsert_clientes_maestro: { Args: { _rows: Json }; Returns: number }
+      upsert_productos_maestro: { Args: { _rows: Json }; Returns: number }
     }
     Enums: {
       app_role: "admin" | "director_comercial" | "jefe_de_zona" | "comercial"
