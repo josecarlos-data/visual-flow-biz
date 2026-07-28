@@ -50,6 +50,57 @@ export type Database = {
         }
         Relationships: []
       }
+      cliente_kpis: {
+        Row: {
+          actualizado_en: string
+          cod_cliente: number
+          dias_sin_comprar: number | null
+          importe_anio_actual: number
+          importe_anio_anterior: number
+          importe_anio_anterior_ytd: number
+          importe_total: number
+          margen_anio_actual: number
+          margen_anio_anterior: number
+          margen_total: number
+          num_lineas: number
+          num_referencias: number
+          primera_compra: string | null
+          ultima_compra: string | null
+        }
+        Insert: {
+          actualizado_en?: string
+          cod_cliente: number
+          dias_sin_comprar?: number | null
+          importe_anio_actual?: number
+          importe_anio_anterior?: number
+          importe_anio_anterior_ytd?: number
+          importe_total?: number
+          margen_anio_actual?: number
+          margen_anio_anterior?: number
+          margen_total?: number
+          num_lineas?: number
+          num_referencias?: number
+          primera_compra?: string | null
+          ultima_compra?: string | null
+        }
+        Update: {
+          actualizado_en?: string
+          cod_cliente?: number
+          dias_sin_comprar?: number | null
+          importe_anio_actual?: number
+          importe_anio_anterior?: number
+          importe_anio_anterior_ytd?: number
+          importe_total?: number
+          margen_anio_actual?: number
+          margen_anio_anterior?: number
+          margen_total?: number
+          num_lineas?: number
+          num_referencias?: number
+          primera_compra?: string | null
+          ultima_compra?: string | null
+        }
+        Relationships: []
+      }
       cliente_productos: {
         Row: {
           anio: number | null
@@ -96,6 +147,7 @@ export type Database = {
         Row: {
           cliente: string
           cod_cliente: number
+          cod_vendedor: string | null
           created_at: string
           crecimiento_previsto: number | null
           delegacion: string | null
@@ -119,6 +171,7 @@ export type Database = {
         Insert: {
           cliente: string
           cod_cliente: number
+          cod_vendedor?: string | null
           created_at?: string
           crecimiento_previsto?: number | null
           delegacion?: string | null
@@ -142,6 +195,7 @@ export type Database = {
         Update: {
           cliente?: string
           cod_cliente?: number
+          cod_vendedor?: string | null
           created_at?: string
           crecimiento_previsto?: number | null
           delegacion?: string | null
@@ -351,6 +405,7 @@ export type Database = {
           created_at: string
           descripcion: string | null
           familia: string | null
+          familia_marca: string | null
           id: string
           marca: string | null
           precio: number | null
@@ -361,6 +416,7 @@ export type Database = {
           created_at?: string
           descripcion?: string | null
           familia?: string | null
+          familia_marca?: string | null
           id?: string
           marca?: string | null
           precio?: number | null
@@ -371,6 +427,7 @@ export type Database = {
           created_at?: string
           descripcion?: string | null
           familia?: string | null
+          familia_marca?: string | null
           id?: string
           marca?: string | null
           precio?: number | null
@@ -390,6 +447,7 @@ export type Database = {
           is_approved: boolean
           updated_at: string
           user_id: string
+          ver_margen: boolean
           zone_id: string | null
         }
         Insert: {
@@ -402,6 +460,7 @@ export type Database = {
           is_approved?: boolean
           updated_at?: string
           user_id: string
+          ver_margen?: boolean
           zone_id?: string | null
         }
         Update: {
@@ -414,6 +473,7 @@ export type Database = {
           is_approved?: boolean
           updated_at?: string
           user_id?: string
+          ver_margen?: boolean
           zone_id?: string | null
         }
         Relationships: [
@@ -425,6 +485,93 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      resumen_cliente_familia: {
+        Row: {
+          anio: number
+          cod_cliente: number
+          familia: string
+          importe: number
+          margen: number
+          ultima_compra: string | null
+          unidades: number
+        }
+        Insert: {
+          anio: number
+          cod_cliente: number
+          familia: string
+          importe?: number
+          margen?: number
+          ultima_compra?: string | null
+          unidades?: number
+        }
+        Update: {
+          anio?: number
+          cod_cliente?: number
+          familia?: string
+          importe?: number
+          margen?: number
+          ultima_compra?: string | null
+          unidades?: number
+        }
+        Relationships: []
+      }
+      resumen_cliente_marca: {
+        Row: {
+          anio: number
+          cod_cliente: number
+          importe: number
+          marca: string
+          margen: number
+          unidades: number
+        }
+        Insert: {
+          anio: number
+          cod_cliente: number
+          importe?: number
+          marca: string
+          margen?: number
+          unidades?: number
+        }
+        Update: {
+          anio?: number
+          cod_cliente?: number
+          importe?: number
+          marca?: string
+          margen?: number
+          unidades?: number
+        }
+        Relationships: []
+      }
+      resumen_cliente_mes: {
+        Row: {
+          anio: number
+          cod_cliente: number
+          importe: number
+          lineas: number
+          margen: number
+          mes: number
+          unidades: number
+        }
+        Insert: {
+          anio: number
+          cod_cliente: number
+          importe?: number
+          lineas?: number
+          margen?: number
+          mes: number
+          unidades?: number
+        }
+        Update: {
+          anio?: number
+          cod_cliente?: number
+          importe?: number
+          lineas?: number
+          margen?: number
+          mes?: number
+          unidades?: number
+        }
+        Relationships: []
       }
       rutas: {
         Row: {
@@ -599,6 +746,45 @@ export type Database = {
         }
         Relationships: []
       }
+      ventas_diarias: {
+        Row: {
+          cod_cliente: number
+          created_at: string
+          familia: string | null
+          fecha: string
+          id: number
+          importe: number
+          marca: string | null
+          margen: number
+          referencia: string
+          unidades: number
+        }
+        Insert: {
+          cod_cliente: number
+          created_at?: string
+          familia?: string | null
+          fecha: string
+          id?: never
+          importe?: number
+          marca?: string | null
+          margen?: number
+          referencia: string
+          unidades?: number
+        }
+        Update: {
+          cod_cliente?: number
+          created_at?: string
+          familia?: string | null
+          fecha?: string
+          id?: never
+          importe?: number
+          marca?: string | null
+          margen?: number
+          referencia?: string
+          unidades?: number
+        }
+        Relationships: []
+      }
       ventas_mensuales: {
         Row: {
           anio: number
@@ -755,6 +941,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_view_cliente: {
+        Args: { _cod: number; _user_id: string }
+        Returns: boolean
+      }
       get_distinct_delegaciones: {
         Args: never
         Returns: {
@@ -783,6 +973,8 @@ export type Database = {
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_approved: { Args: { _user_id: string }; Returns: boolean }
+      puede_ver_margen: { Args: { _user_id: string }; Returns: boolean }
+      refrescar_resumenes_ventas: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "director_comercial" | "jefe_de_zona" | "comercial"
