@@ -38,6 +38,7 @@ const AuthContext = createContext<AuthContextType>({
   authError: null,
   employeeCode: null,
   delegacion: null,
+  verMargen: false,
   dashboards: [],
   hasDashboard: () => false,
   signOut: async () => {},
@@ -52,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authError, setAuthError] = useState<string | null>(null);
   const [employeeCode, setEmployeeCode] = useState<string | null>(null);
   const [delegacion, setDelegacion] = useState<string | null>(null);
+  const [verMargen, setVerMargen] = useState(false);
   const [dashboards, setDashboards] = useState<DashboardItem[]>([]);
 
   const fetchUserData = async (userId: string) => {
@@ -61,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const [profileRes, roleRes] = await Promise.all([
         supabase
           .from("profiles")
-          .select("is_approved, employee_code, delegacion")
+          .select("is_approved, employee_code, delegacion, ver_margen")
           .eq("user_id", userId)
           .maybeSingle(),
         supabase
@@ -85,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsApproved(profileRes.data?.is_approved ?? false);
         setEmployeeCode(profileRes.data?.employee_code ?? null);
         setDelegacion(profileRes.data?.delegacion ?? null);
+        setVerMargen(((profileRes.data as any)?.ver_margen ?? false) || (roleRes.data?.role as AppRole) === "admin");
       }
 
       if (roleRes.error) {
@@ -123,6 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsApproved(false);
       setRole(null);
       setDashboards([]);
+      setVerMargen(false);
     }
   };
 
@@ -192,6 +196,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setRole(null);
       setIsApproved(false);
       setDashboards([]);
+      setVerMargen(false);
       setIsLoading(false);
     }
   };
@@ -199,7 +204,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasDashboard = (key: string) => role === "admin" || dashboards.some((d) => d.key === key);
 
   return (
-    <AuthContext.Provider value={{ session, user, role, isApproved, isLoading, authError, employeeCode, delegacion, dashboards, hasDashboard, signOut }}>
+    <AuthContext.Provider value={{ session, user, role, isApproved, isLoading, authError, employeeCode, delegacion, verMargen, dashboards, hasDashboard, signOut }}>
       {children}
     </AuthContext.Provider>
   );
