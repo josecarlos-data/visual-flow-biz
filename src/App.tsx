@@ -8,6 +8,7 @@ import { AppLayout } from "@/components/AppLayout";
 import LoadingScreen from "@/components/LoadingScreen";
 import Auth from "./pages/Auth";
 import PendingApproval from "./pages/PendingApproval";
+import Ventas from "./pages/Ventas";
 import Dashboard from "./pages/Dashboard";
 import Compras from "./pages/Compras";
 import Clientes from "./pages/Clientes";
@@ -104,7 +105,8 @@ const App = () => (
           <Routes>
             <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
             <Route path="/pending" element={<PendingRoute><PendingApproval /></PendingRoute>} />
-            <Route path="/" element={<ProtectedRoute dashboardKey="ventas"><Dashboard /></ProtectedRoute>} />
+            <Route path="/" element={<ProtectedRoute dashboardKey="ventas"><Ventas /></ProtectedRoute>} />
+            <Route path="/ventas-historico" element={<ProtectedRoute dashboardKey="ventas"><Dashboard /></ProtectedRoute>} />
             <Route path="/compras" element={<ProtectedRoute dashboardKey="compras"><Compras /></ProtectedRoute>} />
             <Route path="/clientes" element={<ProtectedRoute dashboardKey="clientes"><Clientes /></ProtectedRoute>} />
             <Route path="/clientes/:cod" element={<ProtectedRoute dashboardKey="clientes"><ClienteDetalle /></ProtectedRoute>} />
