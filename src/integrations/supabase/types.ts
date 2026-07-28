@@ -978,6 +978,75 @@ export type Database = {
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_approved: { Args: { _user_id: string }; Returns: boolean }
       marcar_top_truck: { Args: { _cods: Json }; Returns: number }
+      panel_alertas: {
+        Args: { _limite?: number }
+        Returns: {
+          cliente: string
+          cod_cliente: number
+          dias: number
+          tipo: string
+          valor: number
+          valor_ref: number
+          vendedor: string
+        }[]
+      }
+      panel_dormidos: {
+        Args: { _limite?: number }
+        Returns: {
+          cliente: string
+          cod_cliente: number
+          importe_total: number
+          ultima_compra: string
+          vendedor: string
+        }[]
+      }
+      panel_top_clientes: {
+        Args: { _anio: number; _limite?: number }
+        Returns: {
+          cliente: string
+          cod_cliente: number
+          importe: number
+          margen: number
+          vendedor: string
+        }[]
+      }
+      panel_top_familias: {
+        Args: { _anio: number; _limite?: number }
+        Returns: {
+          familia: string
+          importe: number
+          margen: number
+        }[]
+      }
+      panel_top_marcas: {
+        Args: { _anio: number; _limite?: number }
+        Returns: {
+          importe: number
+          marca: string
+          margen: number
+        }[]
+      }
+      panel_ventas_kpis: {
+        Args: never
+        Returns: {
+          anio: number
+          clientes: number
+          importe: number
+          lineas: number
+          margen: number
+          unidades: number
+        }[]
+      }
+      panel_ventas_mensual: {
+        Args: never
+        Returns: {
+          anio: number
+          importe: number
+          margen: number
+          mes: number
+          unidades: number
+        }[]
+      }
       puede_ver_margen: { Args: { _user_id: string }; Returns: boolean }
       refrescar_resumenes_admin: { Args: never; Returns: undefined }
       refrescar_resumenes_ventas: { Args: never; Returns: undefined }
