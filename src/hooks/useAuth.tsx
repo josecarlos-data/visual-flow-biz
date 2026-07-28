@@ -23,6 +23,7 @@ interface AuthContextType {
   authError: string | null;
   employeeCode: string | null;
   delegacion: string | null;
+  verMargen: boolean;
   dashboards: DashboardItem[];
   hasDashboard: (key: string) => boolean;
   signOut: () => Promise<void>;
