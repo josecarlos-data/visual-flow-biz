@@ -1,25 +1,40 @@
-## Causa confirmada
+## Qué he comprobado
 
-Las contraseñas son correctas y **los 4 usuarios están aprobados** en la base de datos (`is_approved = true`). El bloqueo no es de aprobación.
+He intentado descargar el enlace que me has pasado sin autenticación: la API pública de OneDrive responde `User migrated / generalException` y el enlace directo devuelve la página de login. Es decir, **al ser un archivo de SharePoint corporativo protegido con contraseña, no se puede leer con un simple enlace**: hace falta autenticación real contra Microsoft. La contraseña del enlace sirve para un navegador humano, no para la app.
 
-En el arreglo de seguridad anterior se revocó `EXECUTE` a `authenticated` sobre las funciones auxiliares `is_admin`, `has_role`, `get_user_zone_id` y `has_dashboard_access` (verificado: sus permisos actuales solo incluyen `postgres` y `service_role`).
+La solución correcta es conectar la cuenta de Microsoft de RIMOSA mediante el conector oficial (OAuth), que da acceso al archivo sin exponer credenciales y refresca los tokens solo.
 
-Pero esas mismas funciones se usan dentro de las políticas RLS de `profiles` (y de casi todas las tablas). Al evaluar la política, Postgres devuelve "permission denied for function" → la consulta del perfil falla → el hook de auth cae al `catch` y pone `isApproved = false` → redirección a **/pending**. De ahí que entre con contraseña correcta y se quede atascado.
+## Plan
 
-## Solución
+### 1. Conexión a Microsoft (OneDrive / SharePoint)
+- Lanzar el conector de Microsoft OneDrive y hacer login con la cuenta que tiene el archivo (info3@rimosa.com) o con una cuenta que lo tenga compartido. Es un OAuth de Microsoft: la app solo recibe permiso de lectura de archivos, no la contraseña.
+- Una vez conectado, listar los archivos, localizar el Excel y guardar su identificador.
 
-1. **Migración**: volver a conceder `EXECUTE` a `authenticated` (y `anon` donde la política lo requiera durante el arranque de sesión) sobre:
-   - `public.is_admin(uuid)`
-   - `public.has_role(uuid, app_role)`
-   - `public.get_user_zone_id(uuid)`
-   - `public.has_dashboard_access(uuid, text)`
-   
-   Es seguro: son `SECURITY DEFINER`, de solo lectura, y solo responden sí/no sobre el usuario que se les pasa; sin ellas el modelo RLS entero no funciona.
+### 2. Inspección real del Excel
+- Leer las hojas del libro (nombres, cabeceras y una muestra de filas) para saber exactamente qué campos hay: ventas, clientes, productos y visitas.
+- Con eso te presento un resumen de la información disponible antes de tocar nada más — ahí decidimos cómo rediseñar el panel de ventas.
 
-2. **Robustez del login**: en `useAuth`, si la consulta de perfil devuelve error (no "sin fila"), no asumir "no aprobado" en silencio; mostrar un mensaje de error real en pantalla en lugar de mandar a /pending, para que un fallo de permisos no vuelva a disfrazarse de "cuenta pendiente".
+### 3. Sincronización automática
+- Reescribir la función `sync-onedrive` para que lea el fichero a través del conector (Microsoft Graph) en lugar de por enlace público, mapeando cada hoja a su tabla (`clientes`, `ventas_mensuales`, `productos`, `visitas`).
+- Pantalla de administración con: archivo/hoja configurados, botón "Sincronizar ahora", fecha y resultado de la última sincronización, y registro de errores.
+- Programar la sincronización diaria automática.
+- La carga manual por Excel se mantiene como respaldo.
 
-3. **Registro de seguridad**: marcar los findings `SUPA_anon_security_definer_function_executable` / `SUPA_authenticated_security_definer_function_executable` como ignorados con la justificación (funciones requeridas por las políticas RLS) y actualizar la memoria de seguridad para que no se vuelvan a revocar.
+### 4. Accesos por perfil
+- Dejar **Compras** fuera del alcance de los comerciales: por defecto, un usuario nuevo con rol comercial recibirá acceso a Ventas, Clientes, Agenda y Visitas; Compras queda solo para administración.
+- Aplicar esa asignación a las cuentas de comercial existentes desde la pantalla de Administración → Usuarios.
 
-## Verificación
+### 5. Asistente IA
+- Icono flotante presente en toda la app que abre un panel de chat.
+- Consciente del contexto: si estás en la ficha de un cliente, responde sobre ese cliente (ventas, productos, visitas); si no, responde sobre la cartera visible según los permisos del usuario.
+- Funciona sobre los datos que el usuario puede ver (respeta el filtro por rol/delegación).
 
-Tras aplicar la migración, comprobar con el navegador que el admin entra al dashboard en lugar de a /pending.
+## Detalles técnicos
+
+- Conector: `microsoft_onedrive` (gateway de Lovable, tokens OAuth renovados automáticamente). Llamadas solo desde funciones de servidor, nunca desde el navegador.
+- Lectura del libro con Microsoft Graph (`/me/drive/items/{id}/workbook/...`), paginando rangos para evitar timeouts en hojas grandes.
+- Nuevo edge function `crm-assistant` usando la IA de Lovable, con las consultas a la base de datos ejecutadas bajo la sesión del usuario para respetar RLS.
+
+## Siguiente paso
+
+Al aprobar, lo primero será abrirte la tarjeta de conexión de Microsoft para que autorices la cuenta; sin ese paso no puedo leer el Excel.
