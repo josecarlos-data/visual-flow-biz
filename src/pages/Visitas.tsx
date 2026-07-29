@@ -1,18 +1,20 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Search, CalendarDays } from "lucide-react";
+import { Plus, Search, CalendarDays, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useVisitas, useClientes, useMotivos, fechaCorta } from "@/hooks/useCrm";
 
 export default function Visitas() {
-  const { data: visitas, isLoading } = useVisitas();
-  const { data: clientes } = useClientes();
+  const { data: visitas, isLoading } = useVisitas(300);
+  const { data: clientes } = useClientes(false);
   const { data: motivos } = useMotivos();
   const [q, setQ] = useState("");
+  const [motivoFiltro, setMotivoFiltro] = useState("todos");
 
   const nombreCliente = useMemo(() => {
     const m = new Map<number, string>();
@@ -20,13 +22,23 @@ export default function Visitas() {
     return m;
   }, [clientes]);
 
+  const titulo = (v: { cod_cliente: number | null; cliente_externo: string | null }) =>
+    v.cod_cliente != null
+      ? nombreCliente.get(v.cod_cliente) ?? `Cliente #${v.cod_cliente}`
+      : v.cliente_externo ?? "Cliente potencial";
+
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
-    if (!term) return visitas ?? [];
-    return (visitas ?? []).filter((v) =>
-      (nombreCliente.get(v.cod_cliente) ?? "").toLowerCase().includes(term),
-    );
-  }, [visitas, q, nombreCliente]);
+    return (visitas ?? []).filter((v) => {
+      if (motivoFiltro !== "todos" && v.motivo_key !== motivoFiltro) return false;
+      if (!term) return true;
+      return (
+        titulo(v).toLowerCase().includes(term) ||
+        (v.comercial_nombre ?? "").toLowerCase().includes(term) ||
+        (v.ruta ?? "").toLowerCase().includes(term)
+      );
+    });
+  }, [visitas, q, motivoFiltro, nombreCliente]);
 
   return (
     <div className="space-y-4">
@@ -40,9 +52,23 @@ export default function Visitas() {
         </Button>
       </div>
 
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por cliente…" className="pl-9" />
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Buscar por cliente, comercial o ruta…"
+            className="pl-9"
+          />
+        </div>
+        <Select value={motivoFiltro} onValueChange={setMotivoFiltro}>
+          <SelectTrigger className="sm:w-64"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos los motivos</SelectItem>
+            {(motivos ?? []).map((m) => <SelectItem key={m.key} value={m.key}>{m.nombre}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
 
       {isLoading ? (
@@ -51,30 +77,56 @@ export default function Visitas() {
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
             <CalendarDays className="h-8 w-8 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">Todavía no hay visitas registradas.</p>
-            <Button asChild variant="outline"><Link to="/visitas/nueva">Registrar la primera</Link></Button>
+            <p className="text-sm text-muted-foreground">No hay visitas que coincidan con la búsqueda.</p>
+            <Button asChild variant="outline"><Link to="/visitas/nueva">Registrar una visita</Link></Button>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-2">
-          {filtered.map((v) => (
-            <Link key={v.id} to={`/clientes/${v.cod_cliente}`} className="block rounded-lg border bg-card p-4 hover:bg-accent">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate font-medium">{nombreCliente.get(v.cod_cliente) ?? `Cliente #${v.cod_cliente}`}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{fechaCorta(v.fecha)}</p>
+          {filtered.map((v) => {
+            const contenido = (
+              <>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{titulo(v)}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {fechaCorta(v.fecha)}
+                      {v.hora ? ` · ${v.hora.slice(0, 5)}` : ""}
+                      {v.comercial_nombre ? ` · ${v.comercial_nombre}` : ""}
+                      {v.ruta ? ` · Ruta ${v.ruta}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <Badge variant="secondary">
+                      {motivos?.find((m) => m.key === v.motivo_key)?.nombre ?? "Visita"}
+                    </Badge>
+                    {v.validacion && (
+                      <Badge variant={v.validacion === "correcto" ? "outline" : "destructive"}>
+                        {v.validacion === "correcto" ? "Correcto" : "No correcto"}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
-                <Badge variant="secondary" className="shrink-0">
-                  {motivos?.find((m) => m.key === v.motivo_key)?.nombre ?? "Visita"}
-                </Badge>
-              </div>
-              {(v.observaciones || v.transcripcion) && (
-                <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
-                  {v.observaciones || v.transcripcion}
-                </p>
-              )}
-            </Link>
-          ))}
+                {(v.observaciones || v.transcripcion) && (
+                  <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
+                    {v.observaciones || v.transcripcion}
+                  </p>
+                )}
+                {v.latitud != null && v.longitud != null && (
+                  <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                    <MapPin className="h-3 w-3" />Visita geolocalizada
+                  </p>
+                )}
+              </>
+            );
+            return v.cod_cliente != null ? (
+              <Link key={v.id} to={`/clientes/${v.cod_cliente}`} className="block rounded-lg border bg-card p-4 hover:bg-accent">
+                {contenido}
+              </Link>
+            ) : (
+              <div key={v.id} className="rounded-lg border bg-card p-4">{contenido}</div>
+            );
+          })}
         </div>
       )}
     </div>
