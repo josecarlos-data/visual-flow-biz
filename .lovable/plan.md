@@ -1,59 +1,28 @@
-## Qué dice el fichero (21.581 visitas, 03/2025 – 12/2026)
+## Qué está pasando
 
-| Campo | Contenido | Uso |
-|---|---|---|
-| Fecha / Hora | separados | se unen en fecha + hora |
-| Código cliente | `04-10374` (21.088) y `NV-xxx` (461 = clientes nuevos/prospectos) | el número tras el guion enlaza con `cod_cliente` |
-| Motivo | 6 valores + 452 vacíos | base de las plantillas |
-| Tipo | Ruta (9.013), Cliente (8.139), Llamada (4.346), Agenda (83) | canal de la visita |
-| Estado | Realizada (17.965), Pendiente (3.591), Cancelada (25) | ya coincide con nuestro modelo |
-| Observaciones | 84% rellenas, media 130 caracteres | texto libre a explotar con IA |
-| Comercial | 7 comerciales, formato `23 - Nombre` | el número es el código de vendedor |
-| Ruta / Zona / Lat / Lon | parciales (63% con GPS) | mapa y filtros |
-| Título / Clase | prácticamente vacíos | se descartan |
+La carga del Maestro ISI falla en el primer paso ("Limpieza inicial") con `cannot truncate a table referenced in a foreign key constraint`.
 
-Hallazgo clave: casi todas las observaciones empiezan por **CORRECTO / NO CORRECTO**: es una marca de validación del jefe de zona, no parte del comentario. Se extrae a un campo propio y se limpia del texto.
+Verificado en la base de datos: la función `reset_maestro_isi_data` hace `TRUNCATE` tabla por tabla, y hay dos claves foráneas que lo impiden:
 
-Segundo hallazgo: dentro de cada motivo el texto sigue un patrón repetido (referencia, precio Rimosa, precio competencia, respuesta del cliente…). Eso es exactamente lo que deben ser los campos de la plantilla, y lo que la IA rellenará desde la nota de voz.
+- `ventas_mensuales.cod_cliente` → `clientes`
+- `visitas_planificadas.visita_id` → `visitas`
 
-## Plantillas propuestas (revisables y editables después desde Administración)
+Postgres rechaza truncar una tabla referenciada aunque la tabla que la referencia ya esté vacía, salvo que se trunquen juntas en la misma sentencia o con `CASCADE`.
 
-1. **Seguimiento** — situación del cliente / necesidades detectadas / acuerdos / próxima acción / fecha próxima acción
-2. **Promoción, oferta o campaña** — producto ofertado / referencia / precio ofertado / respuesta del cliente (interesado, lo piensa, rechaza) / importe estimado / próxima acción
-3. **Revisión de seguimiento** — oferta que se revisa / referencia / resultado (pedido, pendiente, perdida) / motivo si se pierde / importe / próxima acción
-4. **Estudio de competencia** — competidor / referencia / nuestro precio / precio competencia / marca que compra / conclusión y acción
-5. **GSMart / Viaje crucero** — tema (GSMart, crucero, ambos) / entradas del mes / importe pedido por GSMart / incidencias detectadas / formación dada / próxima acción
-6. **Información importante / potencial** — persona de contacto / nº vehículos / marcas de vehículo / tipo de ejes / nº mecánicos / tipo de trabajo / potencial estimado / observaciones
-7. **Incidencia** (se mantiene la actual) — descripción / impacto / solución
+## Riesgo detectado (importante)
 
-Campos comunes a todos: cliente, fecha, hora, tipo (ruta/cliente/llamada/agenda), estado, observación libre, validación, GPS opcional.
+La función actual también borra `visitas` y `visitas_planificadas`. Como el histórico de Gespromo ya se ha importado correctamente, cada carga del Maestro ISI lo estaría eliminando. Hay que sacar las visitas del reset.
 
-## Ejecución
+## Cambios
 
-**1. Base de datos**
-- Ampliar `visitas`: `hora`, `tipo`, `validacion` (correcto / no correcto / sin marcar), `latitud`, `longitud`, `ruta`, `zona`, `comercial_nombre`, `titulo`, `cliente_externo` (para los `NV-`), y `origen` admite `gespromo`.
-- Ampliar `motivo_campos`: `tipo` acepta `select`, `fecha`, `booleano`; nuevos `opciones` (jsonb) y `placeholder`.
-- Sustituir los 4 motivos actuales por los 7 propuestos con sus campos, mapeando los nombres de Gespromo.
-- RPC de carga masiva `importar_visitas_historicas` (solo admin), con deduplicado por cliente+fecha+hora+comercial para poder repetir la carga sin duplicar.
+1. **Migración**: reescribir `reset_maestro_isi_data` para
+   - truncar en una sola sentencia todas las tablas de datos comerciales (clientes, productos, ventas_diarias, detalle_ventas, ventas_mensuales, cliente_productos, cliente_kpis, resúmenes, cliente_insights),
+   - **no** tocar `visitas` ni `visitas_planificadas`.
 
-**2. Carga del histórico**
-- Nuevo módulo en Gestión de Datos: **Visitas (histórico Gespromo)**, que lee este mismo formato de Excel, normaliza el código de cliente, extrae CORRECTO/NO CORRECTO, mapea motivos y comerciales, y avisa de los clientes que no existen en el maestro.
-- (Opcional, segunda pasada) proceso de IA que relee las observaciones históricas y rellena los campos de plantilla retroactivamente, para que el histórico sea explotable como datos y no solo como texto.
+2. **Carga de datos**: subir yo el Maestro ISI directamente a la base de datos usando los RPC existentes (`upsert_clientes_maestro`, `upsert_productos_maestro`, `insertar_ventas_diarias`) y refrescar los resúmenes con `refrescar_resumenes_admin`.
 
-**3. Administración → Plantillas de visita**
-Pantalla nueva: lista de motivos (crear, renombrar, color, orden, activar/desactivar) y, dentro de cada uno, sus campos (etiqueta, ayuda, tipo, obligatorio, opciones de lista, orden) con arrastrar para reordenar. Todo lo que se cambie ahí afecta al formulario del comercial y al prompt de la IA sin tocar código.
+   Para esto necesito que vuelvas a adjuntar el archivo `Maestro ISI - CRM.xlsx` en el chat (el pantallazo no incluye el fichero).
 
-**4. Panel de Visitas**
-- KPIs: visitas del periodo, realizadas vs pendientes, % validadas, media por comercial.
-- Gráficos: evolución mensual, reparto por motivo, ranking por comercial, cobertura de clientes visitados.
-- Listado filtrable (comercial, motivo, tipo, estado, fechas, ruta) con ficha de detalle y acceso al cliente.
-- En la ficha 360 del cliente, las visitas pasan a mostrar los campos de plantilla además del texto.
+3. **Verificación**: comprobar recuentos por tabla (clientes, productos, ventas_diarias) y que el histórico de visitas sigue intacto.
 
-**5. Formulario del comercial**
-El formulario de nueva visita y el prompt de la nota de voz se generan desde las plantillas ya editables, incluidos los campos de lista.
-
-### Detalle técnico
-`Código cliente` se normaliza con `split('-')[1]::int`; los `NV-` se guardan sin `cod_cliente` y con el nombre en `cliente_externo`. El comercial se enlaza por el número previo al guion contra `profiles.employee_code`, con el nombre original guardado como respaldo. La carga se hace en bloques de 500 filas vía RPC `SECURITY DEFINER` reutilizando el patrón del maestro ISI.
-
-### Orden de trabajo
-Migración → módulo de carga y importación del histórico → administración de plantillas → panel de visitas → formulario y voz.
+No hace falta cambiar nada en la pantalla de Gestión de Datos: con la función corregida, la carga manual funcionará igual.
