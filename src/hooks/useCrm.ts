@@ -12,8 +12,9 @@ export interface Cliente {
   email: string | null;
   vendedor: string | null;
   ruta: string | null;
-  tipo_cliente: string | null;
-  observaciones: string | null;
+  cod_tipo_cliente: string | null;
+  observaciones_almacen: string | null;
+
 }
 
 export interface MotivoCampo {
@@ -117,8 +118,9 @@ export function useClientes(soloActivos = true, orden: OrdenClientes = "ventas")
         email: null,
         vendedor: (r.vendedor as string) ?? null,
         ruta: (r.ruta as string) ?? null,
-        tipo_cliente: null,
-        observaciones: null,
+        cod_tipo_cliente: null,
+        observaciones_almacen: null,
+
         importe_actual: Number(r.importe_actual ?? 0),
         importe_anterior: Number(r.importe_anterior ?? 0),
         ultima_compra: (r.ultima_compra as string) ?? null,
