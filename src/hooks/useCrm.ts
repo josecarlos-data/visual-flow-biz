@@ -15,7 +15,25 @@ export interface Cliente {
   cod_tipo_cliente: string | null;
   observaciones_almacen: string | null;
 
+  razon_social?: string | null;
+  cif?: string | null;
+  cod_vendedor?: string | null;
+  ruta_comercial?: string | null;
+  ruta_especial?: string | null;
+  cod_delegacion?: string | null;
+  grupo?: string | null;
+  grupo_rappel?: string | null;
+  tramos_rappel?: string | null;
+  cod_postal?: string | null;
+  telefono2?: string | null;
+  persona_contacto?: string | null;
+  web?: string | null;
+  fecha_alta?: string | null;
+  num_empleados_taller?: number | null;
+  prohibicion_venta?: string | null;
+  top_truck?: boolean | null;
 }
+
 
 export interface MotivoCampo {
   id: string;
