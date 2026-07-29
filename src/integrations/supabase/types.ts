@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          created_at: string
+          description: string | null
+          key: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          key: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          key?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: []
+      }
       cliente_insights: {
         Row: {
           alertas: Json
@@ -944,6 +968,27 @@ export type Database = {
       can_view_cliente: {
         Args: { _cod: number; _user_id: string }
         Returns: boolean
+      }
+      clientes_permitidos: {
+        Args: { _user_id: string }
+        Returns: {
+          cod_cliente: number
+        }[]
+      }
+      clientes_visibles: {
+        Args: { _anios?: number; _solo_activos?: boolean }
+        Returns: {
+          activo: boolean
+          cliente: string
+          cod_cliente: number
+          delegacion: string
+          importe_actual: number
+          importe_anterior: number
+          localidad: string
+          ruta: string
+          ultima_compra: string
+          vendedor: string
+        }[]
       }
       get_distinct_delegaciones: {
         Args: never
