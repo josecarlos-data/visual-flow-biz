@@ -169,76 +169,133 @@ export type Database = {
       }
       clientes: {
         Row: {
+          cif: string | null
           cliente: string
           cod_cliente: number
+          cod_delegacion: string | null
+          cod_postal: string | null
+          cod_prohibicion_venta: string | null
+          cod_rappel: string | null
+          cod_tipo_cliente: string | null
           cod_vendedor: string | null
           created_at: string
           crecimiento_previsto: number | null
           delegacion: string | null
           direccion: string | null
           email: string | null
+          extra: Json
+          fecha_alta: string | null
+          grupo: string | null
+          grupo_rappel: string | null
           gsmart_comercial: string | null
           gsmart_delegacion: string | null
           id: string
           localidad: string | null
-          observaciones: string | null
+          num_empleados_taller: number | null
+          observaciones_almacen: string | null
+          persona_contacto: string | null
+          prohibicion_venta: string | null
           provincia: string | null
           proyeccion_2026: number | null
+          razon_social: string | null
           ruta: string | null
+          ruta_comercial: string | null
+          ruta_especial: string | null
           telefono: string | null
+          telefono2: string | null
           tipo_cliente: string | null
-          top_truck: string | null
+          top_truck: boolean
+          tramos_rappel: string | null
           transporte: number | null
           updated_at: string
           vendedor: string | null
+          web: string | null
         }
         Insert: {
+          cif?: string | null
           cliente: string
           cod_cliente: number
+          cod_delegacion?: string | null
+          cod_postal?: string | null
+          cod_prohibicion_venta?: string | null
+          cod_rappel?: string | null
+          cod_tipo_cliente?: string | null
           cod_vendedor?: string | null
           created_at?: string
           crecimiento_previsto?: number | null
           delegacion?: string | null
           direccion?: string | null
           email?: string | null
+          extra?: Json
+          fecha_alta?: string | null
+          grupo?: string | null
+          grupo_rappel?: string | null
           gsmart_comercial?: string | null
           gsmart_delegacion?: string | null
           id?: string
           localidad?: string | null
-          observaciones?: string | null
+          num_empleados_taller?: number | null
+          observaciones_almacen?: string | null
+          persona_contacto?: string | null
+          prohibicion_venta?: string | null
           provincia?: string | null
           proyeccion_2026?: number | null
+          razon_social?: string | null
           ruta?: string | null
+          ruta_comercial?: string | null
+          ruta_especial?: string | null
           telefono?: string | null
+          telefono2?: string | null
           tipo_cliente?: string | null
-          top_truck?: string | null
+          top_truck?: boolean
+          tramos_rappel?: string | null
           transporte?: number | null
           updated_at?: string
           vendedor?: string | null
+          web?: string | null
         }
         Update: {
+          cif?: string | null
           cliente?: string
           cod_cliente?: number
+          cod_delegacion?: string | null
+          cod_postal?: string | null
+          cod_prohibicion_venta?: string | null
+          cod_rappel?: string | null
+          cod_tipo_cliente?: string | null
           cod_vendedor?: string | null
           created_at?: string
           crecimiento_previsto?: number | null
           delegacion?: string | null
           direccion?: string | null
           email?: string | null
+          extra?: Json
+          fecha_alta?: string | null
+          grupo?: string | null
+          grupo_rappel?: string | null
           gsmart_comercial?: string | null
           gsmart_delegacion?: string | null
           id?: string
           localidad?: string | null
-          observaciones?: string | null
+          num_empleados_taller?: number | null
+          observaciones_almacen?: string | null
+          persona_contacto?: string | null
+          prohibicion_venta?: string | null
           provincia?: string | null
           proyeccion_2026?: number | null
+          razon_social?: string | null
           ruta?: string | null
+          ruta_comercial?: string | null
+          ruta_especial?: string | null
           telefono?: string | null
+          telefono2?: string | null
           tipo_cliente?: string | null
-          top_truck?: string | null
+          top_truck?: boolean
+          tramos_rappel?: string | null
           transporte?: number | null
           updated_at?: string
           vendedor?: string | null
+          web?: string | null
         }
         Relationships: []
       }
@@ -426,36 +483,72 @@ export type Database = {
       }
       productos: {
         Row: {
+          cod_proveedor: string | null
           created_at: string
           descripcion: string | null
+          estado: string | null
           familia: string | null
           familia_marca: string | null
+          familia_nombre: string | null
           id: string
+          importe_periodo: number | null
           marca: string | null
+          marca_nombre: string | null
+          observaciones: string | null
           precio: number | null
+          primera_venta: string | null
+          proveedor: string | null
           referencia: string
+          sustituida_por: string | null
+          sustituye_a: string | null
+          ultima_venta: string | null
+          unidades_periodo: number | null
           updated_at: string
         }
         Insert: {
+          cod_proveedor?: string | null
           created_at?: string
           descripcion?: string | null
+          estado?: string | null
           familia?: string | null
           familia_marca?: string | null
+          familia_nombre?: string | null
           id?: string
+          importe_periodo?: number | null
           marca?: string | null
+          marca_nombre?: string | null
+          observaciones?: string | null
           precio?: number | null
+          primera_venta?: string | null
+          proveedor?: string | null
           referencia: string
+          sustituida_por?: string | null
+          sustituye_a?: string | null
+          ultima_venta?: string | null
+          unidades_periodo?: number | null
           updated_at?: string
         }
         Update: {
+          cod_proveedor?: string | null
           created_at?: string
           descripcion?: string | null
+          estado?: string | null
           familia?: string | null
           familia_marca?: string | null
+          familia_nombre?: string | null
           id?: string
+          importe_periodo?: number | null
           marca?: string | null
+          marca_nombre?: string | null
+          observaciones?: string | null
           precio?: number | null
+          primera_venta?: string | null
+          proveedor?: string | null
           referencia?: string
+          sustituida_por?: string | null
+          sustituye_a?: string | null
+          ultima_venta?: string | null
+          unidades_periodo?: number | null
           updated_at?: string
         }
         Relationships: []
@@ -1022,7 +1115,6 @@ export type Database = {
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_approved: { Args: { _user_id: string }; Returns: boolean }
-      marcar_top_truck: { Args: { _cods: Json }; Returns: number }
       panel_alertas: {
         Args: { _limite?: number }
         Returns: {

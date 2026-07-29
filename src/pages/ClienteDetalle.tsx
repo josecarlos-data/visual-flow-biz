@@ -175,14 +175,15 @@ export default function ClienteDetalle() {
             </CardContent>
           </Card>
 
-          {(cliente.observaciones || cliente.direccion || cliente.tipo_cliente || cliente.delegacion) && (
+          {(cliente.observaciones_almacen || cliente.direccion || cliente.cod_tipo_cliente || cliente.delegacion) && (
             <Card>
               <CardHeader><CardTitle className="text-base">Datos de ficha</CardTitle></CardHeader>
               <CardContent className="space-y-2 text-sm">
                 {cliente.direccion && <p><span className="text-muted-foreground">Dirección: </span>{cliente.direccion}</p>}
-                {cliente.tipo_cliente && <p><span className="text-muted-foreground">Tipo: </span>{cliente.tipo_cliente}</p>}
+                {cliente.cod_tipo_cliente && <p><span className="text-muted-foreground">Tipo: </span>{cliente.cod_tipo_cliente}</p>}
                 {cliente.delegacion && <p><span className="text-muted-foreground">Delegación: </span>{cliente.delegacion}</p>}
-                {cliente.observaciones && <p className="whitespace-pre-wrap"><span className="text-muted-foreground">Observaciones: </span>{cliente.observaciones}</p>}
+                {cliente.observaciones_almacen && <p className="whitespace-pre-wrap"><span className="text-muted-foreground">Observaciones almacén: </span>{cliente.observaciones_almacen}</p>}
+
               </CardContent>
             </Card>
           )}

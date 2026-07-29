@@ -12,8 +12,9 @@ export interface Cliente {
   email: string | null;
   vendedor: string | null;
   ruta: string | null;
-  tipo_cliente: string | null;
-  observaciones: string | null;
+  cod_tipo_cliente: string | null;
+  observaciones_almacen: string | null;
+
 }
 
 export interface MotivoCampo {
@@ -117,8 +118,9 @@ export function useClientes(soloActivos = true, orden: OrdenClientes = "ventas")
         email: null,
         vendedor: (r.vendedor as string) ?? null,
         ruta: (r.ruta as string) ?? null,
-        tipo_cliente: null,
-        observaciones: null,
+        cod_tipo_cliente: null,
+        observaciones_almacen: null,
+
         importe_actual: Number(r.importe_actual ?? 0),
         importe_anterior: Number(r.importe_anterior ?? 0),
         ultima_compra: (r.ultima_compra as string) ?? null,
@@ -298,16 +300,11 @@ export function useAgendaMutations() {
   return { add, update, remove };
 }
 
-export const eur = (v: number, decimals = 0) =>
-  new Intl.NumberFormat("es-ES", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(v || 0);
+export { eur, num, eurK, pct } from "@/lib/format";
 
 export const fechaCorta = (iso: string) =>
   new Date(`${iso}T00:00:00`).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
+
 
 export const hoyISO = () => {
   const d = new Date();
