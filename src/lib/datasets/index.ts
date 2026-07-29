@@ -7,4 +7,4 @@ import type { DatasetModule } from "./types";
 // 2. Importarlo y añadirlo aquí.
 export const DATASETS: DatasetModule<any>[] = [maestroIsiDataset, comprasDataset];
 
-export type { DatasetModule } from "./types";
+export type { DatasetModule, UploadResult, UploadStageResult } from "./types";

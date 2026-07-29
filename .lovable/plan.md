@@ -1,61 +1,51 @@
-## Qué dicen los datos (11.592 clientes analizados)
+**Diagnóstico**
 
-Relleno real de cada campo dudoso:
+- La carga no está fallando por el archivo completo, sino por la parte de **productos/referencias**.
+- El Excel contiene referencias repetidas dentro del mismo bloque de carga.
+- La base de datos intenta actualizar la misma referencia más de una vez en una sola operación y por eso devuelve: `ON CONFLICT DO UPDATE command cannot affect row a second time`.
+- Además, el refresco de resúmenes ha llegado a timeout, así que ahora la base está en estado **parcial/incompleto**.
 
-| Campo | Relleno | Valor real |
-|---|---|---|
-| Cif | 0% | vacío (censurado) |
-| Extensión | 8%, 38 valores | subcódigos de sucursal/dirección de entrega — sin uso analítico hoy |
-| Estado | 100% | 11.584 Activo / 8 Baja → **inútil** para saber quién compra; el "activo" real lo da la última venta |
-| Ruta Comercial | 56%, 401 rutas | útil (GU0MO, MA0MO…) |
-| Cód. Delegación / Delegación | 99%, 5 valores | Granada, Almería, Guarromán, Málaga (+1) |
-| Cód. Vendedor / Vendedor | 99% / 64%, 15-16 valores | el código está siempre; el nombre falta en 36% (los que tienen cód. 0 = 4.114 sin comercial) |
-| Cód. Tipo cliente / Tipo cliente | 99% | son el mismo dato: A/B/C/D ↔ "TC A/B/C/D" → basta el código |
-| Clasificac. abc | 5 filas | **vacío** |
-| Nº empleados taller | 100% pero 11.559 son 0 | dato muerto en la práctica (33 clientes con valor) |
-| Observaciones almacén | 49 filas | anecdótico ("MUY CARO", notas de abono) |
-| Fecha de alta | 99% | útil: permite antigüedad y detectar clientes nuevos |
-| Motivo/Fecha de baja | 8 y 0 filas | irrelevante |
-| Prohibic. venta | 72%, 113 valores | **relevante de verdad**: 5.998 "CLIENTE DESACTUALIZADO", 1.408 "PROHIBICION DE VENTA", 795 "AVISAR A ADMINISTRACION" → bandera comercial clara |
-| Modo de pago / entrega / Serie / Pedido obligatorio | altos pero casi constantes | operativos, no comerciales |
-| Rappel (cód., grupo, tramos, nº, aviso) | 56 clientes | testimonial, pero interesante para esos 56 |
-| Grupo | 4%, 230 valores | grupos empresariales / cadenas → útil aunque escaso |
-| Ruta Especial | 6 filas | testimonial |
-| Top Truck | 100% | 13 clientes True |
-| Dirección → Web (contacto) | 0% | todos vacíos en este export |
+**No hacer ahora**
 
-## Conclusión sobre la estructura
+- No volver a cargar todavía.
+- Si recargas sin corregirlo, volverá a fallar y puede dejar datos parciales otra vez.
 
-Tu criterio es correcto en casi todo. Ajustes que propongo frente a tu tabla:
+**Plan de corrección**
 
-- **Tipo de cliente**: solo `cod_tipo_cliente` (A/B/C/D), como dices. El literal es redundante.
-- **Clasificac. abc**: fuera, está vacío.
-- **Extensión**: fuera de la tabla principal (8% y sin lectura comercial), pero se conserva (ver más abajo).
-- **Estado**: fuera como filtro; genera confusión con "cliente activo", que ya se calcula por última venta.
-- **Prohibic. venta**: la subiría de "QUIZÁS" a **SÍ** — es la única bandera con volumen real y avisa al comercial antes de visitar.
-- **Nº empleados taller** y **Observaciones almacén**: los mantengo porque los marcas SÍ/DUDA, pero hoy están casi vacíos.
-- **Contacto (dirección…web)**: columnas creadas y vacías, listas para cuando el export las traiga. Sin coste.
+1. **Deduplicar productos en la base**
+   - Modificar `upsert_productos_maestro` para que agrupe por `referencia` antes de insertar/actualizar.
+   - Si una referencia aparece varias veces, conservar una única versión combinando los campos disponibles.
 
-**Y para tus dudas: nada se pierde.** Todo campo que no pase a columna propia se guarda en una columna `extra` (JSON) del cliente. Si mañana quieres explotar Extensión, Serie o Modo de pago, están ahí y se promocionan a columna sin recargar nada.
+2. **Deduplicar clientes también**
+   - Modificar `upsert_clientes_maestro` para agrupar por `cod_cliente`.
+   - Esto evita el mismo problema si en futuras exportaciones vienen clientes duplicados.
 
-## Estructura final de `clientes`
+3. **Limpiar la carga parcial actual**
+   - Vaciar únicamente las tablas de datos comerciales/cargados:
+     - clientes
+     - productos
+     - ventas diarias
+     - resúmenes de cliente, familia, marca y mes
+     - KPIs de cliente
+     - visitas/agenda si están vinculadas al maestro cargado
+   - Mantener usuarios, roles, permisos de dashboards y parámetros de administración.
 
-Columnas de trabajo: `cod_cliente`, `razon_social`, `cif`, `ruta_comercial`, `cod_delegacion`, `delegacion`, `cod_vendedor`, `vendedor`, `cod_tipo_cliente`, `num_empleados_taller`, `observaciones_almacen`, `fecha_alta`, `prohibicion_venta` (+`cod_prohibicion_venta`), `cod_rappel`, `grupo_rappel`, `tramos_rappel`, `grupo`, `ruta_especial`, `top_truck` (booleano), contacto (`direccion`, `cod_postal`, `localidad`, `provincia`, `telefono`, `telefono2`, `email`, `persona_contacto`, `web`) y `extra` (JSON con el resto).
+4. **Hacer la carga completa reiniciable**
+   - Al iniciar una nueva carga del Maestro ISI, limpiar primero los datos comerciales derivados.
+   - Después cargar clientes, productos y ventas.
+   - Finalmente regenerar resúmenes y KPIs.
 
-`productos` (Dim_Referencia): referencia, descripción, familia + nombre, marca + nombre, proveedor + código, estado, sustituye_a, sustituida_por, observaciones, primera_venta, última_venta, unidades_periodo, importe_periodo.
+5. **Reducir riesgo de timeout en resúmenes**
+   - Revisar índices y añadir los necesarios para que el refresco de resúmenes sobre ventas diarias sea más rápido.
+   - Mantener la lógica de seguridad por comercial/delegación.
 
-`ventas_diarias` (Hechos_Diarios): sin cambios — cliente, referencia, marca, familia, fecha, unidades, importe, margen.
+6. **Mejorar feedback en pantalla**
+   - Si falla una parte de la carga, mostrar qué bloque falló: clientes, productos, ventas o resúmenes.
+   - Evitar que parezca que se han cargado bien cientos de miles de registros cuando la carga quedó incompleta.
 
-## Plan de ejecución
+**Resultado esperado**
 
-1. **Vaciar datos**: ventas_diarias, resúmenes, cliente_kpis, cliente_productos, clientes, productos, rutas, ventas_mensuales, detalle_ventas, compras, visitas, visitas_planificadas, cliente_insights, sync_log. Se conservan usuarios, perfiles, roles, dashboards y permisos, app_settings y motivos de visita.
-2. **Migración de estructura**: nuevas columnas en `clientes` y `productos`, eliminación de las obsoletas del maestro antiguo (incluido el `observaciones` que te generaba dudas), y RPC de carga actualizadas.
-3. **Carga manual**: en Administración → Gestión de datos, "Ventas" se sustituye por **Maestro ISI (CRM)**: un único Excel con las tres hojas, resumen previo antes de confirmar, carga por lotes con progreso y recálculo automático de resúmenes y KPIs al terminar. "Compras" se mantiene.
-4. **Formato de miles**: helper único es-ES (punto para miles, coma para decimales) aplicado también donde aún se usa el formato por defecto del navegador (tooltips de gráficos y contadores).
-
-## Detalles técnicos
-
-- `TRUNCATE` en orden de dependencias; sin tocar `auth`, `profiles`, `user_roles`, `dashboards`, `user_dashboard_access`, `app_settings`, `motivos_visita`, `motivo_campos`.
-- `ALTER TABLE ADD COLUMN IF NOT EXISTS` + `DROP COLUMN` de las obsoletas; `extra jsonb NOT NULL DEFAULT '{}'`. `upsert_clientes_maestro` / `upsert_productos_maestro` reescritas (SECURITY DEFINER, admin-only) con `ON CONFLICT` por clave natural.
-- Nuevo `src/lib/datasets/maestroIsi.ts` en sustitución de `ventas.ts`; parseo con `@e965/xlsx`, lotes de ~2.000 filas a `insertar_ventas_diarias` (`_reset` en el primero) y `refrescar_resumenes_admin` al final.
-- Nuevo `src/lib/format.ts` (`eur`, `num`, `pct`) reutilizado desde `useCrm.ts`, páginas y componentes de gráfico.
+- Podrás volver a subir el Excel una sola vez.
+- Las referencias repetidas no romperán la carga.
+- La base quedará limpia y consistente.
+- Los paneles se calcularán sobre datos completos, no parciales.
