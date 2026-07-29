@@ -8,6 +8,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Eye, Pencil, RotateCcw, Save, ChevronDown, HelpCircle, AlertTriangle, Copy, Check } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import AppSettingsCard from "@/components/AppSettingsCard";
+
 
 interface SystemFunction {
   id: string;
