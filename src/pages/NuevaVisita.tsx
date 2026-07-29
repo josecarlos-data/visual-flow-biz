@@ -249,6 +249,38 @@ export default function NuevaVisita() {
                     value={valores[c.campo_key] ?? ""}
                     onChange={(e) => setValores((v) => ({ ...v, [c.campo_key]: e.target.value }))}
                   />
+                ) : c.tipo === "fecha" ? (
+                  <Input
+                    type="date"
+                    value={valores[c.campo_key] ?? ""}
+                    onChange={(e) => setValores((v) => ({ ...v, [c.campo_key]: e.target.value }))}
+                  />
+                ) : c.tipo === "select" ? (
+                  <Select
+                    value={valores[c.campo_key] ?? ""}
+                    onValueChange={(val) => setValores((v) => ({ ...v, [c.campo_key]: val }))}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Selecciona una opción" /></SelectTrigger>
+                    <SelectContent>
+                      {c.opciones.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                ) : c.tipo === "booleano" ? (
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={valores[c.campo_key] === "si"}
+                      onCheckedChange={(val) => setValores((v) => ({ ...v, [c.campo_key]: val ? "si" : "no" }))}
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      {valores[c.campo_key] === "si" ? "Sí" : "No"}
+                    </span>
+                  </div>
+                ) : c.tipo === "texto" ? (
+                  <Input
+                    placeholder={c.ayuda ?? ""}
+                    value={valores[c.campo_key] ?? ""}
+                    onChange={(e) => setValores((v) => ({ ...v, [c.campo_key]: e.target.value }))}
+                  />
                 ) : (
                   <Textarea
                     rows={3}
@@ -257,8 +289,12 @@ export default function NuevaVisita() {
                     onChange={(e) => setValores((v) => ({ ...v, [c.campo_key]: e.target.value }))}
                   />
                 )}
+                {c.ayuda && c.tipo !== "texto" && c.tipo !== "texto_largo" && (
+                  <p className="text-xs text-muted-foreground">{c.ayuda}</p>
+                )}
               </div>
             ))}
+
             <div className="space-y-1.5">
               <Label>Observaciones adicionales</Label>
               <Textarea rows={2} value={observaciones} onChange={(e) => setObservaciones(e.target.value)} />
