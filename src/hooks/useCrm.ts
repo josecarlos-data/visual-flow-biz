@@ -79,18 +79,68 @@ async function fetchAll<T>(table: string, columns: string, order?: string): Prom
   return rows;
 }
 
-export function useClientes() {
+export type OrdenClientes = "ventas" | "alfabetico";
+
+export interface ClienteVisible extends Cliente {
+  importe_actual: number;
+  importe_anterior: number;
+  ultima_compra: string | null;
+  activo: boolean;
+}
+
+/** Listado de clientes visibles para el usuario, ordenado por ventas del año en curso. */
+export function useClientes(soloActivos = true, orden: OrdenClientes = "ventas") {
   return useQuery({
-    queryKey: ["crm_clientes"],
-    queryFn: () =>
-      fetchAll<Cliente>(
-        "clientes",
-        "cod_cliente, cliente, delegacion, localidad, provincia, direccion, telefono, email, vendedor, ruta, tipo_cliente, observaciones",
-        "cliente",
-      ),
+    queryKey: ["crm_clientes", soloActivos],
     staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("clientes_visibles" as never, {
+        _solo_activos: soloActivos,
+      } as never);
+      if (error) throw error;
+      return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => ({
+        cod_cliente: Number(r.cod_cliente),
+        cliente: String(r.cliente ?? ""),
+        delegacion: (r.delegacion as string) ?? null,
+        localidad: (r.localidad as string) ?? null,
+        provincia: null,
+        direccion: null,
+        telefono: null,
+        email: null,
+        vendedor: (r.vendedor as string) ?? null,
+        ruta: (r.ruta as string) ?? null,
+        tipo_cliente: null,
+        observaciones: null,
+        importe_actual: Number(r.importe_actual ?? 0),
+        importe_anterior: Number(r.importe_anterior ?? 0),
+        ultima_compra: (r.ultima_compra as string) ?? null,
+        activo: Boolean(r.activo),
+      })) as ClienteVisible[];
+    },
+    select: (rows) =>
+      orden === "alfabetico"
+        ? [...rows].sort((a, b) => a.cliente.localeCompare(b.cliente, "es"))
+        : rows,
   });
 }
+
+/** Parámetros de configuración de la aplicación. */
+export function useAppSetting(key: string, fallback: string) {
+  return useQuery({
+    queryKey: ["app_setting", key],
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("app_settings" as never)
+        .select("value")
+        .eq("key", key)
+        .maybeSingle();
+      if (error) throw error;
+      return ((data as { value?: string } | null)?.value ?? fallback) as string;
+    },
+  });
+}
+
 
 export function useCliente(cod: number | null) {
   return useQuery({
