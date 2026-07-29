@@ -147,6 +147,15 @@ export default function Ventas() {
         <p className="text-muted-foreground">Rendimiento, rentabilidad y alertas comerciales {anioActual}</p>
       </div>
 
+      {errorMsg && (
+        <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>No se han podido cargar algunos datos: {errorMsg}</span>
+        </div>
+      )}
+
+
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi
           icon={<Euro className="h-4 w-4" />}
