@@ -43,6 +43,7 @@ const num = (v: unknown) => Number(v ?? 0);
 export default function Ventas() {
   const { verMargen } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [mensual, setMensual] = useState<MensualRow[]>([]);
   const [kpis, setKpis] = useState<KpiRow[]>([]);
   const [topClientes, setTopClientes] = useState<TopCliente[]>([]);
@@ -63,6 +64,8 @@ export default function Ventas() {
         supabase.rpc("panel_ventas_kpis" as any),
         supabase.rpc("panel_alertas" as any, { _limite: 10 } as any),
       ]);
+      const err = mRes.error ?? kRes.error ?? aRes.error;
+      setErrorMsg(err ? err.message : null);
       setMensual(((mRes.data as any[]) ?? []).map((r) => ({
         anio: num(r.anio), mes: num(r.mes), importe: num(r.importe), margen: num(r.margen), unidades: num(r.unidades),
       })));
@@ -77,6 +80,7 @@ export default function Ventas() {
       setLoading(false);
     })();
   }, []);
+
 
   useEffect(() => {
     if (!anioActual) return;
