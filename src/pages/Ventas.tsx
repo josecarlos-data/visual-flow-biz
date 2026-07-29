@@ -90,6 +90,8 @@ export default function Ventas() {
         supabase.rpc("panel_top_familias" as any, { _anio: anioActual, _limite: 10 } as any),
         supabase.rpc("panel_top_marcas" as any, { _anio: anioActual, _limite: 10 } as any),
       ]);
+      const err2 = cRes.error ?? fRes.error ?? brRes.error;
+      if (err2) setErrorMsg(err2.message);
       setTopClientes(((cRes.data as any[]) ?? []).map((r) => ({
         cod_cliente: num(r.cod_cliente), cliente: r.cliente, vendedor: r.vendedor,
         importe: num(r.importe), margen: num(r.margen),
@@ -97,6 +99,7 @@ export default function Ventas() {
       setTopFamilias(((fRes.data as any[]) ?? []).map((r) => ({ familia: r.familia ?? "Sin familia", importe: num(r.importe), margen: num(r.margen) })));
       setTopMarcas(((brRes.data as any[]) ?? []).map((r) => ({ marca: r.marca ?? "Sin marca", importe: num(r.importe), margen: num(r.margen) })));
     })();
+
   }, [anioActual]);
 
   const anios = useMemo(() => [...new Set(mensual.map((m) => m.anio))].sort(), [mensual]);
