@@ -1,15 +1,18 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Search, MapPin, Route as RouteIcon, User } from "lucide-react";
+import { Search, MapPin, Route as RouteIcon, User, ArrowDownAZ, ArrowDownWideNarrow } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useClientes } from "@/hooks/useCrm";
+import { useClientes, eur, fechaCorta, type OrdenClientes } from "@/hooks/useCrm";
 
 export default function Clientes() {
-  const { data: clientes, isLoading } = useClientes();
+  const [soloActivos, setSoloActivos] = useState(true);
+  const [orden, setOrden] = useState<OrdenClientes>("ventas");
+  const { data: clientes, isLoading, error } = useClientes(soloActivos, orden);
   const [q, setQ] = useState("");
   const [ruta, setRuta] = useState("todas");
 
@@ -66,7 +69,43 @@ export default function Clientes() {
         )}
       </div>
 
-      {isLoading ? (
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="inline-flex rounded-md border p-0.5">
+          <Button
+            size="sm"
+            variant={soloActivos ? "secondary" : "ghost"}
+            className="h-7 px-3 text-xs"
+            onClick={() => setSoloActivos(true)}
+          >
+            Activos
+          </Button>
+          <Button
+            size="sm"
+            variant={soloActivos ? "ghost" : "secondary"}
+            className="h-7 px-3 text-xs"
+            onClick={() => setSoloActivos(false)}
+          >
+            Todos
+          </Button>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-8 gap-1.5 text-xs"
+          onClick={() => setOrden((o) => (o === "ventas" ? "alfabetico" : "ventas"))}
+        >
+          {orden === "ventas" ? <ArrowDownWideNarrow className="h-3.5 w-3.5" /> : <ArrowDownAZ className="h-3.5 w-3.5" />}
+          {orden === "ventas" ? "Por ventas" : "A-Z"}
+        </Button>
+      </div>
+
+      {error ? (
+        <Card>
+          <CardContent className="py-8 text-center text-sm text-destructive">
+            No se ha podido cargar la cartera: {(error as Error).message}
+          </CardContent>
+        </Card>
+      ) : isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-20 w-full" />
@@ -80,7 +119,9 @@ export default function Clientes() {
         </Card>
       ) : (
         <>
-          <p className="text-xs text-muted-foreground">{filtered.length} clientes</p>
+          <p className="text-xs text-muted-foreground">
+            {filtered.length} clientes {soloActivos ? "activos" : "en total"}
+          </p>
           <div className="space-y-2">
             {filtered.slice(0, 300).map((c) => (
               <Link
@@ -105,14 +146,18 @@ export default function Clientes() {
                           {c.vendedor}
                         </span>
                       )}
+                      {c.ultima_compra && <span>Última compra {fechaCorta(c.ultima_compra)}</span>}
                     </div>
                   </div>
-                  {c.ruta && (
-                    <Badge variant="secondary" className="shrink-0 gap-1">
-                      <RouteIcon className="h-3 w-3" />
-                      {c.ruta}
-                    </Badge>
-                  )}
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <span className="text-sm font-semibold">{eur(c.importe_actual)}</span>
+                    {c.ruta && (
+                      <Badge variant="secondary" className="gap-1">
+                        <RouteIcon className="h-3 w-3" />
+                        {c.ruta}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               </Link>
             ))}
