@@ -1,35 +1,61 @@
-## Qué he comprobado
+## Qué dicen los datos (11.592 clientes analizados)
 
-- Los datos están completos: 35.428 filas de resumen mensual, 84.666 por familia, 83.034 por marca, 3.419 clientes con KPIs (2024: 14,6 M€ / 2025: 15,0 M€ / 2026: 7,9 M€).
-- Los permisos y el acceso a las tablas están bien; el problema no es de datos ni de GRANTs.
-- Causa muy probable de los KPIs y gráficos vacíos: las funciones `panel_ventas_kpis`, `panel_ventas_mensual`, `panel_top_familias` y `panel_top_marcas` **no** son de tipo "security definer", así que la regla de acceso `can_view_cliente(...)` se evalúa **fila a fila** (35.000–85.000 veces por consulta). El rol de la aplicación tiene un límite de 8 segundos por consulta, por lo que esas llamadas se cortan y llegan vacías. Las que sí funcionan (alertas, top clientes) leen tablas mucho más pequeñas o mejor filtradas. Primer paso del trabajo: confirmarlo midiendo el tiempo real de cada función antes de cambiarlas.
+Relleno real de cada campo dudoso:
 
-## Plan
+| Campo | Relleno | Valor real |
+|---|---|---|
+| Cif | 0% | vacío (censurado) |
+| Extensión | 8%, 38 valores | subcódigos de sucursal/dirección de entrega — sin uso analítico hoy |
+| Estado | 100% | 11.584 Activo / 8 Baja → **inútil** para saber quién compra; el "activo" real lo da la última venta |
+| Ruta Comercial | 56%, 401 rutas | útil (GU0MO, MA0MO…) |
+| Cód. Delegación / Delegación | 99%, 5 valores | Granada, Almería, Guarromán, Málaga (+1) |
+| Cód. Vendedor / Vendedor | 99% / 64%, 15-16 valores | el código está siempre; el nombre falta en 36% (los que tienen cód. 0 = 4.114 sin comercial) |
+| Cód. Tipo cliente / Tipo cliente | 99% | son el mismo dato: A/B/C/D ↔ "TC A/B/C/D" → basta el código |
+| Clasificac. abc | 5 filas | **vacío** |
+| Nº empleados taller | 100% pero 11.559 son 0 | dato muerto en la práctica (33 clientes con valor) |
+| Observaciones almacén | 49 filas | anecdótico ("MUY CARO", notas de abono) |
+| Fecha de alta | 99% | útil: permite antigüedad y detectar clientes nuevos |
+| Motivo/Fecha de baja | 8 y 0 filas | irrelevante |
+| Prohibic. venta | 72%, 113 valores | **relevante de verdad**: 5.998 "CLIENTE DESACTUALIZADO", 1.408 "PROHIBICION DE VENTA", 795 "AVISAR A ADMINISTRACION" → bandera comercial clara |
+| Modo de pago / entrega / Serie / Pedido obligatorio | altos pero casi constantes | operativos, no comerciales |
+| Rappel (cód., grupo, tramos, nº, aviso) | 56 clientes | testimonial, pero interesante para esos 56 |
+| Grupo | 4%, 230 valores | grupos empresariales / cadenas → útil aunque escaso |
+| Ruta Especial | 6 filas | testimonial |
+| Top Truck | 100% | 13 clientes True |
+| Dirección → Web (contacto) | 0% | todos vacíos en este export |
 
-### 1. Arreglar el Panel de Ventas (prioridad)
-- Reescribir las funciones de panel (`panel_ventas_kpis`, `panel_ventas_mensual`, `panel_top_clientes`, `panel_top_familias`, `panel_top_marcas`, `panel_alertas`, `panel_dormidos`) como funciones seguras que aplican **una sola vez** el filtro de visibilidad según el rol (admin/dirección: todo; jefe de zona: su delegación; comercial: sus clientes), en lugar de comprobarlo fila a fila.
-- Añadir índices de apoyo por `cod_cliente` en las tablas de resumen.
-- Resultado: todos los KPIs, la evolución mensual y los tops se cargan en menos de un segundo y respetan que cada comercial vea solo lo suyo.
-- Añadir en la pantalla un aviso claro si una consulta falla, en vez de mostrar ceros silenciosos.
+## Conclusión sobre la estructura
 
-### 2. Orden por defecto: importe del año actual, descendente
-- Nueva función que devuelve, para cada cliente visible, su facturación del año actual y del anterior.
-- Se aplica como orden por defecto en: listado de Clientes, buscador de cliente en Nueva Visita, selector de cliente en Agenda y el filtro de clientes de los paneles.
-- En cada uno, un botón de alternancia para pasar a orden alfabético (A-Z), manteniendo "por ventas" como opción por defecto.
+Tu criterio es correcto en casi todo. Ajustes que propongo frente a tu tabla:
 
-### 3. Clientes activos
-- Concepto: cliente con al menos una venta en los últimos N años (N configurable, por defecto 3).
-- Nueva tabla de **ajustes de la aplicación** con el parámetro `anios_cliente_activo`, editable desde Administración (solo admin).
-- En Clientes (y demás selectores) un interruptor **Activos / Todos**, con "Activos" por defecto.
-- El contador de resultados indicará cuántos se están mostrando de cuántos totales.
+- **Tipo de cliente**: solo `cod_tipo_cliente` (A/B/C/D), como dices. El literal es redundante.
+- **Clasificac. abc**: fuera, está vacío.
+- **Extensión**: fuera de la tabla principal (8% y sin lectura comercial), pero se conserva (ver más abajo).
+- **Estado**: fuera como filtro; genera confusión con "cliente activo", que ya se calcula por última venta.
+- **Prohibic. venta**: la subiría de "QUIZÁS" a **SÍ** — es la única bandera con volumen real y avisa al comercial antes de visitar.
+- **Nº empleados taller** y **Observaciones almacén**: los mantengo porque los marcas SÍ/DUDA, pero hoy están casi vacíos.
+- **Contacto (dirección…web)**: columnas creadas y vacías, listas para cuando el export las traiga. Sin coste.
 
-### 4. Visitas
-Una vez validado lo anterior, me pasas el informe de visitas de los 2 últimos años y diseñamos el panel de visitas y su uso como base de conocimiento para la IA.
+**Y para tus dudas: nada se pierde.** Todo campo que no pase a columna propia se guarda en una columna `extra` (JSON) del cliente. Si mañana quieres explotar Extensión, Serie o Modo de pago, están ahí y se promocionan a columna sin recargar nada.
+
+## Estructura final de `clientes`
+
+Columnas de trabajo: `cod_cliente`, `razon_social`, `cif`, `ruta_comercial`, `cod_delegacion`, `delegacion`, `cod_vendedor`, `vendedor`, `cod_tipo_cliente`, `num_empleados_taller`, `observaciones_almacen`, `fecha_alta`, `prohibicion_venta` (+`cod_prohibicion_venta`), `cod_rappel`, `grupo_rappel`, `tramos_rappel`, `grupo`, `ruta_especial`, `top_truck` (booleano), contacto (`direccion`, `cod_postal`, `localidad`, `provincia`, `telefono`, `telefono2`, `email`, `persona_contacto`, `web`) y `extra` (JSON con el resto).
+
+`productos` (Dim_Referencia): referencia, descripción, familia + nombre, marca + nombre, proveedor + código, estado, sustituye_a, sustituida_por, observaciones, primera_venta, última_venta, unidades_periodo, importe_periodo.
+
+`ventas_diarias` (Hechos_Diarios): sin cambios — cliente, referencia, marca, familia, fecha, unidades, importe, margen.
+
+## Plan de ejecución
+
+1. **Vaciar datos**: ventas_diarias, resúmenes, cliente_kpis, cliente_productos, clientes, productos, rutas, ventas_mensuales, detalle_ventas, compras, visitas, visitas_planificadas, cliente_insights, sync_log. Se conservan usuarios, perfiles, roles, dashboards y permisos, app_settings y motivos de visita.
+2. **Migración de estructura**: nuevas columnas en `clientes` y `productos`, eliminación de las obsoletas del maestro antiguo (incluido el `observaciones` que te generaba dudas), y RPC de carga actualizadas.
+3. **Carga manual**: en Administración → Gestión de datos, "Ventas" se sustituye por **Maestro ISI (CRM)**: un único Excel con las tres hojas, resumen previo antes de confirmar, carga por lotes con progreso y recálculo automático de resúmenes y KPIs al terminar. "Compras" se mantiene.
+4. **Formato de miles**: helper único es-ES (punto para miles, coma para decimales) aplicado también donde aún se usa el formato por defecto del navegador (tooltips de gráficos y contadores).
 
 ## Detalles técnicos
 
-- Migración: funciones `SECURITY DEFINER` con `search_path` fijo, filtro por rol resuelto en un CTE de `cod_cliente` permitidos; `EXECUTE` concedido solo a `authenticated`; `REVOKE` de `anon`/`PUBLIC`.
-- Nueva tabla `app_settings` (clave/valor) con RLS: lectura para usuarios aprobados, escritura solo admin, más los GRANT correspondientes.
-- Nueva función `clientes_visibles(_solo_activos boolean, _anios int)` devolviendo `cod_cliente, cliente, ruta, localidad, vendedor, importe_actual, importe_anterior, ultima_compra`, ordenada por importe descendente.
-- Frontend: `useCrm.ts` pasa a consumir esa función con parámetros de orden/activos; estado compartido de preferencia de orden.
-- El margen se sigue devolviendo solo si `puede_ver_margen`.
+- `TRUNCATE` en orden de dependencias; sin tocar `auth`, `profiles`, `user_roles`, `dashboards`, `user_dashboard_access`, `app_settings`, `motivos_visita`, `motivo_campos`.
+- `ALTER TABLE ADD COLUMN IF NOT EXISTS` + `DROP COLUMN` de las obsoletas; `extra jsonb NOT NULL DEFAULT '{}'`. `upsert_clientes_maestro` / `upsert_productos_maestro` reescritas (SECURITY DEFINER, admin-only) con `ON CONFLICT` por clave natural.
+- Nuevo `src/lib/datasets/maestroIsi.ts` en sustitución de `ventas.ts`; parseo con `@e965/xlsx`, lotes de ~2.000 filas a `insertar_ventas_diarias` (`_reset` en el primero) y `refrescar_resumenes_admin` al final.
+- Nuevo `src/lib/format.ts` (`eur`, `num`, `pct`) reutilizado desde `useCrm.ts`, páginas y componentes de gráfico.
