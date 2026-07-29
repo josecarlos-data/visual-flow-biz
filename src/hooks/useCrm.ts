@@ -300,16 +300,11 @@ export function useAgendaMutations() {
   return { add, update, remove };
 }
 
-export const eur = (v: number, decimals = 0) =>
-  new Intl.NumberFormat("es-ES", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(v || 0);
+export { eur, num, eurK, pct } from "@/lib/format";
 
 export const fechaCorta = (iso: string) =>
   new Date(`${iso}T00:00:00`).toLocaleDateString("es-ES", { day: "2-digit", month: "short", year: "numeric" });
+
 
 export const hoyISO = () => {
   const d = new Date();
