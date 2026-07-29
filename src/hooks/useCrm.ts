@@ -94,15 +94,23 @@ export function useClientes(soloActivos = true, orden: OrdenClientes = "ventas")
     queryKey: ["crm_clientes", soloActivos],
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("clientes_visibles" as never, {
-        _solo_activos: soloActivos,
-      } as never);
-      if (error) throw error;
-      return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => ({
+      const SIZE = 1000;
+      const raw: Record<string, unknown>[] = [];
+      for (let page = 0; page < 30; page++) {
+        const { data, error } = await supabase
+          .rpc("clientes_visibles" as never, { _solo_activos: soloActivos } as never)
+          .range(page * SIZE, page * SIZE + SIZE - 1);
+        if (error) throw error;
+        const batch = (data ?? []) as unknown as Record<string, unknown>[];
+        raw.push(...batch);
+        if (batch.length < SIZE) break;
+      }
+      return raw.map((r) => ({
         cod_cliente: Number(r.cod_cliente),
         cliente: String(r.cliente ?? ""),
         delegacion: (r.delegacion as string) ?? null,
         localidad: (r.localidad as string) ?? null,
+
         provincia: null,
         direccion: null,
         telefono: null,
