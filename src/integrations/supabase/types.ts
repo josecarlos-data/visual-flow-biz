@@ -1187,6 +1187,7 @@ export type Database = {
       puede_ver_margen: { Args: { _user_id: string }; Returns: boolean }
       refrescar_resumenes_admin: { Args: never; Returns: undefined }
       refrescar_resumenes_ventas: { Args: never; Returns: undefined }
+      reset_maestro_isi_data: { Args: never; Returns: undefined }
       upsert_clientes_maestro: { Args: { _rows: Json }; Returns: number }
       upsert_productos_maestro: { Args: { _rows: Json }; Returns: number }
     }
