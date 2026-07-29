@@ -255,7 +255,10 @@ export function useMotivos() {
       ]);
       if (mRes.error) throw mRes.error;
       if (cRes.error) throw cRes.error;
-      const campos = (cRes.data ?? []) as unknown as MotivoCampo[];
+      const campos = ((cRes.data ?? []) as unknown as MotivoCampo[]).map((c) => ({
+        ...c,
+        opciones: Array.isArray(c.opciones) ? c.opciones.map(String) : [],
+      }));
       return ((mRes.data ?? []) as unknown as Omit<Motivo, "campos">[]).map((m) => ({
         ...m,
         campos: campos.filter((c) => c.motivo_key === m.key),
@@ -264,6 +267,51 @@ export function useMotivos() {
     staleTime: 5 * 60 * 1000,
   });
 }
+
+/** Alta, edición y borrado de plantillas de visita (solo administración). */
+export function useMotivosAdmin() {
+  const qc = useQueryClient();
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["crm_motivos"] });
+
+  const guardarMotivo = useMutation({
+    mutationFn: async (m: Partial<Motivo> & { key: string }) => {
+      const { campos: _campos, ...row } = m as Motivo;
+      const { error } = await supabase.from("motivos_visita").upsert(row as never, { onConflict: "key" });
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+
+  const borrarMotivo = useMutation({
+    mutationFn: async (key: string) => {
+      const { error } = await supabase.from("motivos_visita").delete().eq("key", key);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+
+  const guardarCampo = useMutation({
+    mutationFn: async (c: Partial<MotivoCampo> & { motivo_key: string; campo_key: string; label: string }) => {
+      const { id, ...rest } = c as MotivoCampo;
+      const { error } = id
+        ? await supabase.from("motivo_campos").update(rest as never).eq("id", id)
+        : await supabase.from("motivo_campos").insert(rest as never);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+
+  const borrarCampo = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("motivo_campos").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+
+  return { guardarMotivo, borrarMotivo, guardarCampo, borrarCampo };
+}
+
 
 export function useAgenda(desde: string, hasta: string) {
   return useQuery({
