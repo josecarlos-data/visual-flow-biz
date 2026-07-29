@@ -43,6 +43,7 @@ const num = (v: unknown) => Number(v ?? 0);
 export default function Ventas() {
   const { verMargen } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [mensual, setMensual] = useState<MensualRow[]>([]);
   const [kpis, setKpis] = useState<KpiRow[]>([]);
   const [topClientes, setTopClientes] = useState<TopCliente[]>([]);
@@ -63,6 +64,8 @@ export default function Ventas() {
         supabase.rpc("panel_ventas_kpis" as any),
         supabase.rpc("panel_alertas" as any, { _limite: 10 } as any),
       ]);
+      const err = mRes.error ?? kRes.error ?? aRes.error;
+      setErrorMsg(err ? err.message : null);
       setMensual(((mRes.data as any[]) ?? []).map((r) => ({
         anio: num(r.anio), mes: num(r.mes), importe: num(r.importe), margen: num(r.margen), unidades: num(r.unidades),
       })));
@@ -78,6 +81,7 @@ export default function Ventas() {
     })();
   }, []);
 
+
   useEffect(() => {
     if (!anioActual) return;
     (async () => {
@@ -86,6 +90,8 @@ export default function Ventas() {
         supabase.rpc("panel_top_familias" as any, { _anio: anioActual, _limite: 10 } as any),
         supabase.rpc("panel_top_marcas" as any, { _anio: anioActual, _limite: 10 } as any),
       ]);
+      const err2 = cRes.error ?? fRes.error ?? brRes.error;
+      if (err2) setErrorMsg(err2.message);
       setTopClientes(((cRes.data as any[]) ?? []).map((r) => ({
         cod_cliente: num(r.cod_cliente), cliente: r.cliente, vendedor: r.vendedor,
         importe: num(r.importe), margen: num(r.margen),
@@ -93,6 +99,7 @@ export default function Ventas() {
       setTopFamilias(((fRes.data as any[]) ?? []).map((r) => ({ familia: r.familia ?? "Sin familia", importe: num(r.importe), margen: num(r.margen) })));
       setTopMarcas(((brRes.data as any[]) ?? []).map((r) => ({ marca: r.marca ?? "Sin marca", importe: num(r.importe), margen: num(r.margen) })));
     })();
+
   }, [anioActual]);
 
   const anios = useMemo(() => [...new Set(mensual.map((m) => m.anio))].sort(), [mensual]);
@@ -139,6 +146,15 @@ export default function Ventas() {
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Panel de Ventas</h1>
         <p className="text-muted-foreground">Rendimiento, rentabilidad y alertas comerciales {anioActual}</p>
       </div>
+
+      {errorMsg && (
+        <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>No se han podido cargar algunos datos: {errorMsg}</span>
+        </div>
+      )}
+
+
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Kpi

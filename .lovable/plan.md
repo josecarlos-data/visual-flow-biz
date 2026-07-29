@@ -1,62 +1,35 @@
-## Lo que hay en el fichero
+## Qué he comprobado
 
-- **Hechos_Diarios**: 402.527 líneas diarias (02/01/2024 → 24/07/2026) con cliente, referencia, marca, familia, fecha, unidades, **importe y margen**. Incluye abonos (negativos).
-- **Dim_Cliente**: 11.588 clientes (solo 3.419 con ventas), con vendedor y código de vendedor.
-- **Dim_Referencia**: 68.401 referencias, 357 marcas, 168 familias (8.908 sin descripción).
-- **TopTruck**: 13 clientes marcados.
-- Falta la delegación (la añadirás al origen), y no hay localidad, teléfono ni ruta.
+- Los datos están completos: 35.428 filas de resumen mensual, 84.666 por familia, 83.034 por marca, 3.419 clientes con KPIs (2024: 14,6 M€ / 2025: 15,0 M€ / 2026: 7,9 M€).
+- Los permisos y el acceso a las tablas están bien; el problema no es de datos ni de GRANTs.
+- Causa muy probable de los KPIs y gráficos vacíos: las funciones `panel_ventas_kpis`, `panel_ventas_mensual`, `panel_top_familias` y `panel_top_marcas` **no** son de tipo "security definer", así que la regla de acceso `can_view_cliente(...)` se evalúa **fila a fila** (35.000–85.000 veces por consulta). El rol de la aplicación tiene un límite de 8 segundos por consulta, por lo que esas llamadas se cortan y llegan vacías. Las que sí funcionan (alertas, top clientes) leen tablas mucho más pequeñas o mejor filtradas. Primer paso del trabajo: confirmarlo midiendo el tiempo real de cada función antes de cambiarlas.
 
 ## Plan
 
-### 1. Nuevo modelo de datos
-- `ventas_diarias`: detalle línea a línea (cliente, referencia, marca, familia, fecha, unidades, importe, margen).
-- `productos`: ampliada con marca y familia_marca desde Dim_Referencia.
-- `clientes`: se alimenta de Dim_Cliente (razón social, vendedor, código de vendedor, Top Truck). El CIF **no se carga** — no aporta nada al análisis y evita el debate de protección de datos.
-- Tablas resumen recalculadas en la propia base de datos tras cada carga:
-  - resumen mes × cliente (importe, margen, unidades),
-  - resumen año × cliente × familia y × marca,
-  - ficha rápida por cliente (última compra, días sin comprar, nº de referencias, margen %).
-- La `delegacion` queda preparada: en cuanto añadas la columna al Excel se rellena sola; mientras tanto la seguridad por rol funciona por vendedor.
+### 1. Arreglar el Panel de Ventas (prioridad)
+- Reescribir las funciones de panel (`panel_ventas_kpis`, `panel_ventas_mensual`, `panel_top_clientes`, `panel_top_familias`, `panel_top_marcas`, `panel_alertas`, `panel_dormidos`) como funciones seguras que aplican **una sola vez** el filtro de visibilidad según el rol (admin/dirección: todo; jefe de zona: su delegación; comercial: sus clientes), en lugar de comprobarlo fila a fila.
+- Añadir índices de apoyo por `cod_cliente` en las tablas de resumen.
+- Resultado: todos los KPIs, la evolución mensual y los tops se cargan en menos de un segundo y respetan que cada comercial vea solo lo suyo.
+- Añadir en la pantalla un aviso claro si una consulta falla, en vez de mostrar ceros silenciosos.
 
-### 2. Carga de los datos reales (ahora)
-- Se sube el maestro a un almacén privado de la aplicación y una función de servidor lo procesa por bloques (el volumen es demasiado grande para el navegador).
-- Pantalla "Gestión de datos" rehecha: subir maestro, ver progreso, filas cargadas por hoja, errores y fecha de la última carga.
-- Cuando haya acceso a OneDrive, esa misma función leerá el fichero directamente sin cambiar nada más.
+### 2. Orden por defecto: importe del año actual, descendente
+- Nueva función que devuelve, para cada cliente visible, su facturación del año actual y del anterior.
+- Se aplica como orden por defecto en: listado de Clientes, buscador de cliente en Nueva Visita, selector de cliente en Agenda y el filtro de clientes de los paneles.
+- En cada uno, un botón de alternancia para pasar a orden alfabético (A-Z), manteniendo "por ventas" como opción por defecto.
 
-### 3. Permiso de margen configurable
-- Nuevo permiso por usuario, gestionado desde Administración → Usuarios, igual que los dashboards.
-- Sin permiso, la aplicación no muestra margen en ningún panel, ficha, gráfico ni respuesta de la IA (bloqueado también en el servidor, no solo en pantalla).
+### 3. Clientes activos
+- Concepto: cliente con al menos una venta en los últimos N años (N configurable, por defecto 3).
+- Nueva tabla de **ajustes de la aplicación** con el parámetro `anios_cliente_activo`, editable desde Administración (solo admin).
+- En Clientes (y demás selectores) un interruptor **Activos / Todos**, con "Activos" por defecto.
+- El contador de resultados indicará cuántos se están mostrando de cuántos totales.
 
-### 4. Panel de ventas rediseñado
-- KPIs: facturación, margen € y %, unidades, nº de clientes activos, ticket medio — con comparativa contra el mismo periodo del año anterior.
-- Evolución mensual con margen superpuesto y selector de año.
-- Rankings: top clientes por facturación y por margen, top familias y top marcas.
-- **Cuadro de alertas**, lo más valioso de estos datos:
-  - clientes que caen respecto al año anterior,
-  - clientes con muchos días sin comprar (fuga),
-  - clientes de alta facturación y margen bajo,
-  - familias que un cliente ha dejado de comprar,
-  - cartera dormida: los ~8.000 clientes sin ventas, filtrados por vendedor.
-
-### 5. Ficha de cliente 360 ampliada
-- Recencia y frecuencia de compra, evolución mensual, mix por familia y marca, referencias top y referencias abandonadas, margen (si tiene permiso), histórico de visitas.
-
-### 6. Asistente IA
-- Icono flotante en toda la app; en la ficha de un cliente responde sobre ese cliente, y en el panel sobre la cartera visible.
-- Respeta rol, vendedor, delegación y el permiso de margen.
-
-### 7. Accesos por perfil
-- Comerciales: Ventas, Clientes, Agenda y Visitas. Compras se queda solo para administración.
+### 4. Visitas
+Una vez validado lo anterior, me pasas el informe de visitas de los 2 últimos años y diseñamos el panel de visitas y su uso como base de conocimiento para la IA.
 
 ## Detalles técnicos
 
-- Ingesta con edge function + almacenamiento privado, lectura por streaming en bloques de 2.000 filas y `upsert` idempotente; los resúmenes se recalculan con SQL al terminar.
-- Índices por `cod_cliente`, `fecha`, `familia` y `marca`; los paneles leen de las tablas resumen, nunca del detalle completo.
-- RLS sobre `ventas_diarias` y resúmenes reutilizando `is_admin` / vendedor / delegación ya existentes.
-
-## Orden de trabajo
-
-1. Estructura de datos + permiso de margen.
-2. Carga del maestro real y verificación de cifras (14,6 M€ 2024 / 15,0 M€ 2025 / 7,9 M€ 2026).
-3. Panel de ventas y alertas.
-4. Ficha de cliente y asistente IA.
+- Migración: funciones `SECURITY DEFINER` con `search_path` fijo, filtro por rol resuelto en un CTE de `cod_cliente` permitidos; `EXECUTE` concedido solo a `authenticated`; `REVOKE` de `anon`/`PUBLIC`.
+- Nueva tabla `app_settings` (clave/valor) con RLS: lectura para usuarios aprobados, escritura solo admin, más los GRANT correspondientes.
+- Nueva función `clientes_visibles(_solo_activos boolean, _anios int)` devolviendo `cod_cliente, cliente, ruta, localidad, vendedor, importe_actual, importe_anterior, ultima_compra`, ordenada por importe descendente.
+- Frontend: `useCrm.ts` pasa a consumir esa función con parámetros de orden/activos; estado compartido de preferencia de orden.
+- El margen se sigue devolviendo solo si `puede_ver_margen`.
