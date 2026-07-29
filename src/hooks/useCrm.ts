@@ -64,7 +64,7 @@ export interface Planificada {
 }
 
 /** Paginación en bloques de 1000 para saltar el límite de PostgREST. */
-async function fetchAll<T>(table: string, columns: string, order?: string): Promise<T[]> {
+export async function fetchAll<T>(table: string, columns: string, order?: string): Promise<T[]> {
   const rows: T[] = [];
   const SIZE = 1000;
   for (let page = 0; page < 50; page++) {
