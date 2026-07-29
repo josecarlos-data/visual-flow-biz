@@ -1098,6 +1098,19 @@ export type Database = {
         Args: { _cod: number; _user_id: string }
         Returns: boolean
       }
+      cliente_top_productos: {
+        Args: { _anio?: number; _cod: number }
+        Returns: {
+          descripcion: string
+          familia: string
+          importe: number
+          marca: string
+          margen: number
+          referencia: string
+          ultima_compra: string
+          unidades: number
+        }[]
+      }
       clientes_permitidos: {
         Args: { _user_id: string }
         Returns: {

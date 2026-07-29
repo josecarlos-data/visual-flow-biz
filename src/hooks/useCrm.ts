@@ -15,7 +15,25 @@ export interface Cliente {
   cod_tipo_cliente: string | null;
   observaciones_almacen: string | null;
 
+  razon_social?: string | null;
+  cif?: string | null;
+  cod_vendedor?: string | null;
+  ruta_comercial?: string | null;
+  ruta_especial?: string | null;
+  cod_delegacion?: string | null;
+  grupo?: string | null;
+  grupo_rappel?: string | null;
+  tramos_rappel?: string | null;
+  cod_postal?: string | null;
+  telefono2?: string | null;
+  persona_contacto?: string | null;
+  web?: string | null;
+  fecha_alta?: string | null;
+  num_empleados_taller?: number | null;
+  prohibicion_venta?: string | null;
+  top_truck?: boolean | null;
 }
+
 
 export interface MotivoCampo {
   id: string;
@@ -181,37 +199,138 @@ export function useCliente(cod: number | null) {
   });
 }
 
+export interface VentaMes {
+  anio: number;
+  mes: number;
+  importe: number;
+  margen: number;
+  unidades: number;
+  lineas: number;
+}
+
+/** Ventas mensuales del cliente desde el resumen de Maestro ISI. */
 export function useClienteVentas(cod: number | null) {
   return useQuery({
     queryKey: ["crm_cliente_ventas", cod],
     enabled: cod != null,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("ventas_mensuales")
-        .select("anio, mes, valor")
-        .eq("cod_cliente", cod!);
+        .from("resumen_cliente_mes")
+        .select("anio, mes, importe, margen, unidades, lineas")
+        .eq("cod_cliente", cod!)
+        .order("anio")
+        .order("mes");
       if (error) throw error;
-      return (data ?? []) as { anio: number; mes: number; valor: number }[];
+      return (data ?? []) as unknown as VentaMes[];
     },
   });
 }
 
-export function useClienteProductos(cod: number | null) {
+export interface ClienteKpis {
+  primera_compra: string | null;
+  ultima_compra: string | null;
+  dias_sin_comprar: number | null;
+  num_referencias: number;
+  num_lineas: number;
+  importe_total: number;
+  margen_total: number;
+  importe_anio_actual: number;
+  margen_anio_actual: number;
+  importe_anio_anterior: number;
+  margen_anio_anterior: number;
+  importe_anio_anterior_ytd: number;
+}
+
+export function useClienteKpis(cod: number | null) {
   return useQuery({
-    queryKey: ["crm_cliente_productos", cod],
+    queryKey: ["crm_cliente_kpis", cod],
     enabled: cod != null,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("cliente_productos")
-        .select("referencia, descripcion, familia, importe, unidades, ultima_compra, anio")
+        .from("cliente_kpis")
+        .select("*")
         .eq("cod_cliente", cod!)
-        .order("importe", { ascending: false })
-        .limit(200);
+        .maybeSingle();
       if (error) throw error;
-      return data ?? [];
+      return (data as unknown as ClienteKpis) ?? null;
     },
   });
 }
+
+export interface ProductoCliente {
+  referencia: string;
+  descripcion: string | null;
+  familia: string | null;
+  marca: string | null;
+  unidades: number;
+  importe: number;
+  margen: number;
+  ultima_compra: string | null;
+}
+
+export function useClienteProductos(cod: number | null, anio: number | null = null) {
+  return useQuery({
+    queryKey: ["crm_cliente_productos", cod, anio],
+    enabled: cod != null,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("cliente_top_productos" as never, {
+        _cod: cod!,
+        _anio: anio,
+      } as never);
+      if (error) throw error;
+      return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => ({
+        referencia: String(r.referencia ?? ""),
+        descripcion: (r.descripcion as string) ?? null,
+        familia: (r.familia as string) ?? null,
+        marca: (r.marca as string) ?? null,
+        unidades: Number(r.unidades ?? 0),
+        importe: Number(r.importe ?? 0),
+        margen: Number(r.margen ?? 0),
+        ultima_compra: (r.ultima_compra as string) ?? null,
+      })) as ProductoCliente[];
+    },
+  });
+}
+
+/** Reparto por familia y por marca del cliente. */
+export function useClienteMix(cod: number | null) {
+  return useQuery({
+    queryKey: ["crm_cliente_mix", cod],
+    enabled: cod != null,
+    queryFn: async () => {
+      const [fRes, mRes] = await Promise.all([
+        supabase.from("resumen_cliente_familia").select("anio, familia, importe, unidades").eq("cod_cliente", cod!),
+        supabase.from("resumen_cliente_marca").select("anio, marca, importe, unidades").eq("cod_cliente", cod!),
+      ]);
+      if (fRes.error) throw fRes.error;
+      if (mRes.error) throw mRes.error;
+      return {
+        familias: (fRes.data ?? []) as unknown as { anio: number; familia: string; importe: number }[],
+        marcas: (mRes.data ?? []) as unknown as { anio: number; marca: string; importe: number }[],
+      };
+    },
+  });
+}
+
+/** ¿El usuario actual puede ver márgenes? */
+export function usePuedeVerMargen() {
+  return useQuery({
+    queryKey: ["puede_ver_margen"],
+    staleTime: 10 * 60 * 1000,
+    queryFn: async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth?.user) return false;
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("ver_margen")
+        .eq("user_id", auth.user.id)
+        .maybeSingle();
+      if (error) return false;
+      return Boolean((data as { ver_margen?: boolean } | null)?.ver_margen);
+    },
+  });
+}
+
 
 export function useClienteVisitas(cod: number | null) {
   return useQuery({
