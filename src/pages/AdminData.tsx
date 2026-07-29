@@ -8,14 +8,14 @@ import { Database as DbIcon, Upload, FileSpreadsheet, Loader2, CheckCircle2, Ale
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { DATASETS, type DatasetModule } from "@/lib/datasets";
+import { DATASETS, type DatasetModule, type UploadResult } from "@/lib/datasets";
 
 export default function AdminData() {
   const [activeKey, setActiveKey] = useState<string>(DATASETS[0]?.key ?? "");
   const [parsedData, setParsedData] = useState<unknown>(null);
   const [fileName, setFileName] = useState<string>("");
   const [uploading, setUploading] = useState(false);
-  const [uploadResult, setUploadResult] = useState<{ success: number; errors: number } | null>(null);
+  const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const queryClient = useQueryClient();
 
   const dataset = useMemo(
@@ -45,7 +45,9 @@ export default function AdminData() {
       const reader = new FileReader();
       reader.onload = (ev) => {
         try {
-          const data = dataset.parse(ev.target!.result as ArrayBuffer);
+          const buffer = ev.target?.result;
+          if (!buffer) throw new Error("No se pudo leer el archivo");
+          const data = dataset.parse(buffer as ArrayBuffer);
           setParsedData(data);
           toast({
             title: dataset.countLabel(data),
@@ -77,7 +79,7 @@ export default function AdminData() {
 
     toast({
       title: result.errors === 0 ? "Carga completada" : "Carga con errores",
-      description: `${result.success} registros cargados. ${result.errors} errores.`,
+      description: result.message ?? `${result.success} registros cargados. ${result.errors} errores.`,
       variant: result.errors > 0 ? "destructive" : "default",
     });
   };
@@ -167,19 +169,36 @@ export default function AdminData() {
             </div>
 
             {uploadResult && (
-              <div className="flex items-center gap-2 text-sm">
-                {uploadResult.errors === 0 ? (
-                  <>
-                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                    <span>{uploadResult.success} registros cargados correctamente</span>
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle className="h-4 w-4 text-destructive" />
-                    <span>
-                      {uploadResult.success} éxitos, {uploadResult.errors} errores
-                    </span>
-                  </>
+              <div className="space-y-3 rounded-md border border-input p-3 text-sm">
+                <div className="flex items-center gap-2">
+                  {uploadResult.errors === 0 ? (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 text-primary" />
+                      <span>{uploadResult.success} registros cargados correctamente</span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle className="h-4 w-4 text-destructive" />
+                      <span>
+                        Carga incompleta: {uploadResult.success} éxitos, {uploadResult.errors} errores
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                {uploadResult.message && <p className="text-xs text-muted-foreground">{uploadResult.message}</p>}
+
+                {uploadResult.stages && uploadResult.stages.length > 0 && (
+                  <div className="space-y-1 border-t border-border pt-2 text-xs">
+                    {uploadResult.stages.map((stage) => (
+                      <div key={stage.name} className="grid gap-1 sm:grid-cols-[180px_1fr]">
+                        <span className="font-medium text-foreground">{stage.name}</span>
+                        <span className={stage.errors > 0 ? "text-destructive" : "text-muted-foreground"}>
+                          {stage.success} éxitos · {stage.errors} errores{stage.message ? ` · ${stage.message}` : ""}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             )}

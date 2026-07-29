@@ -1,7 +1,7 @@
 import * as XLSX from "@e965/xlsx";
 import { Database } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import type { DatasetModule } from "./types";
+import type { DatasetModule, UploadStageResult } from "./types";
 import { num as fmtNum } from "@/lib/format";
 
 type Row = Record<string, unknown>;
@@ -225,16 +225,21 @@ function parseExcel(buffer: ArrayBuffer): MaestroIsiParsed {
   return { clientes, productos, ventas };
 }
 
-async function rpcBatches<T>(fn: string, key: string, rows: T[], size: number): Promise<number> {
+async function rpcBatches<T>(fn: string, key: string, rows: T[], size: number): Promise<UploadStageResult> {
+  let success = 0;
   let errors = 0;
+  let message: string | undefined;
   for (let i = 0; i < rows.length; i += size) {
     const { error } = await supabase.rpc(fn as never, { [key]: rows.slice(i, i + size) } as never);
     if (error) {
       errors += Math.min(size, rows.length - i);
+      message = error.message;
       console.error(`${fn} error:`, error.message);
+    } else {
+      success += Math.min(size, rows.length - i);
     }
   }
-  return errors;
+  return { name: fn, success, errors, message };
 }
 
 export const maestroIsiDataset: DatasetModule<MaestroIsiParsed> = {
@@ -258,28 +263,58 @@ export const maestroIsiDataset: DatasetModule<MaestroIsiParsed> = {
   ],
   previewRows: (d, limit) => d.clientes.slice(0, limit) as unknown as Record<string, unknown>[],
   upload: async (data) => {
-    let errors = 0;
+    const stages: UploadStageResult[] = [];
 
-    errors += await rpcBatches("upsert_clientes_maestro", "_rows", data.clientes, 500);
-    errors += await rpcBatches("upsert_productos_maestro", "_rows", data.productos, 1000);
+    const { error: resetError } = await supabase.rpc("reset_maestro_isi_data" as never);
+    if (resetError) {
+      console.error("reset_maestro_isi_data error:", resetError.message);
+      return {
+        success: 0,
+        errors: data.clientes.length + data.productos.length + data.ventas.length,
+        stages: [{ name: "Limpieza inicial", success: 0, errors: 1, message: resetError.message }],
+        message: "No se pudo limpiar la carga anterior. No se ha iniciado la importación.",
+      };
+    }
+    stages.push({ name: "Limpieza inicial", success: 1, errors: 0 });
+
+    stages.push(await rpcBatches("upsert_clientes_maestro", "_rows", data.clientes, 500));
+    stages.push(await rpcBatches("upsert_productos_maestro", "_rows", data.productos, 1000));
 
     const SIZE = 2000;
+    let ventasSuccess = 0;
+    let ventasErrors = 0;
+    let ventasMessage: string | undefined;
     for (let i = 0; i < data.ventas.length; i += SIZE) {
       const { error } = await supabase.rpc("insertar_ventas_diarias" as never, {
         _rows: data.ventas.slice(i, i + SIZE),
-        _reset: i === 0,
+        _reset: false,
       } as never);
       if (error) {
-        errors += Math.min(SIZE, data.ventas.length - i);
+        ventasErrors += Math.min(SIZE, data.ventas.length - i);
+        ventasMessage = error.message;
         console.error("insertar_ventas_diarias error:", error.message);
+      } else {
+        ventasSuccess += Math.min(SIZE, data.ventas.length - i);
       }
     }
+    stages.push({ name: "insertar_ventas_diarias", success: ventasSuccess, errors: ventasErrors, message: ventasMessage });
 
     const { error: refrescoError } = await supabase.rpc("refrescar_resumenes_admin" as never);
-    if (refrescoError) console.error("refrescar_resumenes_admin error:", refrescoError.message);
+    if (refrescoError) {
+      console.error("refrescar_resumenes_admin error:", refrescoError.message);
+      stages.push({ name: "refrescar_resumenes_admin", success: 0, errors: 1, message: refrescoError.message });
+    } else {
+      stages.push({ name: "refrescar_resumenes_admin", success: 1, errors: 0 });
+    }
 
-    const total = data.clientes.length + data.productos.length + data.ventas.length;
-    return { success: total - errors, errors };
+    const success = stages.reduce((acc, s) => acc + s.success, 0) - 2;
+    const errors = stages.reduce((acc, s) => acc + s.errors, 0);
+    return {
+      success: Math.max(0, success),
+      errors,
+      stages,
+      message: errors === 0 ? "Maestro ISI cargado y resúmenes regenerados." : "La carga quedó incompleta. Revisa el detalle antes de volver a intentarlo.",
+    };
   },
   invalidate: (qc) => {
     qc.invalidateQueries({ queryKey: ["historico_data"] });
