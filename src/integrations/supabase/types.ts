@@ -410,6 +410,8 @@ export type Database = {
           is_required: boolean
           label: string
           motivo_key: string
+          opciones: Json
+          placeholder: string | null
           sort_order: number
           tipo: string
           updated_at: string
@@ -422,6 +424,8 @@ export type Database = {
           is_required?: boolean
           label: string
           motivo_key: string
+          opciones?: Json
+          placeholder?: string | null
           sort_order?: number
           tipo?: string
           updated_at?: string
@@ -434,6 +438,8 @@ export type Database = {
           is_required?: boolean
           label?: string
           motivo_key?: string
+          opciones?: Json
+          placeholder?: string | null
           sort_order?: number
           tipo?: string
           updated_at?: string
@@ -940,48 +946,78 @@ export type Database = {
       visitas: {
         Row: {
           campos: Json
-          cod_cliente: number
+          cliente_externo: string | null
+          cod_cliente: number | null
+          comercial_nombre: string | null
           created_at: string
           estado: string
           fecha: string
+          hora: string | null
           id: string
+          latitud: number | null
+          longitud: number | null
           motivo_key: string | null
           observaciones: string | null
           origen: string
+          ruta: string | null
+          tipo: string
+          titulo: string | null
           transcripcion: string | null
           updated_at: string
           user_id: string | null
+          validacion: string | null
           vendedor: string | null
+          zona: string | null
         }
         Insert: {
           campos?: Json
-          cod_cliente: number
+          cliente_externo?: string | null
+          cod_cliente?: number | null
+          comercial_nombre?: string | null
           created_at?: string
           estado?: string
           fecha?: string
+          hora?: string | null
           id?: string
+          latitud?: number | null
+          longitud?: number | null
           motivo_key?: string | null
           observaciones?: string | null
           origen?: string
+          ruta?: string | null
+          tipo?: string
+          titulo?: string | null
           transcripcion?: string | null
           updated_at?: string
           user_id?: string | null
+          validacion?: string | null
           vendedor?: string | null
+          zona?: string | null
         }
         Update: {
           campos?: Json
-          cod_cliente?: number
+          cliente_externo?: string | null
+          cod_cliente?: number | null
+          comercial_nombre?: string | null
           created_at?: string
           estado?: string
           fecha?: string
+          hora?: string | null
           id?: string
+          latitud?: number | null
+          longitud?: number | null
           motivo_key?: string | null
           observaciones?: string | null
           origen?: string
+          ruta?: string | null
+          tipo?: string
+          titulo?: string | null
           transcripcion?: string | null
           updated_at?: string
           user_id?: string | null
+          validacion?: string | null
           vendedor?: string | null
+          zona?: string | null
         }
         Relationships: []
       }
@@ -1108,6 +1144,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      importar_visitas_historicas: {
+        Args: { _reset?: boolean; _rows: Json }
+        Returns: number
       }
       insertar_ventas_diarias: {
         Args: { _reset?: boolean; _rows: Json }
