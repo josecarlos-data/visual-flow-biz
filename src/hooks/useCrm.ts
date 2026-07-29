@@ -26,6 +26,8 @@ export interface MotivoCampo {
   tipo: string;
   is_required: boolean;
   sort_order: number;
+  opciones: string[];
+  placeholder: string | null;
 }
 
 export interface Motivo {
@@ -40,9 +42,19 @@ export interface Motivo {
 
 export interface Visita {
   id: string;
-  cod_cliente: number;
+  cod_cliente: number | null;
+  cliente_externo: string | null;
   motivo_key: string | null;
   fecha: string;
+  hora: string | null;
+  tipo: string | null;
+  validacion: string | null;
+  latitud: number | null;
+  longitud: number | null;
+  ruta: string | null;
+  zona: string | null;
+  comercial_nombre: string | null;
+  titulo: string | null;
   vendedor: string | null;
   user_id: string | null;
   transcripcion: string | null;
@@ -52,6 +64,7 @@ export interface Visita {
   origen: string;
   created_at: string;
 }
+
 
 export interface Planificada {
   id: string;
