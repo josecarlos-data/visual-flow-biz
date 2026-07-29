@@ -457,8 +457,12 @@ export default function AdminFunctions() {
     <div className="space-y-4 sm:space-y-6">
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Funciones</h1>
-        <p className="text-sm text-muted-foreground">Configuración de fórmulas de cálculo del sistema</p>
+        <p className="text-sm text-muted-foreground">Configuración de fórmulas y parámetros del sistema</p>
       </div>
+
+      <AppSettingsCard />
+
+
 
       {loading ? (
         <div className="space-y-3">
