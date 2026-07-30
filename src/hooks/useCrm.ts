@@ -46,6 +46,7 @@ export interface MotivoCampo {
   sort_order: number;
   opciones: string[];
   placeholder: string | null;
+  requerido_validacion?: boolean | null;
 }
 
 export interface Motivo {
@@ -67,6 +68,9 @@ export interface Visita {
   hora: string | null;
   tipo: string | null;
   validacion: string | null;
+  nota_revision: string | null;
+  revisado_por: string | null;
+  revisado_en: string | null;
   latitud: number | null;
   longitud: number | null;
   ruta: string | null;
@@ -362,6 +366,47 @@ export function useVisitas(limit = 200) {
       return (data ?? []) as unknown as Visita[];
     },
   });
+}
+
+/** Visitas registradas por comerciales pendientes de revisar o ya validadas. */
+export function useVisitasRevision(limit = 300) {
+  return useQuery({
+    queryKey: ["crm_visitas_revision", limit],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("visitas")
+        .select("*")
+        .eq("origen", "app")
+        .order("fecha", { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return (data ?? []) as unknown as Visita[];
+    },
+  });
+}
+
+/** Validación y edición de visitas por el jefe comercial. */
+export function useRevisionMutations() {
+  const qc = useQueryClient();
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["crm_visitas_revision"] });
+    qc.invalidateQueries({ queryKey: ["crm_visitas"] });
+  };
+
+  const revisar = useMutation({
+    mutationFn: async (v: { id: string; validacion: string; nota_revision?: string | null; observaciones?: string | null; campos?: Record<string, unknown> }) => {
+      const { data: auth } = await supabase.auth.getUser();
+      const { id, ...rest } = v;
+      const { error } = await supabase
+        .from("visitas")
+        .update({ ...rest, revisado_por: auth?.user?.id ?? null, revisado_en: new Date().toISOString() } as never)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+
+  return { revisar };
 }
 
 export function useMotivos() {
