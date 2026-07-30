@@ -287,6 +287,83 @@ export default function Ventas() {
       </Card>
 
       <Card>
+        <CardHeader><CardTitle>Ticket medio por mes</CardTitle></CardHeader>
+        <CardContent className="h-[300px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={serieTicket} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
+              <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => eur(Number(v))} width={70} />
+              <Tooltip formatter={(v) => eur(Number(v), 2)} />
+              <Legend />
+              {anios.map((a) => (
+                <Line key={a} type="monotone" dataKey={String(a)} stroke={getYearColor(a, anioActual)} strokeWidth={a === anioActual ? 2.5 : 1.5} dot={false} />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader><CardTitle>Mix por canal {anioActual}</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {canales.length === 0 && <Vacio />}
+            {canales.map((c) => {
+              const total = canales.reduce((s, x) => s + x.importe, 0);
+              const share = total > 0 ? (c.importe / total) * 100 : 0;
+              return (
+                <div key={c.canal} className="rounded-md border p-2 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="truncate font-medium">{c.canal}</span>
+                    <span className="shrink-0 font-medium">{eur(c.importe)}</span>
+                  </div>
+                  <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                    <div className="h-full rounded-full bg-primary" style={{ width: `${share.toFixed(1)}%` }} />
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {pct(share)} · {fnum(c.documentos)} transacciones · ticket {eur(c.ticket_medio, 2)} · {fnum(c.clientes)} clientes
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Devoluciones {anioActual}</CardTitle></CardHeader>
+          <CardContent>
+            <Tabs defaultValue="motivo">
+              <TabsList className="mb-3">
+                <TabsTrigger value="motivo">Motivos</TabsTrigger>
+                <TabsTrigger value="referencia">Referencias</TabsTrigger>
+                <TabsTrigger value="vendedor">Vendedores</TabsTrigger>
+              </TabsList>
+              {["motivo", "referencia", "vendedor"].map((t) => {
+                const filas = devoluciones.filter((d) => d.tipo === t);
+                return (
+                  <TabsContent key={t} value={t} className="space-y-2">
+                    {filas.length === 0 && <Vacio />}
+                    {filas.map((d) => (
+                      <div key={`${t}-${d.etiqueta}`} className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm">
+                        <span className="truncate">{d.etiqueta}</span>
+                        <span className="shrink-0 text-right">
+                          <span className="font-medium">{eur(d.importe)}</span>
+                          <span className="ml-2 text-xs text-muted-foreground">{fnum(d.lineas)} líneas</span>
+                        </span>
+                      </div>
+                    ))}
+                  </TabsContent>
+                );
+              })}
+            </Tabs>
+          </CardContent>
+        </Card>
+      </div>
+
+
+
+      <Card>
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-destructive" /> Alertas comerciales</CardTitle>
           <div className="inline-flex shrink-0 rounded-md border p-0.5">
