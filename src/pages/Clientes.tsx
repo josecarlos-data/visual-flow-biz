@@ -131,7 +131,12 @@ export default function Clientes() {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate font-medium">{c.cliente}</p>
+                    <p className="flex min-w-0 items-center gap-2">
+                      <span className="truncate font-medium">{c.cliente}</span>
+                      {situaciones.get(c.cod_cliente) && (
+                        <SituacionBadge className="shrink-0" situacion={situaciones.get(c.cod_cliente)!} />
+                      )}
+                    </p>
                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                       <span>#{c.cod_cliente}</span>
                       {c.localidad && (
