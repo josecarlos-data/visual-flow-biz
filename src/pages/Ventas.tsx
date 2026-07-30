@@ -105,12 +105,14 @@ export default function Ventas() {
   useEffect(() => {
     if (!anioActual) return;
     (async () => {
-      const [cRes, fRes, brRes] = await Promise.all([
+      const [cRes, fRes, brRes, canRes, devRes] = await Promise.all([
         supabase.rpc("panel_top_clientes" as any, { _anio: anioActual, _limite: 10 } as any),
         supabase.rpc("panel_top_familias" as any, { _anio: anioActual, _limite: 10 } as any),
         supabase.rpc("panel_top_marcas" as any, { _anio: anioActual, _limite: 10 } as any),
+        supabase.rpc("panel_canales" as any, { _anio: anioActual } as any),
+        supabase.rpc("panel_devoluciones" as any, { _anio: anioActual, _limite: 8 } as any),
       ]);
-      const err2 = cRes.error ?? fRes.error ?? brRes.error;
+      const err2 = cRes.error ?? fRes.error ?? brRes.error ?? canRes.error ?? devRes.error;
       if (err2) setErrorMsg(err2.message);
       setTopClientes(((cRes.data as any[]) ?? []).map((r) => ({
         cod_cliente: num(r.cod_cliente), cliente: r.cliente, vendedor: r.vendedor,
@@ -118,7 +120,15 @@ export default function Ventas() {
       })));
       setTopFamilias(((fRes.data as any[]) ?? []).map((r) => ({ familia: r.familia ?? "Sin familia", importe: num(r.importe), margen: num(r.margen) })));
       setTopMarcas(((brRes.data as any[]) ?? []).map((r) => ({ marca: r.marca ?? "Sin marca", importe: num(r.importe), margen: num(r.margen) })));
+      setCanales(((canRes.data as any[]) ?? []).map((r) => ({
+        canal: r.canal ?? "Sin canal", documentos: num(r.documentos), importe: num(r.importe),
+        margen: num(r.margen), ticket_medio: num(r.ticket_medio), clientes: num(r.clientes),
+      })));
+      setDevoluciones(((devRes.data as any[]) ?? []).map((r) => ({
+        tipo: r.tipo, etiqueta: r.etiqueta ?? "—", importe: num(r.importe), lineas: num(r.lineas),
+      })));
     })();
+
 
   }, [anioActual]);
 
