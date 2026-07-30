@@ -52,6 +52,7 @@ export default function Ventas() {
   const [topFamilias, setTopFamilias] = useState<TopDim[]>([]);
   const [topMarcas, setTopMarcas] = useState<TopDim[]>([]);
   const [alertas, setAlertas] = useState<AlertaRow[]>([]);
+  const [verTodasAlertas, setVerTodasAlertas] = useState(false);
 
   const anioActual = useMemo(
     () => (kpis.length ? Math.max(...kpis.map((k) => k.anio)) : new Date().getFullYear()),
@@ -64,7 +65,7 @@ export default function Ventas() {
       const [mRes, kRes, aRes] = await Promise.all([
         supabase.rpc("panel_ventas_mensual" as any),
         supabase.rpc("panel_ventas_kpis" as any),
-        supabase.rpc("panel_alertas" as any, { _limite: 10 } as any),
+        supabase.rpc("panel_alertas" as any, { _limite: 25, _incluir_excluidos: true } as any),
       ]);
       const err = mRes.error ?? kRes.error ?? aRes.error;
       setErrorMsg(err ? err.message : null);
@@ -78,10 +79,12 @@ export default function Ventas() {
       setAlertas(((aRes.data as any[]) ?? []).map((r) => ({
         tipo: r.tipo, cod_cliente: num(r.cod_cliente), cliente: r.cliente, vendedor: r.vendedor,
         valor: num(r.valor), valor_ref: num(r.valor_ref), dias: r.dias === null ? null : num(r.dias),
+        etiqueta: r.etiqueta ?? null, situacion_categoria: r.situacion_categoria ?? null,
       })));
       setLoading(false);
     })();
   }, []);
+
 
 
   useEffect(() => {
