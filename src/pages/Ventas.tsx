@@ -169,6 +169,18 @@ export default function Ventas() {
     .reduce((s, m) => s + m.importe, 0);
   const variacion = ytdPrevio > 0 && kpiActual ? ((kpiActual.importe - ytdPrevio) / ytdPrevio) * 100 : null;
   const margenPct = kpiActual && kpiActual.importe > 0 ? (kpiActual.margen / kpiActual.importe) * 100 : 0;
+  const ticketVar =
+    kpiActual && kpiPrevio && kpiPrevio.ticket_medio > 0
+      ? ((kpiActual.ticket_medio - kpiPrevio.ticket_medio) / kpiPrevio.ticket_medio) * 100
+      : null;
+  // Tasa de devolución: importe abonado sobre la venta bruta (neto + abonos).
+  const tasaDevolucion = (() => {
+    if (!kpiActual) return 0;
+    const abonos = Math.abs(kpiActual.importe_abonos);
+    const bruto = kpiActual.importe + abonos;
+    return bruto > 0 ? (abonos / bruto) * 100 : 0;
+  })();
+
 
   const alertasPorTipo = (tipo: string) => {
     const delTipo = alertas.filter((a) => a.tipo === tipo);
