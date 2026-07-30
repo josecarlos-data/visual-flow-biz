@@ -310,7 +310,9 @@ export default function ClienteDetalle() {
         <TabsList className="w-full justify-start overflow-x-auto">
           <TabsTrigger value="resumen">Resumen</TabsTrigger>
           <TabsTrigger value="productos">Productos</TabsTrigger>
+          <TabsTrigger value="documentos">Documentos</TabsTrigger>
           <TabsTrigger value="visitas">Visitas</TabsTrigger>
+
           <TabsTrigger value="ia">Análisis IA</TabsTrigger>
         </TabsList>
 
