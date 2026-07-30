@@ -131,7 +131,11 @@ export default function Ventas() {
   const variacion = ytdPrevio > 0 && kpiActual ? ((kpiActual.importe - ytdPrevio) / ytdPrevio) * 100 : null;
   const margenPct = kpiActual && kpiActual.importe > 0 ? (kpiActual.margen / kpiActual.importe) * 100 : 0;
 
-  const alertasPorTipo = (tipo: string) => alertas.filter((a) => a.tipo === tipo);
+  const alertasPorTipo = (tipo: string) =>
+    alertas.filter((a) => a.tipo === tipo && (verTodasAlertas || !a.etiqueta)).slice(0, 10);
+
+  const ocultasPorSituacion = alertas.filter((a) => a.etiqueta).length;
+
 
   if (loading) {
     return (
