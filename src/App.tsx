@@ -20,6 +20,7 @@ import AdminUsers from "./pages/AdminUsers";
 import AdminData from "./pages/AdminData";
 import AdminFunctions from "./pages/AdminFunctions";
 import AdminVisitas from "./pages/AdminVisitas";
+import RevisionVisitas from "./pages/RevisionVisitas";
 import AdminSituaciones from "./pages/AdminSituaciones";
 
 import NotFound from "./pages/NotFound";
@@ -115,6 +116,7 @@ const App = () => (
             <Route path="/clientes/:cod" element={<ProtectedRoute dashboardKey="clientes"><ClienteDetalle /></ProtectedRoute>} />
             <Route path="/visitas" element={<ProtectedRoute dashboardKey="visitas"><Visitas /></ProtectedRoute>} />
             <Route path="/visitas/nueva" element={<ProtectedRoute dashboardKey="visitas"><NuevaVisita /></ProtectedRoute>} />
+            <Route path="/visitas/revision" element={<ProtectedRoute dashboardKey="visitas"><RevisionVisitas /></ProtectedRoute>} />
             <Route path="/agenda" element={<ProtectedRoute dashboardKey="agenda"><Agenda /></ProtectedRoute>} />
             <Route path="/admin/users" element={<ProtectedRoute adminOnly><AdminUsers /></ProtectedRoute>} />
             <Route path="/admin/data" element={<ProtectedRoute adminOnly><AdminData /></ProtectedRoute>} />
