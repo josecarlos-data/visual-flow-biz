@@ -286,7 +286,7 @@ export default function ClienteDetalle() {
             <p className="text-xs text-muted-foreground">{eur(Math.abs(kpis?.importe_abonos ?? 0))} devueltos</p>
           </CardContent>
         </Card>
-        {cliente.canal_principal_placeholder}
+        
 
         <Card>
           <CardContent className="p-4">
