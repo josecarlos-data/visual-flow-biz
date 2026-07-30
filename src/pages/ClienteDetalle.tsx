@@ -55,6 +55,8 @@ export default function ClienteDetalle() {
   const { data: visitas } = useClienteVisitas(codNum);
   const { data: motivos } = useMotivos();
   const { data: verMargen } = usePuedeVerMargen();
+  const { mapa: situaciones } = useSituacionesVigentes();
+  const situacion = codNum != null ? situaciones.get(codNum) : undefined;
   const [insights, setInsights] = useState<Insights | null>(null);
   const [anioProd, setAnioProd] = useState<string>("todos");
   const { data: productos, isLoading: cargandoProductos } = useClienteProductos(
