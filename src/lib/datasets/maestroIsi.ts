@@ -33,6 +33,18 @@ const datev = (v: unknown): string | null => {
   const d = new Date(s);
   return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
 };
+const timev = (v: unknown): string | null => {
+  if (v === null || v === undefined || v === "") return null;
+  if (v instanceof Date) return v.toISOString().slice(11, 19);
+  if (typeof v === "number") {
+    const total = Math.round((v % 1) * 86400);
+    const p = (n: number) => String(n).padStart(2, "0");
+    return `${p(Math.floor(total / 3600))}:${p(Math.floor(total / 60) % 60)}:${p(total % 60)}`;
+  }
+  const m = String(v).trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  return m ? `${m[1].padStart(2, "0")}:${m[2]}:${m[3] ?? "00"}` : null;
+};
+
 
 export interface MaestroCliente {
   cod_cliente: number;
@@ -96,7 +108,24 @@ export interface MaestroVenta {
   unidades: number;
   importe: number;
   margen: number;
+  id_documento: string | null;
+  ejercicio: number | null;
+  num_documento: number | null;
+  linea: number | null;
+  tipo_documento: string | null;
+  operacion: string | null;
+  hora: string | null;
+  canal: string | null;
+  cod_almacen: string | null;
+  almacen: string | null;
+  cod_vendedor_linea: string | null;
+  vendedor_linea: string | null;
+  registrado_por: string | null;
+  motivo_abono: string | null;
+  id_doc_enlazado: string | null;
+  descripcion_linea: string | null;
 }
+
 
 export interface MaestroIsiParsed {
   clientes: MaestroCliente[];
@@ -206,6 +235,8 @@ function parseExcel(buffer: ArrayBuffer): MaestroIsiParsed {
     const ref = str(r["Referencia"]);
     const fecha = datev(r["Fecha"]);
     if (cod === null || !ref || !fecha) continue;
+    const doc = str(r["ID Documento"]);
+    const contador = str(r["Contador"]);
     ventas.push({
       cod_cliente: cod,
       referencia: ref,
@@ -215,7 +246,24 @@ function parseExcel(buffer: ArrayBuffer): MaestroIsiParsed {
       unidades: numv(r["Unidades"]) ?? 0,
       importe: numv(r["Importe"]) ?? 0,
       margen: numv(r["Margen"]) ?? 0,
+      id_documento: doc ? (contador ? `${contador}|${doc}` : doc) : null,
+      ejercicio: numv(r["Ejercicio"]),
+      num_documento: numv(r["Nº Documento"]),
+      linea: numv(r["Línea"]),
+      tipo_documento: str(r["Tipo documento"]),
+      operacion: str(r["Operación"]),
+      hora: timev(r["Hora"]),
+      canal: str(r["Canal"]),
+      cod_almacen: str(r["Cód. Almacén"]),
+      almacen: str(r["Almacén"]),
+      cod_vendedor_linea: str(r["Cód. Vendedor"]),
+      vendedor_linea: str(r["Vendedor"]),
+      registrado_por: str(r["Registrado por"]),
+      motivo_abono: str(r["Motivo abono"]),
+      id_doc_enlazado: str(r["ID Doc. enlazado"]),
+      descripcion_linea: str(r["Descripción línea"]),
     });
+
   }
 
   if (clientes.length === 0 && productos.length === 0 && ventas.length === 0) {

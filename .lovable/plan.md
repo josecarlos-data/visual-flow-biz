@@ -1,53 +1,63 @@
-## Fase A — Efecto de las situaciones (lo ya acordado)
+## Qué trae el nuevo fichero
 
-### 1. Campo "Efecto" en cada situación
-Tres valores: **Ocultar de alertas** (INAGRA, concurso), **Caída justificada** (sigue visible, con contexto) y **Solo informativa** (etiqueta en ficha/listado, no toca alertas). Las situaciones existentes pasan a "Ocultar" para no cambiar nada de lo actual.
+Verificado sobre `Maestro_ISI_-_CRM-2.xlsx`:
 
-### 2. Nuevas categorías
-Pérdida de cliente final, reducción de flota/actividad, obra o proyecto finalizado, estacionalidad conocida — junto a las actuales.
+- `Hechos_Diarios`: 433.215 líneas → **325.498 documentos únicos** (1,33 líneas/doc), 34 columnas nuevas.
+- Operación: Venta 389.907 / Abono 43.308. Tipo documento: Albarán venta 380.407, Factura contado 46.285, Abono contado 6.523.
+- Canal: Mostrador/interno 380.667, Gsmart 49.088, Web 1.931, Garantías 1.468.
+- Nuevos ejes: hora, almacén, vendedor de la línea (quién despachó), usuario que registró, motivo de abono, y enlace documento→documento abonado.
+- `Dim_Cliente` (11.592) y `Dim_Referencia` (67.076) mantienen la misma estructura actual.
 
-### 3. Alertas comerciales
-Conmutador de tres estados: **Atención** (por defecto: sin las ocultas; las justificadas al final, atenuadas y con su etiqueta) / **Justificadas** / **Todos**. Contador: "3 ocultos por situación · 2 con caída justificada". Ámbar para ocultas, azul para justificadas.
+## Decisión sobre abonos (mi recomendación)
 
-### 4. Ficha y listado
-El aviso adapta el tono al efecto e incluye la nota completa y la vigencia.
+Modelo híbrido, que es el que mejor responde a tu ejemplo del volante devuelto:
 
-### 5. Caso de ejemplo (demo)
-Se elige un cliente real que hoy aparezca en "Caídas" y se le crea una situación de ejemplo: categoría *pérdida de cliente final*, efecto *caída justificada*, etiqueta "Perdió flota Mercadona", nota indicando que lo detectó Rafael Cárdenas en visita. Editable/borrable desde Administración cuando quieras.
+- **Importe siempre neto**: el abono resta. Si el cliente devuelve, sus ventas bajan.
+- **Transacciones = documentos de venta** (albarán/factura). El abono no suma transacción, pero **sí resta importe**, de modo que el ticket medio baja cuando hay devoluciones — exactamente el efecto que buscas.
+- **Devoluciones como KPI propio**: nº de abonos, importe abonado y **tasa de devolución** (% sobre venta bruta), con desglose por motivo de abono, referencia y vendedor. Ahí es donde de verdad se detecta el problema (referencias que se devuelven mucho, errores de despacho de un compañero concreto).
 
-## Fase B — Validación de visitas por el jefe de ventas
+Si prefieres contar el abono como transacción, es un cambio de una línea en la función de resumen; lo dejo parametrizable en ajustes.
 
-### Flujo
-El comercial registra la visita → queda **Pendiente de revisión** → el jefe de ventas la abre, la edita si hace falta y la marca **Correcta**, **Pendiente de completar** (con nota para el comercial) o **No correcta**. Sustituye al truco actual de escribir "Correcto/Pdte" al principio de observaciones.
+## Fase 1 — Modelo de datos
 
-### Bandeja de revisión (nueva pantalla)
-- Filtros por comercial, fecha, motivo y estado de validación; por defecto las pendientes.
-- Cada visita muestra los campos de la plantilla, marcando en rojo los obligatorios vacíos.
-- Botones rápidos: Correcta / Pendiente / No correcta + nota de revisión.
-- Edición en línea de los campos por parte del revisor, con registro de quién y cuándo validó.
-- Contador por comercial (visitas correctas del periodo) pensando en el incentivo, y exportación CSV.
+1. Ampliar `ventas_diarias` con: `id_documento`, `ejercicio`, `num_documento`, `linea`, `tipo_documento`, `operacion` (Venta/Abono), `hora`, `canal`, `cod_almacen`, `almacen`, `cod_vendedor_linea`, `vendedor_linea`, `registrado_por`, `motivo_abono`, `id_doc_enlazado`, `descripcion_linea`. Índices por `(cod_cliente, ejercicio, id_documento)`, `(fecha)`, `(canal)`, `(operacion)`.
+2. Nueva tabla agregada `resumen_documentos` (por cliente/año/mes/canal): nº documentos venta, nº abonos, importe neto, margen, unidades, líneas — para que los paneles sigan siendo instantáneos.
+3. Ampliar `cliente_kpis` con: `num_documentos_actual/anterior`, `ticket_medio_actual/anterior`, `lineas_por_documento`, `frecuencia_compra_dias`, `num_abonos`, `importe_abonos`, `canal_principal`.
+4. Actualizar `refrescar_resumenes_ventas()`, `insertar_ventas_diarias()`, `reset_maestro_isi_data()` y `panel_ventas_kpis()` con los nuevos campos, respetando permisos y `puede_ver_margen`.
 
-### Requisitos de calidad por motivo
-En *Administración → Plantillas de visita* se añade, por cada motivo, la marca de qué campos son **exigibles para considerar la visita correcta**. La visita muestra un semáforo automático ("cumple 5/6 requisitos") que ayuda al jefe a decidir, pero la palabra final siempre es suya.
+## Fase 2 — Ingesta
 
-### Quién ve qué
-- Comercial: ve el estado de sus visitas y la nota del revisor; puede completar las que estén "Pendiente de completar".
-- Jefe de zona: revisa las de su delegación. Director/Admin: todas.
+- Actualizar `src/lib/datasets/maestroIsi.ts` para leer las 34 columnas de `Hechos_Diarios` (con parseo de hora, operación y enlaces) manteniendo el flujo por lotes y el informe por etapas.
+- Cargar el fichero nuevo completo y regenerar resúmenes y KPIs.
 
-### Botón "Justificar caída de ventas" en la visita
-Desde Nueva visita / ficha de cliente, crea la situación con efecto *Caída justificada* enlazada a esa visita y comercial, sin salir del flujo.
+## Fase 3 — Explotación (paneles)
 
-## Detalle técnico
+**Ventas** (nuevos KPIs junto a los actuales):
+- Transacciones, ticket medio, líneas por documento, unidades por documento.
+- Evolución mensual de ticket medio vs año anterior.
+- Mix por canal (Mostrador / Gsmart / Web / Garantías) con importe y ticket medio de cada uno — mide de verdad la adopción del canal digital.
+- Panel de devoluciones: tasa, top motivos de abono, top referencias devueltas.
 
-**Fase A**
-- `ALTER TABLE public.situaciones_cliente ADD COLUMN efecto text NOT NULL DEFAULT 'ocultar' CHECK (efecto IN ('ocultar','justificada','informativa'))`.
-- `situaciones_activas()` devuelve `efecto`; `panel_alertas` / `panel_dormidos` excluyen solo `efecto='ocultar'` y devuelven la columna `efecto`. `panel_ventas_kpis`, `panel_ventas_mensual` y `panel_top_*` sin tocar.
-- Frontend: `EFECTOS_SITUACION` y categorías nuevas en `useCrm.ts`; variante de color en `SituacionBadge`; selector y columna en `AdminSituaciones.tsx` (+CSV); conmutador de 3 estados y ordenación en `Ventas.tsx`; tono adaptativo en `ClienteDetalle.tsx`.
-- Inserción del caso demo con la herramienta de datos tras localizar un `cod_cliente` presente en "Caídas".
+**Ficha de cliente**:
+- Ticket medio y frecuencia de compra (días entre documentos) frente a la media de su tipo/delegación.
+- Nueva pestaña **Documentos**: listado de albaranes/facturas con fecha, hora, canal, importe, nº líneas, quién lo despachó, y detalle de líneas al desplegar. Esto es lo que pedías para saber a quién reclamar.
+- Alerta nueva "el cliente compra igual de veces pero gasta menos" (transacciones estables + ticket medio a la baja) frente a "compra menos veces" — diagnósticos comerciales distintos.
 
-**Fase B**
-- `visitas`: usar `validacion` con valores normalizados (`pendiente|correcta|incompleta|no_correcta`) + nuevas columnas `nota_revision text`, `revisado_por uuid`, `revisado_en timestamptz`. Default `pendiente` para origen `app`; el histórico Gespromo conserva su valor detectado.
-- `motivo_campos`: nueva bandera `requerido_validacion boolean default false`.
-- RLS: política de UPDATE de validación solo para admin, director comercial y jefe de zona (limitado a su delegación vía `get_user_delegacion`); el comercial puede editar campos de sus propias visitas mientras estén `pendiente`/`incompleta`.
-- Nueva página `src/pages/RevisionVisitas.tsx` + ruta protegida + entrada de menú; hooks de revisión en `useCrm.ts`; marca de requisitos en `AdminVisitas.tsx`; estado y nota visibles en `Visitas.tsx` y `NuevaVisita.tsx`.
-- Se implementa la Fase A completa primero; la Fase B a continuación en el mismo desarrollo.
+**Nuevas alertas en `panel_alertas`**: caída de ticket medio, caída de frecuencia, y exceso de devoluciones.
+
+## Fase 4 — Cesta y productos relacionados (lo que preguntabas)
+
+Con `ID Documento` ya se puede hacer análisis de cesta real:
+
+- Vista/tabla `producto_afinidad`: pares de referencias que aparecen en el mismo documento, con soporte y confianza (calculada en batch al refrescar resúmenes, limitada al top N por referencia para que sea rápida).
+- En la ficha de cliente: **"Suelen comprarse juntas y este cliente no la lleva"** → lista de referencias que sus clientes similares compran junto a lo que él ya compra. Argumentario directo de venta cruzada para el comercial.
+- En el argumentario IA (`cliente-insights`): alimentar el prompt con estas oportunidades, canal habitual, ticket medio y devoluciones.
+
+## Detalles técnicos
+
+- Todo el cálculo pesado va en agregados regenerados por `refrescar_resumenes_ventas()`; las consultas del front solo leen resúmenes o RPCs con `LIMIT`.
+- Nuevas RPCs: `cliente_documentos(_cod, _desde, _hasta)`, `panel_canales(_anio)`, `panel_devoluciones(_anio)`, `producto_relacionados(_referencia)` — todas `SECURITY DEFINER` con filtro por `clientes_permitidos` y `GRANT EXECUTE` solo a `authenticated`.
+- Márgenes siguen ocultos según `puede_ver_margen`.
+- Formato es-ES ya existente (`src/lib/format.ts`); ticket medio con 2 decimales, transacciones sin decimales.
+
+Fases 1–3 son el núcleo; la Fase 4 la puedo dejar para un segundo paso si prefieres validar antes los KPIs de transacciones.

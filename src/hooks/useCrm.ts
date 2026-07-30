@@ -243,7 +243,93 @@ export interface ClienteKpis {
   importe_anio_anterior: number;
   margen_anio_anterior: number;
   importe_anio_anterior_ytd: number;
+  num_documentos_actual: number;
+  num_documentos_anterior: number;
+  ticket_medio_actual: number;
+  ticket_medio_anterior: number;
+  lineas_por_documento: number;
+  frecuencia_compra_dias: number | null;
+  num_abonos: number;
+  importe_abonos: number;
+  canal_principal: string | null;
 }
+
+export interface DocumentoCliente {
+  id_documento: string;
+  fecha: string;
+  hora: string | null;
+  tipo_documento: string | null;
+  operacion: string | null;
+  canal: string | null;
+  almacen: string | null;
+  vendedor_linea: string | null;
+  registrado_por: string | null;
+  importe: number;
+  margen: number;
+  lineas: number;
+}
+
+export function useClienteDocumentos(cod: number | null, limite = 100) {
+  return useQuery({
+    queryKey: ["crm_cliente_documentos", cod, limite],
+    enabled: cod != null,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("cliente_documentos" as never, {
+        _cod: cod!,
+        _limite: limite,
+      } as never);
+      if (error) throw error;
+      return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => ({
+        id_documento: String(r.id_documento ?? ""),
+        fecha: String(r.fecha ?? ""),
+        hora: (r.hora as string) ?? null,
+        tipo_documento: (r.tipo_documento as string) ?? null,
+        operacion: (r.operacion as string) ?? null,
+        canal: (r.canal as string) ?? null,
+        almacen: (r.almacen as string) ?? null,
+        vendedor_linea: (r.vendedor_linea as string) ?? null,
+        registrado_por: (r.registrado_por as string) ?? null,
+        importe: Number(r.importe ?? 0),
+        margen: Number(r.margen ?? 0),
+        lineas: Number(r.lineas ?? 0),
+      })) as DocumentoCliente[];
+    },
+  });
+}
+
+export interface LineaDocumento {
+  referencia: string;
+  descripcion: string | null;
+  marca: string | null;
+  familia: string | null;
+  unidades: number;
+  importe: number;
+  margen: number;
+}
+
+export function useDocumentoLineas(cod: number | null, idDocumento: string | null) {
+  return useQuery({
+    queryKey: ["crm_documento_lineas", cod, idDocumento],
+    enabled: cod != null && !!idDocumento,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("cliente_documento_lineas" as never, {
+        _cod: cod!,
+        _id_documento: idDocumento!,
+      } as never);
+      if (error) throw error;
+      return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => ({
+        referencia: String(r.referencia ?? ""),
+        descripcion: (r.descripcion as string) ?? null,
+        marca: (r.marca as string) ?? null,
+        familia: (r.familia as string) ?? null,
+        unidades: Number(r.unidades ?? 0),
+        importe: Number(r.importe ?? 0),
+        margen: Number(r.margen ?? 0),
+      })) as LineaDocumento[];
+    },
+  });
+}
+
 
 export function useClienteKpis(cod: number | null) {
   return useQuery({

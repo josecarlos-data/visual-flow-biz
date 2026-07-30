@@ -20,7 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import {
   useCliente, useClienteVentas, useClienteKpis, useClienteProductos, useClienteMix,
-  useClienteVisitas, useMotivos, usePuedeVerMargen, useSituacionesVigentes,
+  useClienteVisitas, useMotivos, usePuedeVerMargen, useSituacionesVigentes, useClienteDocumentos,
   etiquetaCategoria, eur, num, eurK, fechaCorta,
 } from "@/hooks/useCrm";
 
@@ -53,6 +53,8 @@ export default function ClienteDetalle() {
   const { data: kpis } = useClienteKpis(codNum);
   const { data: mix } = useClienteMix(codNum);
   const { data: visitas } = useClienteVisitas(codNum);
+  const { data: documentos } = useClienteDocumentos(codNum);
+
   const { data: motivos } = useMotivos();
   const { data: verMargen } = usePuedeVerMargen();
   const { mapa: situaciones } = useSituacionesVigentes();
@@ -247,11 +249,47 @@ export default function ClienteDetalle() {
         )}
         <Card>
           <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Transacciones {anioActual}</p>
+            <p className="mt-1 text-xl font-bold">{num(kpis?.num_documentos_actual ?? 0)}</p>
+            <p className="text-xs text-muted-foreground">{num(kpis?.num_documentos_anterior ?? 0)} en {anioPrevio}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Ticket medio {anioActual}</p>
+            <p className="mt-1 text-xl font-bold">{eur(kpis?.ticket_medio_actual ?? 0, 2)}</p>
+            <p className="text-xs text-muted-foreground">
+              {kpis?.ticket_medio_anterior ? `${eur(kpis.ticket_medio_anterior, 2)} en ${anioPrevio}` : "—"}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Frecuencia de compra</p>
+            <p className="mt-1 text-xl font-bold">
+              {kpis?.frecuencia_compra_dias ? `${num(kpis.frecuencia_compra_dias, 1)} días` : "—"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {num(kpis?.lineas_por_documento ?? 0, 1)} líneas por documento
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Referencias distintas</p>
             <p className="mt-1 text-xl font-bold">{num(kpis?.num_referencias ?? 0)}</p>
             <p className="text-xs text-muted-foreground">{num(kpis?.num_lineas ?? 0)} líneas</p>
           </CardContent>
         </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Abonos</p>
+            <p className="mt-1 text-xl font-bold">{num(kpis?.num_abonos ?? 0)}</p>
+            <p className="text-xs text-muted-foreground">{eur(Math.abs(kpis?.importe_abonos ?? 0))} devueltos</p>
+          </CardContent>
+        </Card>
+        
+
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Última compra</p>
@@ -274,7 +312,9 @@ export default function ClienteDetalle() {
         <TabsList className="w-full justify-start overflow-x-auto">
           <TabsTrigger value="resumen">Resumen</TabsTrigger>
           <TabsTrigger value="productos">Productos</TabsTrigger>
+          <TabsTrigger value="documentos">Documentos</TabsTrigger>
           <TabsTrigger value="visitas">Visitas</TabsTrigger>
+
           <TabsTrigger value="ia">Análisis IA</TabsTrigger>
         </TabsList>
 
@@ -441,7 +481,46 @@ export default function ClienteDetalle() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="documentos" className="space-y-3">
+          <Card>
+            <CardHeader><CardTitle className="text-base">Últimos documentos</CardTitle></CardHeader>
+            <CardContent className="overflow-x-auto">
+              {(documentos?.length ?? 0) === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">Sin documentos registrados.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Documento</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Canal</TableHead>
+                      <TableHead>Vendedor</TableHead>
+                      <TableHead className="text-right">Líneas</TableHead>
+                      <TableHead className="text-right">Importe</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {documentos!.map((d) => (
+                      <TableRow key={d.id_documento}>
+                        <TableCell className="whitespace-nowrap">{fechaCorta(d.fecha)}{d.hora ? ` ${d.hora.slice(0, 5)}` : ""}</TableCell>
+                        <TableCell className="font-mono text-xs">{d.id_documento}</TableCell>
+                        <TableCell>{d.operacion ?? d.tipo_documento ?? "—"}</TableCell>
+                        <TableCell>{d.canal ?? "—"}</TableCell>
+                        <TableCell className="truncate">{d.vendedor_linea ?? "—"}</TableCell>
+                        <TableCell className="text-right">{num(d.lineas)}</TableCell>
+                        <TableCell className={`text-right font-medium ${d.importe < 0 ? "text-destructive" : ""}`}>{eur(d.importe, 2)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="visitas" className="space-y-3">
+
           {!visitas || visitas.length === 0 ? (
             <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">Sin visitas registradas.</CardContent></Card>
           ) : (

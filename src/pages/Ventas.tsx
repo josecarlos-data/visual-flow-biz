@@ -22,14 +22,19 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { AlertTriangle, TrendingDown, Percent, Users, Euro, Package } from "lucide-react";
+import { AlertTriangle, TrendingDown, Percent, Users, Euro, Package, Receipt, RotateCcw } from "lucide-react";
+import { num as fnum, pct } from "@/lib/format";
+
 
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
-interface MensualRow { anio: number; mes: number; importe: number; margen: number; unidades: number }
-interface KpiRow { anio: number; importe: number; margen: number; unidades: number; clientes: number; lineas: number }
+interface MensualRow { anio: number; mes: number; importe: number; margen: number; unidades: number; documentos: number; ticket_medio: number }
+interface KpiRow { anio: number; importe: number; margen: number; unidades: number; clientes: number; lineas: number; documentos: number; abonos: number; importe_abonos: number; ticket_medio: number }
 interface TopCliente { cod_cliente: number; cliente: string; vendedor: string | null; importe: number; margen: number }
 interface TopDim { importe: number; margen: number; familia?: string; marca?: string }
+interface CanalRow { canal: string; documentos: number; importe: number; margen: number; ticket_medio: number; clientes: number }
+interface DevolucionRow { tipo: string; etiqueta: string; importe: number; lineas: number }
+
 interface AlertaRow {
   tipo: string;
   cod_cliente: number;
@@ -57,7 +62,10 @@ export default function Ventas() {
   const [topFamilias, setTopFamilias] = useState<TopDim[]>([]);
   const [topMarcas, setTopMarcas] = useState<TopDim[]>([]);
   const [alertas, setAlertas] = useState<AlertaRow[]>([]);
+  const [canales, setCanales] = useState<CanalRow[]>([]);
+  const [devoluciones, setDevoluciones] = useState<DevolucionRow[]>([]);
   const [vistaAlertas, setVistaAlertas] = useState<VistaAlertas>("atencion");
+
 
   const anioActual = useMemo(
     () => (kpis.length ? Math.max(...kpis.map((k) => k.anio)) : new Date().getFullYear()),
@@ -76,11 +84,14 @@ export default function Ventas() {
       setErrorMsg(err ? err.message : null);
       setMensual(((mRes.data as any[]) ?? []).map((r) => ({
         anio: num(r.anio), mes: num(r.mes), importe: num(r.importe), margen: num(r.margen), unidades: num(r.unidades),
+        documentos: num(r.documentos), ticket_medio: num(r.ticket_medio),
       })));
       setKpis(((kRes.data as any[]) ?? []).map((r) => ({
         anio: num(r.anio), importe: num(r.importe), margen: num(r.margen), unidades: num(r.unidades),
-        clientes: num(r.clientes), lineas: num(r.lineas),
+        clientes: num(r.clientes), lineas: num(r.lineas), documentos: num(r.documentos),
+        abonos: num(r.abonos), importe_abonos: num(r.importe_abonos), ticket_medio: num(r.ticket_medio),
       })));
+
       setAlertas(((aRes.data as any[]) ?? []).map((r) => ({
         tipo: r.tipo, cod_cliente: num(r.cod_cliente), cliente: r.cliente, vendedor: r.vendedor,
         valor: num(r.valor), valor_ref: num(r.valor_ref), dias: r.dias === null ? null : num(r.dias),
@@ -96,12 +107,14 @@ export default function Ventas() {
   useEffect(() => {
     if (!anioActual) return;
     (async () => {
-      const [cRes, fRes, brRes] = await Promise.all([
+      const [cRes, fRes, brRes, canRes, devRes] = await Promise.all([
         supabase.rpc("panel_top_clientes" as any, { _anio: anioActual, _limite: 10 } as any),
         supabase.rpc("panel_top_familias" as any, { _anio: anioActual, _limite: 10 } as any),
         supabase.rpc("panel_top_marcas" as any, { _anio: anioActual, _limite: 10 } as any),
+        supabase.rpc("panel_canales" as any, { _anio: anioActual } as any),
+        supabase.rpc("panel_devoluciones" as any, { _anio: anioActual, _limite: 8 } as any),
       ]);
-      const err2 = cRes.error ?? fRes.error ?? brRes.error;
+      const err2 = cRes.error ?? fRes.error ?? brRes.error ?? canRes.error ?? devRes.error;
       if (err2) setErrorMsg(err2.message);
       setTopClientes(((cRes.data as any[]) ?? []).map((r) => ({
         cod_cliente: num(r.cod_cliente), cliente: r.cliente, vendedor: r.vendedor,
@@ -109,7 +122,15 @@ export default function Ventas() {
       })));
       setTopFamilias(((fRes.data as any[]) ?? []).map((r) => ({ familia: r.familia ?? "Sin familia", importe: num(r.importe), margen: num(r.margen) })));
       setTopMarcas(((brRes.data as any[]) ?? []).map((r) => ({ marca: r.marca ?? "Sin marca", importe: num(r.importe), margen: num(r.margen) })));
+      setCanales(((canRes.data as any[]) ?? []).map((r) => ({
+        canal: r.canal ?? "Sin canal", documentos: num(r.documentos), importe: num(r.importe),
+        margen: num(r.margen), ticket_medio: num(r.ticket_medio), clientes: num(r.clientes),
+      })));
+      setDevoluciones(((devRes.data as any[]) ?? []).map((r) => ({
+        tipo: r.tipo, etiqueta: r.etiqueta ?? "—", importe: num(r.importe), lineas: num(r.lineas),
+      })));
     })();
+
 
   }, [anioActual]);
 
@@ -126,6 +147,18 @@ export default function Ventas() {
     });
   }, [mensual, anios]);
 
+  const serieTicket = useMemo(() => {
+    return MESES.map((nombre, i) => {
+      const row: Record<string, number | string> = { mes: nombre };
+      anios.forEach((a) => {
+        const f = mensual.find((m) => m.anio === a && m.mes === i + 1);
+        if (f && f.documentos > 0) row[String(a)] = Math.round(f.ticket_medio);
+      });
+      return row;
+    });
+  }, [mensual, anios]);
+
+
   const kpiActual = kpis.find((k) => k.anio === anioActual);
   const kpiPrevio = kpis.find((k) => k.anio === anioActual - 1);
 
@@ -136,6 +169,18 @@ export default function Ventas() {
     .reduce((s, m) => s + m.importe, 0);
   const variacion = ytdPrevio > 0 && kpiActual ? ((kpiActual.importe - ytdPrevio) / ytdPrevio) * 100 : null;
   const margenPct = kpiActual && kpiActual.importe > 0 ? (kpiActual.margen / kpiActual.importe) * 100 : 0;
+  const ticketVar =
+    kpiActual && kpiPrevio && kpiPrevio.ticket_medio > 0
+      ? ((kpiActual.ticket_medio - kpiPrevio.ticket_medio) / kpiPrevio.ticket_medio) * 100
+      : null;
+  // Tasa de devolución: importe abonado sobre la venta bruta (neto + abonos).
+  const tasaDevolucion = (() => {
+    if (!kpiActual) return 0;
+    const abonos = Math.abs(kpiActual.importe_abonos);
+    const bruto = kpiActual.importe + abonos;
+    return bruto > 0 ? (abonos / bruto) * 100 : 0;
+  })();
+
 
   const alertasPorTipo = (tipo: string) => {
     const delTipo = alertas.filter((a) => a.tipo === tipo);
@@ -200,7 +245,27 @@ export default function Ventas() {
           />
         )}
         <Kpi icon={<Users className="h-4 w-4" />} label="Clientes activos" value={String(kpiActual?.clientes ?? 0)} hint={`${kpiPrevio?.clientes ?? 0} en ${anioActual - 1}`} />
-        <Kpi icon={<Package className="h-4 w-4" />} label="Líneas de venta" value={(kpiActual?.lineas ?? 0).toLocaleString("es-ES")} />
+        <Kpi
+          icon={<Receipt className="h-4 w-4" />}
+          label="Transacciones"
+          value={fnum(kpiActual?.documentos ?? 0)}
+          hint={`${fnum(kpiActual?.abonos ?? 0)} abonos · ${fnum(kpiActual?.lineas ?? 0)} líneas`}
+        />
+        <Kpi
+          icon={<Package className="h-4 w-4" />}
+          label="Ticket medio"
+          value={eur(kpiActual?.ticket_medio ?? 0, 2)}
+          hint={ticketVar !== null ? `${ticketVar >= 0 ? "+" : ""}${ticketVar.toFixed(1)}% vs ${anioActual - 1}` : undefined}
+          positive={ticketVar !== null ? ticketVar >= 0 : undefined}
+        />
+        <Kpi
+          icon={<RotateCcw className="h-4 w-4" />}
+          label="Tasa de devolución"
+          value={pct(tasaDevolucion)}
+          hint={`${eur(Math.abs(kpiActual?.importe_abonos ?? 0))} abonados`}
+          positive={tasaDevolucion <= 5}
+        />
+
       </div>
 
       <Card>
@@ -220,6 +285,83 @@ export default function Ventas() {
           </ResponsiveContainer>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Ticket medio por mes</CardTitle></CardHeader>
+        <CardContent className="h-[300px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={serieTicket} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
+              <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => eur(Number(v))} width={70} />
+              <Tooltip formatter={(v) => eur(Number(v), 2)} />
+              <Legend />
+              {anios.map((a) => (
+                <Line key={a} type="monotone" dataKey={String(a)} stroke={getYearColor(a, anioActual)} strokeWidth={a === anioActual ? 2.5 : 1.5} dot={false} />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader><CardTitle>Mix por canal {anioActual}</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {canales.length === 0 && <Vacio />}
+            {canales.map((c) => {
+              const total = canales.reduce((s, x) => s + x.importe, 0);
+              const share = total > 0 ? (c.importe / total) * 100 : 0;
+              return (
+                <div key={c.canal} className="rounded-md border p-2 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="truncate font-medium">{c.canal}</span>
+                    <span className="shrink-0 font-medium">{eur(c.importe)}</span>
+                  </div>
+                  <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                    <div className="h-full rounded-full bg-primary" style={{ width: `${share.toFixed(1)}%` }} />
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {pct(share)} · {fnum(c.documentos)} transacciones · ticket {eur(c.ticket_medio, 2)} · {fnum(c.clientes)} clientes
+                  </div>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Devoluciones {anioActual}</CardTitle></CardHeader>
+          <CardContent>
+            <Tabs defaultValue="motivo">
+              <TabsList className="mb-3">
+                <TabsTrigger value="motivo">Motivos</TabsTrigger>
+                <TabsTrigger value="referencia">Referencias</TabsTrigger>
+                <TabsTrigger value="vendedor">Vendedores</TabsTrigger>
+              </TabsList>
+              {["motivo", "referencia", "vendedor"].map((t) => {
+                const filas = devoluciones.filter((d) => d.tipo === t);
+                return (
+                  <TabsContent key={t} value={t} className="space-y-2">
+                    {filas.length === 0 && <Vacio />}
+                    {filas.map((d) => (
+                      <div key={`${t}-${d.etiqueta}`} className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm">
+                        <span className="truncate">{d.etiqueta}</span>
+                        <span className="shrink-0 text-right">
+                          <span className="font-medium">{eur(d.importe)}</span>
+                          <span className="ml-2 text-xs text-muted-foreground">{fnum(d.lineas)} líneas</span>
+                        </span>
+                      </div>
+                    ))}
+                  </TabsContent>
+                );
+              })}
+            </Tabs>
+          </CardContent>
+        </Card>
+      </div>
+
+
 
       <Card>
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
