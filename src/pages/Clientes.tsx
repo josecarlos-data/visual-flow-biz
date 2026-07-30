@@ -14,6 +14,7 @@ export default function Clientes() {
   const [soloActivos, setSoloActivos] = useState(true);
   const [orden, setOrden] = useState<OrdenClientes>("ventas");
   const { data: clientes, isLoading, error } = useClientes(soloActivos, orden);
+  const { mapa: situaciones } = useSituacionesVigentes();
   const [q, setQ] = useState("");
   const [ruta, setRuta] = useState("todas");
 
