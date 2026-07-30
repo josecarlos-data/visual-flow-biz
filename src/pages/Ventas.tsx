@@ -40,7 +40,10 @@ interface AlertaRow {
   dias: number | null;
   etiqueta: string | null;
   situacion_categoria: string | null;
+  situacion_efecto: string | null;
 }
+
+type VistaAlertas = "atencion" | "justificadas" | "todos";
 
 const num = (v: unknown) => Number(v ?? 0);
 
@@ -54,7 +57,7 @@ export default function Ventas() {
   const [topFamilias, setTopFamilias] = useState<TopDim[]>([]);
   const [topMarcas, setTopMarcas] = useState<TopDim[]>([]);
   const [alertas, setAlertas] = useState<AlertaRow[]>([]);
-  const [verTodasAlertas, setVerTodasAlertas] = useState(false);
+  const [vistaAlertas, setVistaAlertas] = useState<VistaAlertas>("atencion");
 
   const anioActual = useMemo(
     () => (kpis.length ? Math.max(...kpis.map((k) => k.anio)) : new Date().getFullYear()),
@@ -82,6 +85,7 @@ export default function Ventas() {
         tipo: r.tipo, cod_cliente: num(r.cod_cliente), cliente: r.cliente, vendedor: r.vendedor,
         valor: num(r.valor), valor_ref: num(r.valor_ref), dias: r.dias === null ? null : num(r.dias),
         etiqueta: r.etiqueta ?? null, situacion_categoria: r.situacion_categoria ?? null,
+        situacion_efecto: r.situacion_efecto ?? null,
       })));
       setLoading(false);
     })();
@@ -133,10 +137,22 @@ export default function Ventas() {
   const variacion = ytdPrevio > 0 && kpiActual ? ((kpiActual.importe - ytdPrevio) / ytdPrevio) * 100 : null;
   const margenPct = kpiActual && kpiActual.importe > 0 ? (kpiActual.margen / kpiActual.importe) * 100 : 0;
 
-  const alertasPorTipo = (tipo: string) =>
-    alertas.filter((a) => a.tipo === tipo && (verTodasAlertas || !a.etiqueta)).slice(0, 10);
+  const alertasPorTipo = (tipo: string) => {
+    const delTipo = alertas.filter((a) => a.tipo === tipo);
+    const visibles =
+      vistaAlertas === "todos"
+        ? delTipo
+        : vistaAlertas === "justificadas"
+          ? delTipo.filter((a) => a.situacion_efecto === "justificada")
+          : delTipo.filter((a) => a.situacion_efecto !== "ocultar");
+    // En "Atención" las caídas justificadas van al final: son reales, pero ya tienen explicación.
+    return [...visibles]
+      .sort((a, b) => Number(a.situacion_efecto === "justificada") - Number(b.situacion_efecto === "justificada"))
+      .slice(0, 10);
+  };
 
-  const ocultasPorSituacion = alertas.filter((a) => a.etiqueta).length;
+  const ocultasPorSituacion = alertas.filter((a) => a.situacion_efecto === "ocultar").length;
+  const justificadas = alertas.filter((a) => a.situacion_efecto === "justificada").length;
 
 
   if (loading) {
@@ -209,19 +225,31 @@ export default function Ventas() {
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-destructive" /> Alertas comerciales</CardTitle>
           <div className="inline-flex shrink-0 rounded-md border p-0.5">
-            <Button size="sm" variant={verTodasAlertas ? "ghost" : "secondary"} className="h-7 px-3 text-xs" onClick={() => setVerTodasAlertas(false)}>
-              Atención
-            </Button>
-            <Button size="sm" variant={verTodasAlertas ? "secondary" : "ghost"} className="h-7 px-3 text-xs" onClick={() => setVerTodasAlertas(true)}>
-              Todos
-            </Button>
+            {([
+              { key: "atencion", label: "Atención" },
+              { key: "justificadas", label: "Justificadas" },
+              { key: "todos", label: "Todos" },
+            ] as { key: VistaAlertas; label: string }[]).map((v) => (
+              <Button
+                key={v.key}
+                size="sm"
+                variant={vistaAlertas === v.key ? "secondary" : "ghost"}
+                className="h-7 px-3 text-xs"
+                onClick={() => setVistaAlertas(v.key)}
+              >
+                {v.label}
+              </Button>
+            ))}
           </div>
         </CardHeader>
         <CardContent>
-          {!verTodasAlertas && ocultasPorSituacion > 0 && (
+          {vistaAlertas !== "todos" && (ocultasPorSituacion > 0 || justificadas > 0) && (
             <p className="mb-3 text-xs text-muted-foreground">
-              {ocultasPorSituacion} aviso{ocultasPorSituacion > 1 ? "s" : ""} oculto{ocultasPorSituacion > 1 ? "s" : ""} por situación conocida.{" "}
-              <button type="button" className="underline hover:text-foreground" onClick={() => setVerTodasAlertas(true)}>Ver todos</button>
+              {[
+                ocultasPorSituacion > 0 ? `${ocultasPorSituacion} oculto${ocultasPorSituacion > 1 ? "s" : ""} por situación` : null,
+                justificadas > 0 ? `${justificadas} con caída justificada` : null,
+              ].filter(Boolean).join(" · ")}.{" "}
+              <button type="button" className="underline hover:text-foreground" onClick={() => setVistaAlertas("todos")}>Ver todos</button>
             </p>
           )}
           <Tabs defaultValue="caida">
@@ -335,15 +363,24 @@ function Kpi({ icon, label, value, hint, positive }: { icon: React.ReactNode; la
 }
 
 function FilaAlerta({ a, detalle, badge }: { a: AlertaRow; detalle: string; badge: React.ReactNode }) {
+  const atenuada = a.situacion_efecto === "justificada" || a.situacion_efecto === "ocultar";
   return (
-    <Link to={`/clientes/${a.cod_cliente}`} className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm transition-colors hover:bg-accent">
+    <Link
+      to={`/clientes/${a.cod_cliente}`}
+      className={`flex items-center justify-between gap-3 rounded-md border p-2 text-sm transition-colors hover:bg-accent ${atenuada ? "opacity-70" : ""}`}
+    >
       <span className="min-w-0">
         <span className="flex min-w-0 items-center gap-2">
           <span className="truncate font-medium">{a.cliente}</span>
           {a.etiqueta && (
             <SituacionBadge
               className="shrink-0"
-              situacion={{ etiqueta: a.etiqueta, categoria: a.situacion_categoria ?? "otros", nota: null }}
+              situacion={{
+                etiqueta: a.etiqueta,
+                categoria: a.situacion_categoria ?? "otros",
+                nota: null,
+                efecto: a.situacion_efecto,
+              }}
             />
           )}
         </span>
