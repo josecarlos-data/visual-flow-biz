@@ -20,6 +20,7 @@ import AdminUsers from "./pages/AdminUsers";
 import AdminData from "./pages/AdminData";
 import AdminFunctions from "./pages/AdminFunctions";
 import AdminVisitas from "./pages/AdminVisitas";
+import AdminSituaciones from "./pages/AdminSituaciones";
 
 import NotFound from "./pages/NotFound";
 
