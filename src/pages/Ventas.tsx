@@ -36,6 +36,8 @@ interface AlertaRow {
   valor: number;
   valor_ref: number;
   dias: number | null;
+  etiqueta: string | null;
+  situacion_categoria: string | null;
 }
 
 const num = (v: unknown) => Number(v ?? 0);
