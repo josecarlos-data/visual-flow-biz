@@ -7,12 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useClientes, eur, fechaCorta, type OrdenClientes } from "@/hooks/useCrm";
+import { useClientes, useSituacionesVigentes, eur, fechaCorta, type OrdenClientes } from "@/hooks/useCrm";
+import { SituacionBadge } from "@/components/SituacionBadge";
 
 export default function Clientes() {
   const [soloActivos, setSoloActivos] = useState(true);
   const [orden, setOrden] = useState<OrdenClientes>("ventas");
   const { data: clientes, isLoading, error } = useClientes(soloActivos, orden);
+  const { mapa: situaciones } = useSituacionesVigentes();
   const [q, setQ] = useState("");
   const [ruta, setRuta] = useState("todas");
 
@@ -131,7 +133,12 @@ export default function Clientes() {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate font-medium">{c.cliente}</p>
+                    <p className="flex min-w-0 items-center gap-2">
+                      <span className="truncate font-medium">{c.cliente}</span>
+                      {situaciones.get(c.cod_cliente) && (
+                        <SituacionBadge className="shrink-0" situacion={situaciones.get(c.cod_cliente)!} />
+                      )}
+                    </p>
                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                       <span>#{c.cod_cliente}</span>
                       {c.localidad && (

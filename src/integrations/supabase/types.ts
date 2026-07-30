@@ -726,6 +726,56 @@ export type Database = {
         }
         Relationships: []
       }
+      situaciones_cliente: {
+        Row: {
+          activo: boolean
+          categoria: string
+          cod_cliente: number
+          created_at: string
+          created_by: string | null
+          desde: string
+          etiqueta: string
+          hasta: string | null
+          id: string
+          nota: string | null
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          categoria?: string
+          cod_cliente: number
+          created_at?: string
+          created_by?: string | null
+          desde?: string
+          etiqueta: string
+          hasta?: string | null
+          id?: string
+          nota?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          categoria?: string
+          cod_cliente?: number
+          created_at?: string
+          created_by?: string | null
+          desde?: string
+          etiqueta?: string
+          hasta?: string | null
+          id?: string
+          nota?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "situaciones_cliente_cod_cliente_fkey"
+            columns: ["cod_cliente"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["cod_cliente"]
+          },
+        ]
+      }
       sync_config: {
         Row: {
           created_at: string
@@ -1169,11 +1219,13 @@ export type Database = {
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_approved: { Args: { _user_id: string }; Returns: boolean }
       panel_alertas: {
-        Args: { _limite?: number }
+        Args: { _incluir_excluidos?: boolean; _limite?: number }
         Returns: {
           cliente: string
           cod_cliente: number
           dias: number
+          etiqueta: string
+          situacion_categoria: string
           tipo: string
           valor: number
           valor_ref: number
@@ -1181,10 +1233,11 @@ export type Database = {
         }[]
       }
       panel_dormidos: {
-        Args: { _limite?: number }
+        Args: { _incluir_excluidos?: boolean; _limite?: number }
         Returns: {
           cliente: string
           cod_cliente: number
+          etiqueta: string
           importe_total: number
           ultima_compra: string
           vendedor: string
@@ -1241,6 +1294,15 @@ export type Database = {
       refrescar_resumenes_admin: { Args: never; Returns: undefined }
       refrescar_resumenes_ventas: { Args: never; Returns: undefined }
       reset_maestro_isi_data: { Args: never; Returns: undefined }
+      situaciones_activas: {
+        Args: never
+        Returns: {
+          categoria: string
+          cod_cliente: number
+          etiqueta: string
+          nota: string
+        }[]
+      }
       upsert_clientes_maestro: { Args: { _rows: Json }; Returns: number }
       upsert_productos_maestro: { Args: { _rows: Json }; Returns: number }
     }

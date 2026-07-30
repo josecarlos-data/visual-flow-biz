@@ -7,6 +7,8 @@ import { getYearColor } from "@/lib/yearColors";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { SituacionBadge } from "@/components/SituacionBadge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Bar,
@@ -36,6 +38,8 @@ interface AlertaRow {
   valor: number;
   valor_ref: number;
   dias: number | null;
+  etiqueta: string | null;
+  situacion_categoria: string | null;
 }
 
 const num = (v: unknown) => Number(v ?? 0);
@@ -50,6 +54,7 @@ export default function Ventas() {
   const [topFamilias, setTopFamilias] = useState<TopDim[]>([]);
   const [topMarcas, setTopMarcas] = useState<TopDim[]>([]);
   const [alertas, setAlertas] = useState<AlertaRow[]>([]);
+  const [verTodasAlertas, setVerTodasAlertas] = useState(false);
 
   const anioActual = useMemo(
     () => (kpis.length ? Math.max(...kpis.map((k) => k.anio)) : new Date().getFullYear()),
@@ -62,7 +67,7 @@ export default function Ventas() {
       const [mRes, kRes, aRes] = await Promise.all([
         supabase.rpc("panel_ventas_mensual" as any),
         supabase.rpc("panel_ventas_kpis" as any),
-        supabase.rpc("panel_alertas" as any, { _limite: 10 } as any),
+        supabase.rpc("panel_alertas" as any, { _limite: 25, _incluir_excluidos: true } as any),
       ]);
       const err = mRes.error ?? kRes.error ?? aRes.error;
       setErrorMsg(err ? err.message : null);
@@ -76,10 +81,12 @@ export default function Ventas() {
       setAlertas(((aRes.data as any[]) ?? []).map((r) => ({
         tipo: r.tipo, cod_cliente: num(r.cod_cliente), cliente: r.cliente, vendedor: r.vendedor,
         valor: num(r.valor), valor_ref: num(r.valor_ref), dias: r.dias === null ? null : num(r.dias),
+        etiqueta: r.etiqueta ?? null, situacion_categoria: r.situacion_categoria ?? null,
       })));
       setLoading(false);
     })();
   }, []);
+
 
 
   useEffect(() => {
@@ -126,7 +133,11 @@ export default function Ventas() {
   const variacion = ytdPrevio > 0 && kpiActual ? ((kpiActual.importe - ytdPrevio) / ytdPrevio) * 100 : null;
   const margenPct = kpiActual && kpiActual.importe > 0 ? (kpiActual.margen / kpiActual.importe) * 100 : 0;
 
-  const alertasPorTipo = (tipo: string) => alertas.filter((a) => a.tipo === tipo);
+  const alertasPorTipo = (tipo: string) =>
+    alertas.filter((a) => a.tipo === tipo && (verTodasAlertas || !a.etiqueta)).slice(0, 10);
+
+  const ocultasPorSituacion = alertas.filter((a) => a.etiqueta).length;
+
 
   if (loading) {
     return (
@@ -195,14 +206,31 @@ export default function Ventas() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-destructive" /> Alertas comerciales</CardTitle></CardHeader>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-destructive" /> Alertas comerciales</CardTitle>
+          <div className="inline-flex shrink-0 rounded-md border p-0.5">
+            <Button size="sm" variant={verTodasAlertas ? "ghost" : "secondary"} className="h-7 px-3 text-xs" onClick={() => setVerTodasAlertas(false)}>
+              Atención
+            </Button>
+            <Button size="sm" variant={verTodasAlertas ? "secondary" : "ghost"} className="h-7 px-3 text-xs" onClick={() => setVerTodasAlertas(true)}>
+              Todos
+            </Button>
+          </div>
+        </CardHeader>
         <CardContent>
+          {!verTodasAlertas && ocultasPorSituacion > 0 && (
+            <p className="mb-3 text-xs text-muted-foreground">
+              {ocultasPorSituacion} aviso{ocultasPorSituacion > 1 ? "s" : ""} oculto{ocultasPorSituacion > 1 ? "s" : ""} por situación conocida.{" "}
+              <button type="button" className="underline hover:text-foreground" onClick={() => setVerTodasAlertas(true)}>Ver todos</button>
+            </p>
+          )}
           <Tabs defaultValue="caida">
             <TabsList className="mb-3">
               <TabsTrigger value="caida">Caídas ({alertasPorTipo("caida").length})</TabsTrigger>
               <TabsTrigger value="fuga">Riesgo fuga ({alertasPorTipo("fuga").length})</TabsTrigger>
               {verMargen && <TabsTrigger value="margen_bajo">Margen bajo ({alertasPorTipo("margen_bajo").length})</TabsTrigger>}
             </TabsList>
+
 
             <TabsContent value="caida" className="space-y-2">
               {alertasPorTipo("caida").length === 0 && <Vacio />}
@@ -310,9 +338,18 @@ function FilaAlerta({ a, detalle, badge }: { a: AlertaRow; detalle: string; badg
   return (
     <Link to={`/clientes/${a.cod_cliente}`} className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm transition-colors hover:bg-accent">
       <span className="min-w-0">
-        <span className="block truncate font-medium">{a.cliente}</span>
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="truncate font-medium">{a.cliente}</span>
+          {a.etiqueta && (
+            <SituacionBadge
+              className="shrink-0"
+              situacion={{ etiqueta: a.etiqueta, categoria: a.situacion_categoria ?? "otros", nota: null }}
+            />
+          )}
+        </span>
         <span className="block truncate text-xs text-muted-foreground">{detalle}{a.vendedor ? ` · ${a.vendedor}` : ""}</span>
       </span>
+
       {badge}
     </Link>
   );
