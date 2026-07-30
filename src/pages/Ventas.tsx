@@ -145,6 +145,18 @@ export default function Ventas() {
     });
   }, [mensual, anios]);
 
+  const serieTicket = useMemo(() => {
+    return MESES.map((nombre, i) => {
+      const row: Record<string, number | string> = { mes: nombre };
+      anios.forEach((a) => {
+        const f = mensual.find((m) => m.anio === a && m.mes === i + 1);
+        if (f && f.documentos > 0) row[String(a)] = Math.round(f.ticket_medio);
+      });
+      return row;
+    });
+  }, [mensual, anios]);
+
+
   const kpiActual = kpis.find((k) => k.anio === anioActual);
   const kpiPrevio = kpis.find((k) => k.anio === anioActual - 1);
 
