@@ -338,9 +338,18 @@ function FilaAlerta({ a, detalle, badge }: { a: AlertaRow; detalle: string; badg
   return (
     <Link to={`/clientes/${a.cod_cliente}`} className="flex items-center justify-between gap-3 rounded-md border p-2 text-sm transition-colors hover:bg-accent">
       <span className="min-w-0">
-        <span className="block truncate font-medium">{a.cliente}</span>
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="truncate font-medium">{a.cliente}</span>
+          {a.etiqueta && (
+            <SituacionBadge
+              className="shrink-0"
+              situacion={{ etiqueta: a.etiqueta, categoria: a.situacion_categoria ?? "otros", nota: null }}
+            />
+          )}
+        </span>
         <span className="block truncate text-xs text-muted-foreground">{detalle}{a.vendedor ? ` · ${a.vendedor}` : ""}</span>
       </span>
+
       {badge}
     </Link>
   );
