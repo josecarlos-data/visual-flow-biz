@@ -77,50 +77,77 @@ export type Database = {
       cliente_kpis: {
         Row: {
           actualizado_en: string
+          canal_principal: string | null
           cod_cliente: number
           dias_sin_comprar: number | null
+          frecuencia_compra_dias: number | null
+          importe_abonos: number
           importe_anio_actual: number
           importe_anio_anterior: number
           importe_anio_anterior_ytd: number
           importe_total: number
+          lineas_por_documento: number
           margen_anio_actual: number
           margen_anio_anterior: number
           margen_total: number
+          num_abonos: number
+          num_documentos_actual: number
+          num_documentos_anterior: number
           num_lineas: number
           num_referencias: number
           primera_compra: string | null
+          ticket_medio_actual: number
+          ticket_medio_anterior: number
           ultima_compra: string | null
         }
         Insert: {
           actualizado_en?: string
+          canal_principal?: string | null
           cod_cliente: number
           dias_sin_comprar?: number | null
+          frecuencia_compra_dias?: number | null
+          importe_abonos?: number
           importe_anio_actual?: number
           importe_anio_anterior?: number
           importe_anio_anterior_ytd?: number
           importe_total?: number
+          lineas_por_documento?: number
           margen_anio_actual?: number
           margen_anio_anterior?: number
           margen_total?: number
+          num_abonos?: number
+          num_documentos_actual?: number
+          num_documentos_anterior?: number
           num_lineas?: number
           num_referencias?: number
           primera_compra?: string | null
+          ticket_medio_actual?: number
+          ticket_medio_anterior?: number
           ultima_compra?: string | null
         }
         Update: {
           actualizado_en?: string
+          canal_principal?: string | null
           cod_cliente?: number
           dias_sin_comprar?: number | null
+          frecuencia_compra_dias?: number | null
+          importe_abonos?: number
           importe_anio_actual?: number
           importe_anio_anterior?: number
           importe_anio_anterior_ytd?: number
           importe_total?: number
+          lineas_por_documento?: number
           margen_anio_actual?: number
           margen_anio_anterior?: number
           margen_total?: number
+          num_abonos?: number
+          num_documentos_actual?: number
+          num_documentos_anterior?: number
           num_lineas?: number
           num_referencias?: number
           primera_compra?: string | null
+          ticket_medio_actual?: number
+          ticket_medio_anterior?: number
           ultima_compra?: string | null
         }
         Relationships: []
@@ -699,6 +726,48 @@ export type Database = {
         }
         Relationships: []
       }
+      resumen_documentos: {
+        Row: {
+          abonos: number
+          anio: number
+          canal: string
+          cod_cliente: number
+          documentos: number
+          importe: number
+          importe_abonos: number
+          lineas: number
+          margen: number
+          mes: number
+          unidades: number
+        }
+        Insert: {
+          abonos?: number
+          anio: number
+          canal?: string
+          cod_cliente: number
+          documentos?: number
+          importe?: number
+          importe_abonos?: number
+          lineas?: number
+          margen?: number
+          mes: number
+          unidades?: number
+        }
+        Update: {
+          abonos?: number
+          anio?: number
+          canal?: string
+          cod_cliente?: number
+          documentos?: number
+          importe?: number
+          importe_abonos?: number
+          lineas?: number
+          margen?: number
+          mes?: number
+          unidades?: number
+        }
+        Relationships: []
+      }
       rutas: {
         Row: {
           codigo: string
@@ -927,40 +996,88 @@ export type Database = {
       }
       ventas_diarias: {
         Row: {
+          almacen: string | null
+          canal: string | null
+          cod_almacen: string | null
           cod_cliente: number
+          cod_vendedor_linea: string | null
           created_at: string
+          descripcion_linea: string | null
+          ejercicio: number | null
           familia: string | null
           fecha: string
+          hora: string | null
           id: number
+          id_doc_enlazado: string | null
+          id_documento: string | null
           importe: number
+          linea: number | null
           marca: string | null
           margen: number
+          motivo_abono: string | null
+          num_documento: number | null
+          operacion: string | null
           referencia: string
+          registrado_por: string | null
+          tipo_documento: string | null
           unidades: number
+          vendedor_linea: string | null
         }
         Insert: {
+          almacen?: string | null
+          canal?: string | null
+          cod_almacen?: string | null
           cod_cliente: number
+          cod_vendedor_linea?: string | null
           created_at?: string
+          descripcion_linea?: string | null
+          ejercicio?: number | null
           familia?: string | null
           fecha: string
+          hora?: string | null
           id?: never
+          id_doc_enlazado?: string | null
+          id_documento?: string | null
           importe?: number
+          linea?: number | null
           marca?: string | null
           margen?: number
+          motivo_abono?: string | null
+          num_documento?: number | null
+          operacion?: string | null
           referencia: string
+          registrado_por?: string | null
+          tipo_documento?: string | null
           unidades?: number
+          vendedor_linea?: string | null
         }
         Update: {
+          almacen?: string | null
+          canal?: string | null
+          cod_almacen?: string | null
           cod_cliente?: number
+          cod_vendedor_linea?: string | null
           created_at?: string
+          descripcion_linea?: string | null
+          ejercicio?: number | null
           familia?: string | null
           fecha?: string
+          hora?: string | null
           id?: never
+          id_doc_enlazado?: string | null
+          id_documento?: string | null
           importe?: number
+          linea?: number | null
           marca?: string | null
           margen?: number
+          motivo_abono?: string | null
+          num_documento?: number | null
+          operacion?: string | null
           referencia?: string
+          registrado_por?: string | null
+          tipo_documento?: string | null
           unidades?: number
+          vendedor_linea?: string | null
         }
         Relationships: []
       }
