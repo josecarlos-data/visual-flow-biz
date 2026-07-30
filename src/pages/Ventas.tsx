@@ -231,7 +231,27 @@ export default function Ventas() {
           />
         )}
         <Kpi icon={<Users className="h-4 w-4" />} label="Clientes activos" value={String(kpiActual?.clientes ?? 0)} hint={`${kpiPrevio?.clientes ?? 0} en ${anioActual - 1}`} />
-        <Kpi icon={<Package className="h-4 w-4" />} label="Líneas de venta" value={(kpiActual?.lineas ?? 0).toLocaleString("es-ES")} />
+        <Kpi
+          icon={<Receipt className="h-4 w-4" />}
+          label="Transacciones"
+          value={fnum(kpiActual?.documentos ?? 0)}
+          hint={`${fnum(kpiActual?.abonos ?? 0)} abonos · ${fnum(kpiActual?.lineas ?? 0)} líneas`}
+        />
+        <Kpi
+          icon={<Package className="h-4 w-4" />}
+          label="Ticket medio"
+          value={eur(kpiActual?.ticket_medio ?? 0, 2)}
+          hint={ticketVar !== null ? `${ticketVar >= 0 ? "+" : ""}${ticketVar.toFixed(1)}% vs ${anioActual - 1}` : undefined}
+          positive={ticketVar !== null ? ticketVar >= 0 : undefined}
+        />
+        <Kpi
+          icon={<RotateCcw className="h-4 w-4" />}
+          label="Tasa de devolución"
+          value={pct(tasaDevolucion)}
+          hint={`${eur(Math.abs(kpiActual?.importe_abonos ?? 0))} abonados`}
+          positive={tasaDevolucion <= 5}
+        />
+
       </div>
 
       <Card>
