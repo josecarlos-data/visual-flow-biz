@@ -60,7 +60,10 @@ export default function Ventas() {
   const [topFamilias, setTopFamilias] = useState<TopDim[]>([]);
   const [topMarcas, setTopMarcas] = useState<TopDim[]>([]);
   const [alertas, setAlertas] = useState<AlertaRow[]>([]);
+  const [canales, setCanales] = useState<CanalRow[]>([]);
+  const [devoluciones, setDevoluciones] = useState<DevolucionRow[]>([]);
   const [vistaAlertas, setVistaAlertas] = useState<VistaAlertas>("atencion");
+
 
   const anioActual = useMemo(
     () => (kpis.length ? Math.max(...kpis.map((k) => k.anio)) : new Date().getFullYear()),
