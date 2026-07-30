@@ -96,7 +96,24 @@ export interface MaestroVenta {
   unidades: number;
   importe: number;
   margen: number;
+  id_documento: string | null;
+  ejercicio: number | null;
+  num_documento: number | null;
+  linea: number | null;
+  tipo_documento: string | null;
+  operacion: string | null;
+  hora: string | null;
+  canal: string | null;
+  cod_almacen: string | null;
+  almacen: string | null;
+  cod_vendedor_linea: string | null;
+  vendedor_linea: string | null;
+  registrado_por: string | null;
+  motivo_abono: string | null;
+  id_doc_enlazado: string | null;
+  descripcion_linea: string | null;
 }
+
 
 export interface MaestroIsiParsed {
   clientes: MaestroCliente[];
