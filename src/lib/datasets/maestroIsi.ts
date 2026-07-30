@@ -223,6 +223,8 @@ function parseExcel(buffer: ArrayBuffer): MaestroIsiParsed {
     const ref = str(r["Referencia"]);
     const fecha = datev(r["Fecha"]);
     if (cod === null || !ref || !fecha) continue;
+    const doc = str(r["ID Documento"]);
+    const contador = str(r["Contador"]);
     ventas.push({
       cod_cliente: cod,
       referencia: ref,
@@ -232,7 +234,24 @@ function parseExcel(buffer: ArrayBuffer): MaestroIsiParsed {
       unidades: numv(r["Unidades"]) ?? 0,
       importe: numv(r["Importe"]) ?? 0,
       margen: numv(r["Margen"]) ?? 0,
+      id_documento: doc ? (contador ? `${contador}|${doc}` : doc) : null,
+      ejercicio: numv(r["Ejercicio"]),
+      num_documento: numv(r["Nº Documento"]),
+      linea: numv(r["Línea"]),
+      tipo_documento: str(r["Tipo documento"]),
+      operacion: str(r["Operación"]),
+      hora: timev(r["Hora"]),
+      canal: str(r["Canal"]),
+      cod_almacen: str(r["Cód. Almacén"]),
+      almacen: str(r["Almacén"]),
+      cod_vendedor_linea: str(r["Cód. Vendedor"]),
+      vendedor_linea: str(r["Vendedor"]),
+      registrado_por: str(r["Registrado por"]),
+      motivo_abono: str(r["Motivo abono"]),
+      id_doc_enlazado: str(r["ID Doc. enlazado"]),
+      descripcion_linea: str(r["Descripción línea"]),
     });
+
   }
 
   if (clientes.length === 0 && productos.length === 0 && ventas.length === 0) {
