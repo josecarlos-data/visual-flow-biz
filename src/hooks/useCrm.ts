@@ -490,3 +490,97 @@ export const hoyISO = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
+
+/* ---------------------------------------------------------------------------
+ * Situaciones especiales de cliente (concurso, cierre, licitación perdida…)
+ * Solo filtran alertas y listados de gestión: nunca afectan a las ventas.
+ * ------------------------------------------------------------------------- */
+
+export interface SituacionCliente {
+  id: string;
+  cod_cliente: number;
+  categoria: string;
+  etiqueta: string;
+  nota: string | null;
+  activo: boolean;
+  desde: string;
+  hasta: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export const CATEGORIAS_SITUACION: { key: string; label: string }[] = [
+  { key: "cierre", label: "Cierre / cese de actividad" },
+  { key: "concurso", label: "Concurso de acreedores" },
+  { key: "licitacion", label: "Pérdida de contrato o licitación" },
+  { key: "venta_prohibida", label: "Venta prohibida / solo contado" },
+  { key: "absorbido", label: "Cliente absorbido o fusionado" },
+  { key: "temporal", label: "Bajada temporal conocida" },
+  { key: "otros", label: "Otros" },
+];
+
+export const etiquetaCategoria = (key: string) =>
+  CATEGORIAS_SITUACION.find((c) => c.key === key)?.label ?? key;
+
+const esSituacionVigente = (s: SituacionCliente) => {
+  const hoy = hoyISO();
+  return s.activo && s.desde <= hoy && (!s.hasta || s.hasta >= hoy);
+};
+
+/** Todas las situaciones registradas visibles para el usuario. */
+export function useSituaciones() {
+  return useQuery({
+    queryKey: ["crm_situaciones"],
+    staleTime: 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("situaciones_cliente" as never)
+        .select("*")
+        .order("updated_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as unknown as SituacionCliente[];
+    },
+  });
+}
+
+/** Mapa cod_cliente → situación vigente, para pintar etiquetas. */
+export function useSituacionesVigentes() {
+  const q = useSituaciones();
+  const mapa = new Map<number, SituacionCliente>();
+  for (const s of q.data ?? []) {
+    if (esSituacionVigente(s) && !mapa.has(s.cod_cliente)) mapa.set(s.cod_cliente, s);
+  }
+  return { ...q, mapa };
+}
+
+export function useSituacionesMutations() {
+  const qc = useQueryClient();
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["crm_situaciones"] });
+
+  const guardar = useMutation({
+    mutationFn: async (s: Partial<SituacionCliente> & { cod_cliente: number; etiqueta: string }) => {
+      const { id, created_at, updated_at, ...rest } = s as SituacionCliente;
+      if (id) {
+        const { error } = await supabase.from("situaciones_cliente" as never).update(rest as never).eq("id", id);
+        if (error) throw error;
+      } else {
+        const { data: auth } = await supabase.auth.getUser();
+        const { error } = await supabase
+          .from("situaciones_cliente" as never)
+          .insert({ ...rest, created_by: auth?.user?.id ?? null } as never);
+        if (error) throw error;
+      }
+    },
+    onSuccess: invalidate,
+  });
+
+  const borrar = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("situaciones_cliente" as never).delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+
+  return { guardar, borrar };
+}
