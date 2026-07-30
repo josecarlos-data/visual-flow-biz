@@ -53,6 +53,8 @@ export default function ClienteDetalle() {
   const { data: kpis } = useClienteKpis(codNum);
   const { data: mix } = useClienteMix(codNum);
   const { data: visitas } = useClienteVisitas(codNum);
+  const { data: documentos } = useClienteDocumentos(codNum);
+
   const { data: motivos } = useMotivos();
   const { data: verMargen } = usePuedeVerMargen();
   const { mapa: situaciones } = useSituacionesVigentes();
