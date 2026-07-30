@@ -1,61 +1,49 @@
-## Problema confirmado
+## Objetivo
 
-La ficha de cliente lee de tablas que hoy están **vacías**:
+Que clientes con una situación conocida y sin solución (INAGRA por pérdida de licitación, JOAQUÍN LÓPEZ por concurso de acreedores) dejen de aparecer en primera instancia en las alertas comerciales, sin tocar en absoluto las cifras de ventas.
 
-- `ventas_mensuales` → 0 filas (de ahí "Ventas último año: 0 €" y "Variación anual: —")
-- `cliente_productos` → 0 filas (de ahí "Referencias: 0" y pestaña Productos vacía)
+Regla clave: las situaciones especiales **solo filtran alertas y listados de gestión**. Nunca se restan de ventas, márgenes, KPIs ni rankings.
 
-Los datos reales de Maestro ISI están en: `ventas_diarias` (402.527 líneas), `resumen_cliente_mes` (35.428), `resumen_cliente_familia`, `resumen_cliente_marca` y `cliente_kpis` (3.419). El listado general de clientes ya usa estas tablas, por eso ahí sí se ven los importes.
+## 1. Registro de casos (nuevo panel de administración)
 
-## Qué haré
+Nueva tabla `situaciones_cliente` en la base de datos:
 
-### 1. Conectar la ficha a las tablas reales
+- Cliente (código), etiqueta corta (ej. "Licitación perdida", "Concurso de acreedores"), motivo/categoría, nota larga explicativa
+- Estado activo/inactivo, fecha desde y fecha hasta (opcional)
+- Quién lo creó y cuándo (auditoría)
+- Categorías iniciales: cierre/cese de actividad, concurso de acreedores, pérdida de contrato/licitación, venta prohibida, cliente absorbido, temporalidad conocida, otros
 
-Reescribir los hooks de `src/hooks/useCrm.ts`:
+Permisos: consulta para cualquier usuario aprobado (para que el comercial vea la etiqueta en la ficha); alta, edición y borrado solo para administrador y director comercial.
 
-- **Ventas mensuales/anuales**: leer `resumen_cliente_mes` (importe, margen, unidades, líneas) en vez de `ventas_mensuales`.
-- **KPIs**: leer `cliente_kpis` (primera/última compra, días sin comprar, nº referencias, nº líneas, importe y margen total, año actual, año anterior y año anterior YTD).
-- **Productos**: nueva función de base de datos `cliente_top_productos(cod, año)` que agrega `ventas_diarias` por referencia (importe, unidades, última compra, familia, marca, descripción desde `productos`), con control de acceso por rol (`can_view_cliente`) y ocultando el margen si el usuario no tiene permiso (`puede_ver_margen`).
-- **Familias y marcas**: leer `resumen_cliente_familia` y `resumen_cliente_marca` del cliente.
+Nueva pantalla `Administración → Situaciones de cliente`:
 
-### 2. Rediseñar la cabecera de KPIs
+- Tabla con buscador (por cliente, categoría, estado) y alta/edición en diálogo
+- Selector de cliente con búsqueda por nombre o código
+- Interruptor activo/inactivo (desactivar en vez de borrar conserva el histórico)
+- Botón **Exportar CSV** del listado completo (compatible con Excel, separador y formato es-ES)
+- Opcionalmente, importación posterior desde Excel si se acumulan muchos casos (no en esta fase)
 
-Fila de tarjetas con datos reales y comparables:
+## 2. Filtro en Alertas comerciales
 
-- Ventas año en curso + variación vs. mismo periodo del año anterior (YTD, comparación justa)
-- Ventas año anterior completo
-- Margen y % de margen (solo visible si el usuario tiene permiso de margen)
-- Nº de referencias distintas
-- Última compra y días sin comprar (con aviso visual si supera 90 días)
-- Última visita
+En el panel de Ventas, sobre las pestañas de Caídas / Riesgo de fuga / Margen bajo:
 
-### 3. Pestaña Resumen ampliada
+- Conmutador **Atención** (por defecto) / **Todos**
+- En "Atención" se ocultan los clientes con situación activa; el contador de cada pestaña refleja lo mostrado
+- En "Todos" aparecen todos, y los que tienen situación llevan una etiqueta corta de color junto al nombre con la nota en el tooltip
+- Texto informativo del tipo "3 clientes ocultos por situación conocida" con enlace para cambiar a "Todos"
 
-- Gráfico de evolución **anual** (importe por año, ya existente pero con datos reales).
-- Gráfico de evolución **mensual año actual vs. año anterior** (líneas), igual criterio que el panel de Ventas.
-- Top familias y top marcas del cliente (barras horizontales, top 8).
+## 3. Etiqueta visible en el resto de la aplicación
 
-### 4. Datos de ficha ampliados
-
-La tarjeta "Datos de ficha" pasa a una rejilla de dos columnas con etiquetas y valores, incluyendo:
-
-- **Comercial** (vendedor y su código), **Ruta comercial**, **Ruta especial**, **Delegación**
-- Tipo de cliente, Grupo, Grupo/tramos de rappel
-- CIF / Razón social, Persona de contacto, Teléfonos, Email, Web
-- Dirección completa (dirección, CP, localidad, provincia)
-- Fecha de alta y antigüedad, Nº empleados de taller, Top Truck (distintivo)
-- Aviso de prohibición de venta destacado en rojo si existe
-- Observaciones de almacén
-
-Los datos de comercial/delegación/rappel se muestran a todos los roles (un comercial solo ve sus propios clientes, así que no hay fuga de información).
-
-### 5. Pestaña Productos
-
-Tabla con los datos reales agregados: referencia, descripción, familia, marca, unidades, importe, última compra, con selector de año (todos / año concreto) y orden por importe.
+- **Ficha de cliente**: aviso destacado bajo el nombre con la etiqueta, la categoría, la fecha y la nota completa, para que al entrar se vea al instante
+- **Listado de clientes**: etiqueta compacta en la fila; el cliente se sigue pudiendo buscar y sigue contando en las ventas
+- Sin cambios en los gráficos ni en los KPIs de ventas
 
 ## Detalle técnico
 
-- Nueva función SQL `public.cliente_top_productos(_cod integer, _anio integer default null)` — `SECURITY DEFINER`, comprueba `can_view_cliente(auth.uid(), _cod)`, `GRANT EXECUTE` solo a `authenticated`.
-- El resto de lecturas van directas a tabla: las políticas RLS de `resumen_cliente_*` y `cliente_kpis` ya filtran por `can_view_cliente`.
-- Formato numérico con los helpers existentes de `src/lib/format.ts` (miles con ".", 0 decimales en KPIs, 2 en tablas).
-- Sin cambios de esquema en tablas; `ventas_mensuales` y `cliente_productos` quedan sin uso en la ficha (no se borran).
+- `CREATE TABLE public.situaciones_cliente` (cod_cliente int referenciando `clientes`, categoria text, etiqueta text, nota text, activo bool default true, desde date, hasta date, created_by uuid, timestamps) con GRANT a `authenticated`/`service_role`, RLS activada: lectura con `is_approved(auth.uid())` limitada a `clientes_permitidos`, escritura con `is_admin` o rol `director_comercial`. Trigger de `updated_at`.
+- Función auxiliar `public.cliente_con_situacion(_cod int) -> boolean` (stable, security definer) y vista/consulta de situaciones activas.
+- `panel_alertas(_limite int, _incluir_excluidos boolean default false)`: se añade el parámetro y las columnas `etiqueta` y `situacion_categoria`; cuando es `false` se filtran los códigos con situación activa (`desde <= today` y `hasta` nula o futura). Las funciones `panel_ventas_kpis`, `panel_ventas_mensual`, `panel_top_clientes`, `panel_top_familias/marcas` quedan **sin tocar**.
+- Nuevo hook `useSituaciones` en `src/hooks/useCrm.ts` (consulta cacheada, mutaciones de alta/edición/borrado) y componente `SituacionBadge`.
+- Nueva página `src/pages/AdminSituaciones.tsx` + ruta protegida en `src/App.tsx` y entrada en `AppSidebar.tsx` (solo admin/director).
+- Exportación CSV en cliente, sin dependencias nuevas.
+- `panel_dormidos` recibe el mismo parámetro opcional para mantener coherencia con "Atención/Todos".
