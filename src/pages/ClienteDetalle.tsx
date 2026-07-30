@@ -177,11 +177,24 @@ export default function ClienteDetalle() {
             )}
             {cliente.top_truck && <Badge className="gap-1"><Truck className="h-3 w-3" />Top Truck</Badge>}
           </div>
+          {situacion && (
+            <div className="mt-2 rounded-md border border-amber-500/50 bg-amber-500/10 p-3">
+              <p className="flex items-center gap-2 text-sm font-medium text-amber-700 dark:text-amber-400">
+                <Info className="h-4 w-4" /> {situacion.etiqueta}
+                <span className="font-normal text-muted-foreground">· {etiquetaCategoria(situacion.categoria)}</span>
+              </p>
+              {situacion.nota && <p className="mt-1 text-xs text-muted-foreground">{situacion.nota}</p>}
+              <p className="mt-1 text-xs text-muted-foreground">
+                Desde {fechaCorta(situacion.desde)}{situacion.hasta ? ` hasta ${fechaCorta(situacion.hasta)}` : ""} · no aparece en las alertas comerciales
+              </p>
+            </div>
+          )}
           {cliente.prohibicion_venta && (
             <p className="mt-2 flex items-center gap-1 text-sm font-medium text-destructive">
               <AlertTriangle className="h-4 w-4" /> {cliente.prohibicion_venta}
             </p>
           )}
+
         </div>
         <Button asChild className="shrink-0">
           <Link to={`/visitas/nueva?cliente=${cliente.cod_cliente}`}>
