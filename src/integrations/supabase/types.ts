@@ -412,6 +412,7 @@ export type Database = {
           motivo_key: string
           opciones: Json
           placeholder: string | null
+          requerido_validacion: boolean
           sort_order: number
           tipo: string
           updated_at: string
@@ -426,6 +427,7 @@ export type Database = {
           motivo_key: string
           opciones?: Json
           placeholder?: string | null
+          requerido_validacion?: boolean
           sort_order?: number
           tipo?: string
           updated_at?: string
@@ -440,6 +442,7 @@ export type Database = {
           motivo_key?: string
           opciones?: Json
           placeholder?: string | null
+          requerido_validacion?: boolean
           sort_order?: number
           tipo?: string
           updated_at?: string
@@ -1010,8 +1013,11 @@ export type Database = {
           latitud: number | null
           longitud: number | null
           motivo_key: string | null
+          nota_revision: string | null
           observaciones: string | null
           origen: string
+          revisado_en: string | null
+          revisado_por: string | null
           ruta: string | null
           tipo: string
           titulo: string | null
@@ -1035,8 +1041,11 @@ export type Database = {
           latitud?: number | null
           longitud?: number | null
           motivo_key?: string | null
+          nota_revision?: string | null
           observaciones?: string | null
           origen?: string
+          revisado_en?: string | null
+          revisado_por?: string | null
           ruta?: string | null
           tipo?: string
           titulo?: string | null
@@ -1060,8 +1069,11 @@ export type Database = {
           latitud?: number | null
           longitud?: number | null
           motivo_key?: string | null
+          nota_revision?: string | null
           observaciones?: string | null
           origen?: string
+          revisado_en?: string | null
+          revisado_por?: string | null
           ruta?: string | null
           tipo?: string
           titulo?: string | null
@@ -1295,6 +1307,7 @@ export type Database = {
           unidades: number
         }[]
       }
+      puede_revisar_visitas: { Args: { _user_id: string }; Returns: boolean }
       puede_ver_margen: { Args: { _user_id: string }; Returns: boolean }
       refrescar_resumenes_admin: { Args: never; Returns: undefined }
       refrescar_resumenes_ventas: { Args: never; Returns: undefined }
