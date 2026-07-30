@@ -1280,6 +1280,35 @@ export type Database = {
         Args: { _cod: number; _user_id: string }
         Returns: boolean
       }
+      cliente_documento_lineas: {
+        Args: { _cod: number; _id_documento: string }
+        Returns: {
+          descripcion: string
+          familia: string
+          importe: number
+          marca: string
+          margen: number
+          referencia: string
+          unidades: number
+        }[]
+      }
+      cliente_documentos: {
+        Args: { _cod: number; _limite?: number }
+        Returns: {
+          almacen: string
+          canal: string
+          fecha: string
+          hora: string
+          id_documento: string
+          importe: number
+          lineas: number
+          margen: number
+          operacion: string
+          registrado_por: string
+          tipo_documento: string
+          vendedor_linea: string
+        }[]
+      }
       cliente_top_productos: {
         Args: { _anio?: number; _cod: number }
         Returns: {
@@ -1365,6 +1394,26 @@ export type Database = {
           vendedor: string
         }[]
       }
+      panel_canales: {
+        Args: { _anio: number }
+        Returns: {
+          canal: string
+          clientes: number
+          documentos: number
+          importe: number
+          margen: number
+          ticket_medio: number
+        }[]
+      }
+      panel_devoluciones: {
+        Args: { _anio: number; _limite?: number }
+        Returns: {
+          etiqueta: string
+          importe: number
+          lineas: number
+          tipo: string
+        }[]
+      }
       panel_dormidos: {
         Args: { _incluir_excluidos?: boolean; _limite?: number }
         Returns: {
@@ -1406,11 +1455,15 @@ export type Database = {
       panel_ventas_kpis: {
         Args: never
         Returns: {
+          abonos: number
           anio: number
           clientes: number
+          documentos: number
           importe: number
+          importe_abonos: number
           lineas: number
           margen: number
+          ticket_medio: number
           unidades: number
         }[]
       }
@@ -1418,9 +1471,11 @@ export type Database = {
         Args: never
         Returns: {
           anio: number
+          documentos: number
           importe: number
           margen: number
           mes: number
+          ticket_medio: number
           unidades: number
         }[]
       }
