@@ -1,49 +1,53 @@
-## Objetivo
+## Fase A — Efecto de las situaciones (lo ya acordado)
 
-Que clientes con una situación conocida y sin solución (INAGRA por pérdida de licitación, JOAQUÍN LÓPEZ por concurso de acreedores) dejen de aparecer en primera instancia en las alertas comerciales, sin tocar en absoluto las cifras de ventas.
+### 1. Campo "Efecto" en cada situación
+Tres valores: **Ocultar de alertas** (INAGRA, concurso), **Caída justificada** (sigue visible, con contexto) y **Solo informativa** (etiqueta en ficha/listado, no toca alertas). Las situaciones existentes pasan a "Ocultar" para no cambiar nada de lo actual.
 
-Regla clave: las situaciones especiales **solo filtran alertas y listados de gestión**. Nunca se restan de ventas, márgenes, KPIs ni rankings.
+### 2. Nuevas categorías
+Pérdida de cliente final, reducción de flota/actividad, obra o proyecto finalizado, estacionalidad conocida — junto a las actuales.
 
-## 1. Registro de casos (nuevo panel de administración)
+### 3. Alertas comerciales
+Conmutador de tres estados: **Atención** (por defecto: sin las ocultas; las justificadas al final, atenuadas y con su etiqueta) / **Justificadas** / **Todos**. Contador: "3 ocultos por situación · 2 con caída justificada". Ámbar para ocultas, azul para justificadas.
 
-Nueva tabla `situaciones_cliente` en la base de datos:
+### 4. Ficha y listado
+El aviso adapta el tono al efecto e incluye la nota completa y la vigencia.
 
-- Cliente (código), etiqueta corta (ej. "Licitación perdida", "Concurso de acreedores"), motivo/categoría, nota larga explicativa
-- Estado activo/inactivo, fecha desde y fecha hasta (opcional)
-- Quién lo creó y cuándo (auditoría)
-- Categorías iniciales: cierre/cese de actividad, concurso de acreedores, pérdida de contrato/licitación, venta prohibida, cliente absorbido, temporalidad conocida, otros
+### 5. Caso de ejemplo (demo)
+Se elige un cliente real que hoy aparezca en "Caídas" y se le crea una situación de ejemplo: categoría *pérdida de cliente final*, efecto *caída justificada*, etiqueta "Perdió flota Mercadona", nota indicando que lo detectó Rafael Cárdenas en visita. Editable/borrable desde Administración cuando quieras.
 
-Permisos: consulta para cualquier usuario aprobado (para que el comercial vea la etiqueta en la ficha); alta, edición y borrado solo para administrador y director comercial.
+## Fase B — Validación de visitas por el jefe de ventas
 
-Nueva pantalla `Administración → Situaciones de cliente`:
+### Flujo
+El comercial registra la visita → queda **Pendiente de revisión** → el jefe de ventas la abre, la edita si hace falta y la marca **Correcta**, **Pendiente de completar** (con nota para el comercial) o **No correcta**. Sustituye al truco actual de escribir "Correcto/Pdte" al principio de observaciones.
 
-- Tabla con buscador (por cliente, categoría, estado) y alta/edición en diálogo
-- Selector de cliente con búsqueda por nombre o código
-- Interruptor activo/inactivo (desactivar en vez de borrar conserva el histórico)
-- Botón **Exportar CSV** del listado completo (compatible con Excel, separador y formato es-ES)
-- Opcionalmente, importación posterior desde Excel si se acumulan muchos casos (no en esta fase)
+### Bandeja de revisión (nueva pantalla)
+- Filtros por comercial, fecha, motivo y estado de validación; por defecto las pendientes.
+- Cada visita muestra los campos de la plantilla, marcando en rojo los obligatorios vacíos.
+- Botones rápidos: Correcta / Pendiente / No correcta + nota de revisión.
+- Edición en línea de los campos por parte del revisor, con registro de quién y cuándo validó.
+- Contador por comercial (visitas correctas del periodo) pensando en el incentivo, y exportación CSV.
 
-## 2. Filtro en Alertas comerciales
+### Requisitos de calidad por motivo
+En *Administración → Plantillas de visita* se añade, por cada motivo, la marca de qué campos son **exigibles para considerar la visita correcta**. La visita muestra un semáforo automático ("cumple 5/6 requisitos") que ayuda al jefe a decidir, pero la palabra final siempre es suya.
 
-En el panel de Ventas, sobre las pestañas de Caídas / Riesgo de fuga / Margen bajo:
+### Quién ve qué
+- Comercial: ve el estado de sus visitas y la nota del revisor; puede completar las que estén "Pendiente de completar".
+- Jefe de zona: revisa las de su delegación. Director/Admin: todas.
 
-- Conmutador **Atención** (por defecto) / **Todos**
-- En "Atención" se ocultan los clientes con situación activa; el contador de cada pestaña refleja lo mostrado
-- En "Todos" aparecen todos, y los que tienen situación llevan una etiqueta corta de color junto al nombre con la nota en el tooltip
-- Texto informativo del tipo "3 clientes ocultos por situación conocida" con enlace para cambiar a "Todos"
-
-## 3. Etiqueta visible en el resto de la aplicación
-
-- **Ficha de cliente**: aviso destacado bajo el nombre con la etiqueta, la categoría, la fecha y la nota completa, para que al entrar se vea al instante
-- **Listado de clientes**: etiqueta compacta en la fila; el cliente se sigue pudiendo buscar y sigue contando en las ventas
-- Sin cambios en los gráficos ni en los KPIs de ventas
+### Botón "Justificar caída de ventas" en la visita
+Desde Nueva visita / ficha de cliente, crea la situación con efecto *Caída justificada* enlazada a esa visita y comercial, sin salir del flujo.
 
 ## Detalle técnico
 
-- `CREATE TABLE public.situaciones_cliente` (cod_cliente int referenciando `clientes`, categoria text, etiqueta text, nota text, activo bool default true, desde date, hasta date, created_by uuid, timestamps) con GRANT a `authenticated`/`service_role`, RLS activada: lectura con `is_approved(auth.uid())` limitada a `clientes_permitidos`, escritura con `is_admin` o rol `director_comercial`. Trigger de `updated_at`.
-- Función auxiliar `public.cliente_con_situacion(_cod int) -> boolean` (stable, security definer) y vista/consulta de situaciones activas.
-- `panel_alertas(_limite int, _incluir_excluidos boolean default false)`: se añade el parámetro y las columnas `etiqueta` y `situacion_categoria`; cuando es `false` se filtran los códigos con situación activa (`desde <= today` y `hasta` nula o futura). Las funciones `panel_ventas_kpis`, `panel_ventas_mensual`, `panel_top_clientes`, `panel_top_familias/marcas` quedan **sin tocar**.
-- Nuevo hook `useSituaciones` en `src/hooks/useCrm.ts` (consulta cacheada, mutaciones de alta/edición/borrado) y componente `SituacionBadge`.
-- Nueva página `src/pages/AdminSituaciones.tsx` + ruta protegida en `src/App.tsx` y entrada en `AppSidebar.tsx` (solo admin/director).
-- Exportación CSV en cliente, sin dependencias nuevas.
-- `panel_dormidos` recibe el mismo parámetro opcional para mantener coherencia con "Atención/Todos".
+**Fase A**
+- `ALTER TABLE public.situaciones_cliente ADD COLUMN efecto text NOT NULL DEFAULT 'ocultar' CHECK (efecto IN ('ocultar','justificada','informativa'))`.
+- `situaciones_activas()` devuelve `efecto`; `panel_alertas` / `panel_dormidos` excluyen solo `efecto='ocultar'` y devuelven la columna `efecto`. `panel_ventas_kpis`, `panel_ventas_mensual` y `panel_top_*` sin tocar.
+- Frontend: `EFECTOS_SITUACION` y categorías nuevas en `useCrm.ts`; variante de color en `SituacionBadge`; selector y columna en `AdminSituaciones.tsx` (+CSV); conmutador de 3 estados y ordenación en `Ventas.tsx`; tono adaptativo en `ClienteDetalle.tsx`.
+- Inserción del caso demo con la herramienta de datos tras localizar un `cod_cliente` presente en "Caídas".
+
+**Fase B**
+- `visitas`: usar `validacion` con valores normalizados (`pendiente|correcta|incompleta|no_correcta`) + nuevas columnas `nota_revision text`, `revisado_por uuid`, `revisado_en timestamptz`. Default `pendiente` para origen `app`; el histórico Gespromo conserva su valor detectado.
+- `motivo_campos`: nueva bandera `requerido_validacion boolean default false`.
+- RLS: política de UPDATE de validación solo para admin, director comercial y jefe de zona (limitado a su delegación vía `get_user_delegacion`); el comercial puede editar campos de sus propias visitas mientras estén `pendiente`/`incompleta`.
+- Nueva página `src/pages/RevisionVisitas.tsx` + ruta protegida + entrada de menú; hooks de revisión en `useCrm.ts`; marca de requisitos en `AdminVisitas.tsx`; estado y nota visibles en `Visitas.tsx` y `NuevaVisita.tsx`.
+- Se implementa la Fase A completa primero; la Fase B a continuación en el mismo desarrollo.

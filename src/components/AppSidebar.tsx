@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 export function AppSidebar() {
   const { role, user, signOut, dashboards } = useAuth();
   const isAdmin = role === "admin";
+  const puedeRevisar = isAdmin || role === "director_comercial" || role === "jefe_de_zona";
 
   const mainItems = dashboards.map((d) => {
     const IconComp = (d.icon && (Icons as any)[d.icon]) || BarChart3;
@@ -46,7 +47,10 @@ export function AppSidebar() {
           <SidebarGroupLabel>Principal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainItems.map((item) => (
+              {[
+                ...mainItems,
+                ...(puedeRevisar ? [{ title: "Revisión de visitas", url: "/visitas/revision", icon: Icons.ClipboardCheck, end: false }] : []),
+              ].map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink to={item.url} end={item.end} activeClassName="bg-accent text-accent-foreground font-medium">

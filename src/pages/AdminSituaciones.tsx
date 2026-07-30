@@ -14,13 +14,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "@/hooks/use-toast";
 import {
   useSituaciones, useSituacionesMutations, useClientes,
-  CATEGORIAS_SITUACION, etiquetaCategoria, fechaCorta, hoyISO,
+  CATEGORIAS_SITUACION, EFECTOS_SITUACION, etiquetaCategoria, etiquetaEfecto, fechaCorta, hoyISO,
   type SituacionCliente,
 } from "@/hooks/useCrm";
 
 type Borrador = Partial<SituacionCliente> & { cod_cliente?: number };
 
-const vacio: Borrador = { categoria: "otros", etiqueta: "", nota: "", activo: true, desde: hoyISO(), hasta: null };
+const vacio: Borrador = { categoria: "otros", efecto: "ocultar", etiqueta: "", nota: "", activo: true, desde: hoyISO(), hasta: null };
 
 export default function AdminSituaciones() {
   const { data: situaciones, isLoading } = useSituaciones();
@@ -104,12 +104,13 @@ export default function AdminSituaciones() {
   };
 
   const exportarCsv = () => {
-    const cab = ["Código", "Cliente", "Categoría", "Etiqueta", "Nota", "Estado", "Desde", "Hasta"];
+    const cab = ["Código", "Cliente", "Categoría", "Efecto", "Etiqueta", "Nota", "Estado", "Desde", "Hasta"];
     const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const filas = filtradas.map((s) => [
       s.cod_cliente,
       nombrePorCod.get(s.cod_cliente) ?? "",
       etiquetaCategoria(s.categoria),
+      etiquetaEfecto(s.efecto),
       s.etiqueta,
       s.nota ?? "",
       s.activo ? "Activa" : "Inactiva",
@@ -178,6 +179,7 @@ export default function AdminSituaciones() {
                 <TableRow>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Categoría</TableHead>
+                  <TableHead className="hidden lg:table-cell">Efecto</TableHead>
                   <TableHead>Etiqueta</TableHead>
                   <TableHead className="hidden md:table-cell">Nota</TableHead>
                   <TableHead>Vigencia</TableHead>
@@ -192,6 +194,7 @@ export default function AdminSituaciones() {
                       <p className="text-xs text-muted-foreground">#{s.cod_cliente}</p>
                     </TableCell>
                     <TableCell className="text-sm">{etiquetaCategoria(s.categoria)}</TableCell>
+                    <TableCell className="hidden text-xs text-muted-foreground lg:table-cell">{etiquetaEfecto(s.efecto)}</TableCell>
                     <TableCell>
                       <Badge variant={s.activo ? "secondary" : "outline"}>{s.etiqueta}</Badge>
                     </TableCell>
@@ -250,6 +253,19 @@ export default function AdminSituaciones() {
                   {CATEGORIAS_SITUACION.map((c) => <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>)}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Efecto sobre las alertas</Label>
+              <Select value={borrador.efecto ?? "ocultar"} onValueChange={(v) => setBorrador((b) => ({ ...b, efecto: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {EFECTOS_SITUACION.map((e) => <SelectItem key={e.key} value={e.key}>{e.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {EFECTOS_SITUACION.find((e) => e.key === (borrador.efecto ?? "ocultar"))?.ayuda}
+              </p>
             </div>
 
             <div className="space-y-1.5">
