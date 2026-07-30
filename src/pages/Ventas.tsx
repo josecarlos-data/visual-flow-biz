@@ -79,11 +79,14 @@ export default function Ventas() {
       setErrorMsg(err ? err.message : null);
       setMensual(((mRes.data as any[]) ?? []).map((r) => ({
         anio: num(r.anio), mes: num(r.mes), importe: num(r.importe), margen: num(r.margen), unidades: num(r.unidades),
+        documentos: num(r.documentos), ticket_medio: num(r.ticket_medio),
       })));
       setKpis(((kRes.data as any[]) ?? []).map((r) => ({
         anio: num(r.anio), importe: num(r.importe), margen: num(r.margen), unidades: num(r.unidades),
-        clientes: num(r.clientes), lineas: num(r.lineas),
+        clientes: num(r.clientes), lineas: num(r.lineas), documentos: num(r.documentos),
+        abonos: num(r.abonos), importe_abonos: num(r.importe_abonos), ticket_medio: num(r.ticket_medio),
       })));
+
       setAlertas(((aRes.data as any[]) ?? []).map((r) => ({
         tipo: r.tipo, cod_cliente: num(r.cod_cliente), cliente: r.cliente, vendedor: r.vendedor,
         valor: num(r.valor), valor_ref: num(r.valor_ref), dias: r.dias === null ? null : num(r.dias),
