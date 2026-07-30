@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useClientes, eur, fechaCorta, type OrdenClientes } from "@/hooks/useCrm";
+import { useClientes, useSituacionesVigentes, eur, fechaCorta, type OrdenClientes } from "@/hooks/useCrm";
+import { SituacionBadge } from "@/components/SituacionBadge";
 
 export default function Clientes() {
   const [soloActivos, setSoloActivos] = useState(true);
