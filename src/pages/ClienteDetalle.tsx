@@ -479,7 +479,46 @@ export default function ClienteDetalle() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="documentos" className="space-y-3">
+          <Card>
+            <CardHeader><CardTitle className="text-base">Últimos documentos</CardTitle></CardHeader>
+            <CardContent className="overflow-x-auto">
+              {(documentos?.length ?? 0) === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">Sin documentos registrados.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Documento</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Canal</TableHead>
+                      <TableHead>Vendedor</TableHead>
+                      <TableHead className="text-right">Líneas</TableHead>
+                      <TableHead className="text-right">Importe</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {documentos!.map((d) => (
+                      <TableRow key={d.id_documento}>
+                        <TableCell className="whitespace-nowrap">{fechaCorta(d.fecha)}{d.hora ? ` ${d.hora.slice(0, 5)}` : ""}</TableCell>
+                        <TableCell className="font-mono text-xs">{d.id_documento}</TableCell>
+                        <TableCell>{d.operacion ?? d.tipo_documento ?? "—"}</TableCell>
+                        <TableCell>{d.canal ?? "—"}</TableCell>
+                        <TableCell className="truncate">{d.vendedor_linea ?? "—"}</TableCell>
+                        <TableCell className="text-right">{num(d.lineas)}</TableCell>
+                        <TableCell className={`text-right font-medium ${d.importe < 0 ? "text-destructive" : ""}`}>{eur(d.importe, 2)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="visitas" className="space-y-3">
+
           {!visitas || visitas.length === 0 ? (
             <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">Sin visitas registradas.</CardContent></Card>
           ) : (
