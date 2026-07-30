@@ -503,6 +503,7 @@ export interface SituacionCliente {
   etiqueta: string;
   nota: string | null;
   activo: boolean;
+  efecto: string;
   desde: string;
   hasta: string | null;
   created_at: string;
@@ -516,8 +517,21 @@ export const CATEGORIAS_SITUACION: { key: string; label: string }[] = [
   { key: "venta_prohibida", label: "Venta prohibida / solo contado" },
   { key: "absorbido", label: "Cliente absorbido o fusionado" },
   { key: "temporal", label: "Bajada temporal conocida" },
+  { key: "perdida_cliente_final", label: "Pérdida de un cliente final" },
+  { key: "reduccion_flota", label: "Reducción de flota o actividad" },
+  { key: "obra_finalizada", label: "Obra o proyecto finalizado" },
+  { key: "estacionalidad", label: "Estacionalidad conocida" },
   { key: "otros", label: "Otros" },
 ];
+
+export const EFECTOS_SITUACION: { key: string; label: string; ayuda: string }[] = [
+  { key: "ocultar", label: "Ocultar de alertas", ayuda: "No aparece en Atención: no requiere acción comercial." },
+  { key: "justificada", label: "Caída justificada", ayuda: "Sigue apareciendo, pero con el motivo de la bajada." },
+  { key: "informativa", label: "Solo informativa", ayuda: "Solo etiqueta en ficha y listado; no toca las alertas." },
+];
+
+export const etiquetaEfecto = (key: string) =>
+  EFECTOS_SITUACION.find((e) => e.key === key)?.label ?? key;
 
 export const etiquetaCategoria = (key: string) =>
   CATEGORIAS_SITUACION.find((c) => c.key === key)?.label ?? key;
