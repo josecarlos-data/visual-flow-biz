@@ -734,6 +734,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           desde: string
+          efecto: string
           etiqueta: string
           hasta: string | null
           id: string
@@ -747,6 +748,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           desde?: string
+          efecto?: string
           etiqueta: string
           hasta?: string | null
           id?: string
@@ -760,6 +762,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           desde?: string
+          efecto?: string
           etiqueta?: string
           hasta?: string | null
           id?: string
@@ -1226,6 +1229,7 @@ export type Database = {
           dias: number
           etiqueta: string
           situacion_categoria: string
+          situacion_efecto: string
           tipo: string
           valor: number
           valor_ref: number
@@ -1239,6 +1243,7 @@ export type Database = {
           cod_cliente: number
           etiqueta: string
           importe_total: number
+          situacion_efecto: string
           ultima_compra: string
           vendedor: string
         }[]
@@ -1299,6 +1304,7 @@ export type Database = {
         Returns: {
           categoria: string
           cod_cliente: number
+          efecto: string
           etiqueta: string
           nota: string
         }[]
