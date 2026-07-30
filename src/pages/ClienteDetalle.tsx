@@ -247,11 +247,47 @@ export default function ClienteDetalle() {
         )}
         <Card>
           <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Transacciones {anioActual}</p>
+            <p className="mt-1 text-xl font-bold">{num(kpis?.num_documentos_actual ?? 0)}</p>
+            <p className="text-xs text-muted-foreground">{num(kpis?.num_documentos_anterior ?? 0)} en {anioPrevio}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Ticket medio {anioActual}</p>
+            <p className="mt-1 text-xl font-bold">{eur(kpis?.ticket_medio_actual ?? 0, 2)}</p>
+            <p className="text-xs text-muted-foreground">
+              {kpis?.ticket_medio_anterior ? `${eur(kpis.ticket_medio_anterior, 2)} en ${anioPrevio}` : "—"}
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Frecuencia de compra</p>
+            <p className="mt-1 text-xl font-bold">
+              {kpis?.frecuencia_compra_dias ? `${num(kpis.frecuencia_compra_dias, 1)} días` : "—"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {num(kpis?.lineas_por_documento ?? 0, 1)} líneas por documento
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Referencias distintas</p>
             <p className="mt-1 text-xl font-bold">{num(kpis?.num_referencias ?? 0)}</p>
             <p className="text-xs text-muted-foreground">{num(kpis?.num_lineas ?? 0)} líneas</p>
           </CardContent>
         </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Abonos</p>
+            <p className="mt-1 text-xl font-bold">{num(kpis?.num_abonos ?? 0)}</p>
+            <p className="text-xs text-muted-foreground">{eur(Math.abs(kpis?.importe_abonos ?? 0))} devueltos</p>
+          </CardContent>
+        </Card>
+        {cliente.canal_principal_placeholder}
+
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Última compra</p>
