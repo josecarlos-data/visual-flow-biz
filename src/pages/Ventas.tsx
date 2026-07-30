@@ -204,14 +204,31 @@ export default function Ventas() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-destructive" /> Alertas comerciales</CardTitle></CardHeader>
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-destructive" /> Alertas comerciales</CardTitle>
+          <div className="inline-flex shrink-0 rounded-md border p-0.5">
+            <Button size="sm" variant={verTodasAlertas ? "ghost" : "secondary"} className="h-7 px-3 text-xs" onClick={() => setVerTodasAlertas(false)}>
+              Atención
+            </Button>
+            <Button size="sm" variant={verTodasAlertas ? "secondary" : "ghost"} className="h-7 px-3 text-xs" onClick={() => setVerTodasAlertas(true)}>
+              Todos
+            </Button>
+          </div>
+        </CardHeader>
         <CardContent>
+          {!verTodasAlertas && ocultasPorSituacion > 0 && (
+            <p className="mb-3 text-xs text-muted-foreground">
+              {ocultasPorSituacion} aviso{ocultasPorSituacion > 1 ? "s" : ""} oculto{ocultasPorSituacion > 1 ? "s" : ""} por situación conocida.{" "}
+              <button type="button" className="underline hover:text-foreground" onClick={() => setVerTodasAlertas(true)}>Ver todos</button>
+            </p>
+          )}
           <Tabs defaultValue="caida">
             <TabsList className="mb-3">
               <TabsTrigger value="caida">Caídas ({alertasPorTipo("caida").length})</TabsTrigger>
               <TabsTrigger value="fuga">Riesgo fuga ({alertasPorTipo("fuga").length})</TabsTrigger>
               {verMargen && <TabsTrigger value="margen_bajo">Margen bajo ({alertasPorTipo("margen_bajo").length})</TabsTrigger>}
             </TabsList>
+
 
             <TabsContent value="caida" className="space-y-2">
               {alertasPorTipo("caida").length === 0 && <Vacio />}
