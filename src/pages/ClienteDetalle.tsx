@@ -185,7 +185,13 @@ export default function ClienteDetalle() {
               </p>
               {situacion.nota && <p className="mt-1 text-xs text-muted-foreground">{situacion.nota}</p>}
               <p className="mt-1 text-xs text-muted-foreground">
-                Desde {fechaCorta(situacion.desde)}{situacion.hasta ? ` hasta ${fechaCorta(situacion.hasta)}` : ""} · no aparece en las alertas comerciales
+                Desde {fechaCorta(situacion.desde)}{situacion.hasta ? ` hasta ${fechaCorta(situacion.hasta)}` : ""}
+                {" · "}
+                {situacion.efecto === "ocultar"
+                  ? "no aparece en las alertas comerciales"
+                  : situacion.efecto === "justificada"
+                    ? "sigue en alertas, con la caída justificada"
+                    : "solo informativa"}
               </p>
             </div>
           )}
