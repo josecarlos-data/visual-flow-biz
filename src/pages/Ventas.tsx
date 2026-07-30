@@ -7,6 +7,8 @@ import { getYearColor } from "@/lib/yearColors";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { SituacionBadge } from "@/components/SituacionBadge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Bar,
