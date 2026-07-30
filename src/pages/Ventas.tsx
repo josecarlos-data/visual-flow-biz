@@ -26,10 +26,13 @@ import { AlertTriangle, TrendingDown, Percent, Users, Euro, Package } from "luci
 
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
-interface MensualRow { anio: number; mes: number; importe: number; margen: number; unidades: number }
-interface KpiRow { anio: number; importe: number; margen: number; unidades: number; clientes: number; lineas: number }
+interface MensualRow { anio: number; mes: number; importe: number; margen: number; unidades: number; documentos: number; ticket_medio: number }
+interface KpiRow { anio: number; importe: number; margen: number; unidades: number; clientes: number; lineas: number; documentos: number; abonos: number; importe_abonos: number; ticket_medio: number }
 interface TopCliente { cod_cliente: number; cliente: string; vendedor: string | null; importe: number; margen: number }
 interface TopDim { importe: number; margen: number; familia?: string; marca?: string }
+interface CanalRow { canal: string; documentos: number; importe: number; margen: number; ticket_medio: number; clientes: number }
+interface DevolucionRow { tipo: string; etiqueta: string; importe: number; lineas: number }
+
 interface AlertaRow {
   tipo: string;
   cod_cliente: number;
