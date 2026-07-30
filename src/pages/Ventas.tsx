@@ -22,7 +22,9 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { AlertTriangle, TrendingDown, Percent, Users, Euro, Package } from "lucide-react";
+import { AlertTriangle, TrendingDown, Percent, Users, Euro, Package, Receipt, RotateCcw } from "lucide-react";
+import { num as fnum, pct } from "@/lib/format";
+
 
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
