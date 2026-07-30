@@ -33,6 +33,18 @@ const datev = (v: unknown): string | null => {
   const d = new Date(s);
   return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
 };
+const timev = (v: unknown): string | null => {
+  if (v === null || v === undefined || v === "") return null;
+  if (v instanceof Date) return v.toISOString().slice(11, 19);
+  if (typeof v === "number") {
+    const total = Math.round((v % 1) * 86400);
+    const p = (n: number) => String(n).padStart(2, "0");
+    return `${p(Math.floor(total / 3600))}:${p(Math.floor(total / 60) % 60)}:${p(total % 60)}`;
+  }
+  const m = String(v).trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  return m ? `${m[1].padStart(2, "0")}:${m[2]}:${m[3] ?? "00"}` : null;
+};
+
 
 export interface MaestroCliente {
   cod_cliente: number;
