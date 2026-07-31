@@ -256,7 +256,11 @@ export default function RutaDetalle() {
                           }}
                         />
                       )}
+                      {!c.activo && (
+                        <Badge variant="outline" className="shrink-0 text-[10px]">inactivo</Badge>
+                      )}
                     </p>
+
                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                       <span>#{c.cod_cliente}</span>
                       {c.localidad && <span>{c.localidad}</span>}
