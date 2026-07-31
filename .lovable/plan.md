@@ -1,63 +1,50 @@
-## Qué trae el nuevo fichero
+## Punto de partida (verificado en la base)
 
-Verificado sobre `Maestro_ISI_-_CRM-2.xlsx`:
+- `clientes.ruta` está vacía; la ruta real del ERP está en `clientes.ruta_comercial` (262 rutas, p.ej. GU0MO 621 clientes, AL0MO 521).
+- `clientes.direccion`, `localidad`, `cod_postal` y `provincia` están vacíos en los 11.592 clientes (no se cargaron en el último import) → hoy no hay dirección postal para el mapa.
+- Sí hay coordenadas: `visitas` tiene 13.476 registros con latitud/longitud, que cubren **1.365 clientes distintos**. Esa es la fuente de geoposición de la fase 1.
+- `visitas_planificadas` ya existe (agenda) y está vacía. La tabla `rutas` existe pero está vacía.
 
-- `Hechos_Diarios`: 433.215 líneas → **325.498 documentos únicos** (1,33 líneas/doc), 34 columnas nuevas.
-- Operación: Venta 389.907 / Abono 43.308. Tipo documento: Albarán venta 380.407, Factura contado 46.285, Abono contado 6.523.
-- Canal: Mostrador/interno 380.667, Gsmart 49.088, Web 1.931, Garantías 1.468.
-- Nuevos ejes: hora, almacén, vendedor de la línea (quién despachó), usuario que registró, motivo de abono, y enlace documento→documento abonado.
-- `Dim_Cliente` (11.592) y `Dim_Referencia` (67.076) mantienen la misma estructura actual.
+## Concepto
 
-## Decisión sobre abonos (mi recomendación)
+La ruta comercial del ERP es la base. El comercial entra en **Rutas**, ve sus rutas, abre una y trabaja sobre la lista de clientes: ve de un vistazo quién sube/baja, lanza acciones y vuelca la ruta a su agenda del día. Nada se cierra: puede quitar clientes del día, añadir otros o posponer.
 
-Modelo híbrido, que es el que mejor responde a tu ejemplo del volante devuelto:
+## Fase 1 — Lo que se construye
 
-- **Importe siempre neto**: el abono resta. Si el cliente devuelve, sus ventas bajan.
-- **Transacciones = documentos de venta** (albarán/factura). El abono no suma transacción, pero **sí resta importe**, de modo que el ticket medio baja cuando hay devoluciones — exactamente el efecto que buscas.
-- **Devoluciones como KPI propio**: nº de abonos, importe abonado y **tasa de devolución** (% sobre venta bruta), con desglose por motivo de abono, referencia y vendedor. Ahí es donde de verdad se detecta el problema (referencias que se devuelven mucho, errores de despacho de un compañero concreto).
+**1. Datos**
+- Rellenar `clientes.ruta` desde `ruta_comercial` (una sola pasada) y usar `ruta` como campo único de ruta en toda la app, para no duplicar lógica.
+- Nuevas columnas `latitud`/`longitud` en `clientes` + función que las siembra con la última visita geolocalizada de cada cliente (1.365 clientes de salida). A partir de ahí, cada visita nueva con GPS actualiza el cliente si aún no tiene coordenadas.
+- Nuevo RPC `rutas_visibles()`: devuelve las rutas del usuario (según sus permisos actuales) con nº de clientes, importe año actual vs año anterior YTD, clientes sin visitar en X días y cuántos tienen geoposición.
+- Nuevo RPC `ruta_clientes(_ruta)`: clientes de la ruta con nombre, importe actual/anterior, tendencia, días sin comprar, última visita, situación especial y coordenadas.
+- Registro del dashboard `rutas` para que el admin lo asigne por usuario como el resto.
 
-Si prefieres contar el abono como transacción, es un cambio de una línea en la función de resumen; lo dejo parametrizable en ajustes.
+**2. Listado de rutas** (`/rutas`)
+Tarjetas por ruta: código, nº de clientes, ventas del año vs anterior con flecha de tendencia, y cuántos clientes llevan más de N días sin visita. Buscador por código.
 
-## Fase 1 — Modelo de datos
+**3. Ficha de ruta** (`/rutas/:codigo`)
+- Cabecera con totales de la ruta y dos acciones principales: **Abrir en Google Maps** y **Planificar día**.
+- Lista de clientes con: nombre, código, importe año actual vs anterior, indicador de tendencia sobrio (▲ crece / ▬ estable / ▼ baja, umbral ±5 %), días desde la última compra y desde la última visita, badge de situación especial (concurso, caída justificada…) reutilizando `SituacionBadge`, e icono de "sin geoposición".
+- Orden configurable: por importe, por tendencia (primero los que caen) o por días sin visitar.
+- Menú de acción por cliente: **Programar visita** (a la agenda, con fecha), **Registrar visita ahora** (va a `/visitas/nueva` con el cliente precargado), **Ver ficha**, **Llamar** (si hay teléfono).
 
-1. Ampliar `ventas_diarias` con: `id_documento`, `ejercicio`, `num_documento`, `linea`, `tipo_documento`, `operacion` (Venta/Abono), `hora`, `canal`, `cod_almacen`, `almacen`, `cod_vendedor_linea`, `vendedor_linea`, `registrado_por`, `motivo_abono`, `id_doc_enlazado`, `descripcion_linea`. Índices por `(cod_cliente, ejercicio, id_documento)`, `(fecha)`, `(canal)`, `(operacion)`.
-2. Nueva tabla agregada `resumen_documentos` (por cliente/año/mes/canal): nº documentos venta, nº abonos, importe neto, margen, unidades, líneas — para que los paneles sigan siendo instantáneos.
-3. Ampliar `cliente_kpis` con: `num_documentos_actual/anterior`, `ticket_medio_actual/anterior`, `lineas_por_documento`, `frecuencia_compra_dias`, `num_abonos`, `importe_abonos`, `canal_principal`.
-4. Actualizar `refrescar_resumenes_ventas()`, `insertar_ventas_diarias()`, `reset_maestro_isi_data()` y `panel_ventas_kpis()` con los nuevos campos, respetando permisos y `puede_ver_margen`.
+**4. Volcar ruta a la agenda**
+Diálogo "Planificar día": fecha, motivo de visita y selección de clientes (todos marcados por defecto, se desmarcan los que no interesan). Crea las `visitas_planificadas` del día respetando el orden elegido. Si ya hay planificadas de esa ruta y fecha, no se duplican.
 
-## Fase 2 — Ingesta
+**5. Mapa / navegación**
+Botón que abre Google Maps en una pestaña nueva con las paradas geolocalizadas de la ruta (o de los clientes marcados), usando la URL pública de direcciones — sin API key ni conector. Se limita a 9 paradas por enlace (límite de Google) y, si hay más, se ofrece por tramos. Los clientes sin coordenadas se listan aparte con un aviso "sin geoposición".
 
-- Actualizar `src/lib/datasets/maestroIsi.ts` para leer las 34 columnas de `Hechos_Diarios` (con parseo de hora, operación y enlaces) manteniendo el flujo por lotes y el informe por etapas.
-- Cargar el fichero nuevo completo y regenerar resúmenes y KPIs.
+**6. Cliente potencial / no creado**
+En la ficha de ruta y en la agenda se permite añadir una parada como **cliente potencial** (solo nombre y localidad), que ya está soportada en `visitas.cliente_externo`. Cuando el jefe de zona revisa la visita, podrá vincularla al código de cliente definitivo una vez creado en el ERP — esto lo añado como campo en la pantalla de revisión.
 
-## Fase 3 — Explotación (paneles)
+## Mejoras que propongo (incluidas)
 
-**Ventas** (nuevos KPIs junto a los actuales):
-- Transacciones, ticket medio, líneas por documento, unidades por documento.
-- Evolución mensual de ticket medio vs año anterior.
-- Mix por canal (Mostrador / Gsmart / Web / Garantías) con importe y ticket medio de cada uno — mide de verdad la adopción del canal digital.
-- Panel de devoluciones: tasa, top motivos de abono, top referencias devueltas.
-
-**Ficha de cliente**:
-- Ticket medio y frecuencia de compra (días entre documentos) frente a la media de su tipo/delegación.
-- Nueva pestaña **Documentos**: listado de albaranes/facturas con fecha, hora, canal, importe, nº líneas, quién lo despachó, y detalle de líneas al desplegar. Esto es lo que pedías para saber a quién reclamar.
-- Alerta nueva "el cliente compra igual de veces pero gasta menos" (transacciones estables + ticket medio a la baja) frente a "compra menos veces" — diagnósticos comerciales distintos.
-
-**Nuevas alertas en `panel_alertas`**: caída de ticket medio, caída de frecuencia, y exceso de devoluciones.
-
-## Fase 4 — Cesta y productos relacionados (lo que preguntabas)
-
-Con `ID Documento` ya se puede hacer análisis de cesta real:
-
-- Vista/tabla `producto_afinidad`: pares de referencias que aparecen en el mismo documento, con soporte y confianza (calculada en batch al refrescar resúmenes, limitada al top N por referencia para que sea rápida).
-- En la ficha de cliente: **"Suelen comprarse juntas y este cliente no la lleva"** → lista de referencias que sus clientes similares compran junto a lo que él ya compra. Argumentario directo de venta cruzada para el comercial.
-- En el argumentario IA (`cliente-insights`): alimentar el prompt con estas oportunidades, canal habitual, ticket medio y devoluciones.
+- **Geoposicionamiento progresivo**: cada visita registrada con GPS rellena las coordenadas del cliente si faltan. En pocas semanas la cobertura sube sola sin depender del ERP.
+- **Semáforo de atención en vez de "en negativo"**: en lugar de un rojo genérico, el indicador combina caída de ventas + días sin visita, y respeta las situaciones justificadas ya implementadas.
+- **Contador "sin visitar hace X"** por ruta, que es lo que realmente decide qué ruta hacer mañana.
+- Sin pedidos ni depósitos en esta fase (no hay datos de pedidos en el CRM todavía).
 
 ## Detalles técnicos
 
-- Todo el cálculo pesado va en agregados regenerados por `refrescar_resumenes_ventas()`; las consultas del front solo leen resúmenes o RPCs con `LIMIT`.
-- Nuevas RPCs: `cliente_documentos(_cod, _desde, _hasta)`, `panel_canales(_anio)`, `panel_devoluciones(_anio)`, `producto_relacionados(_referencia)` — todas `SECURITY DEFINER` con filtro por `clientes_permitidos` y `GRANT EXECUTE` solo a `authenticated`.
-- Márgenes siguen ocultos según `puede_ver_margen`.
-- Formato es-ES ya existente (`src/lib/format.ts`); ticket medio con 2 decimales, transacciones sin decimales.
-
-Fases 1–3 son el núcleo; la Fase 4 la puedo dejar para un segundo paso si prefieres validar antes los KPIs de transacciones.
+- Migración: `UPDATE clientes SET ruta = ruta_comercial`, `ALTER TABLE clientes ADD latitud/longitud numeric`, función de siembra desde `visitas`, RPCs `rutas_visibles()` y `ruta_clientes(_ruta)` como `SECURITY DEFINER` filtradas por `clientes_permitidos(auth.uid())`, con `GRANT EXECUTE` solo a `authenticated`. Alta del dashboard `rutas` en `dashboards`.
+- Frontend: `src/pages/Rutas.tsx`, `src/pages/RutaDetalle.tsx`, hooks `useRutas`, `useRutaClientes`, `usePlanificarRuta` en `src/hooks/useCrm.ts`, helper `src/lib/maps.ts` para construir el enlace de Google Maps. Entrada en `AppSidebar` y rutas en `App.tsx` protegidas por `dashboardKey="rutas"`.
+- Diseño mobile-first (el comercial va en coche): tarjetas grandes, acciones al alcance del pulgar, formato es-ES ya existente.

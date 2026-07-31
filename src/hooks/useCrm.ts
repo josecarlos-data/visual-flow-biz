@@ -729,3 +729,138 @@ export function useSituacionesMutations() {
 
   return { guardar, borrar };
 }
+
+/* ---------------------------------------------------------------------------
+ * Rutas comerciales
+ * ------------------------------------------------------------------------- */
+
+export interface RutaResumen {
+  ruta: string;
+  clientes: number;
+  clientes_activos: number;
+  con_geo: number;
+  importe_actual: number;
+  importe_anterior_ytd: number;
+  sin_visitar: number;
+  ultima_visita: string | null;
+}
+
+export interface RutaCliente {
+  cod_cliente: number;
+  cliente: string;
+  vendedor: string | null;
+  telefono: string | null;
+  localidad: string | null;
+  latitud: number | null;
+  longitud: number | null;
+  importe_actual: number;
+  importe_anterior_ytd: number;
+  dias_sin_comprar: number | null;
+  ultima_compra: string | null;
+  ultima_visita: string | null;
+  situacion_etiqueta: string | null;
+  situacion_categoria: string | null;
+  situacion_efecto: string | null;
+}
+
+/** Rutas comerciales visibles para el usuario, con sus indicadores. */
+export function useRutas() {
+  return useQuery({
+    queryKey: ["crm_rutas"],
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("rutas_visibles" as never);
+      if (error) throw error;
+      return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => ({
+        ruta: String(r.ruta ?? ""),
+        clientes: Number(r.clientes ?? 0),
+        clientes_activos: Number(r.clientes_activos ?? 0),
+        con_geo: Number(r.con_geo ?? 0),
+        importe_actual: Number(r.importe_actual ?? 0),
+        importe_anterior_ytd: Number(r.importe_anterior_ytd ?? 0),
+        sin_visitar: Number(r.sin_visitar ?? 0),
+        ultima_visita: (r.ultima_visita as string) ?? null,
+      })) as RutaResumen[];
+    },
+  });
+}
+
+/** Clientes que pertenecen a una ruta concreta. */
+export function useRutaClientes(ruta: string | undefined) {
+  return useQuery({
+    queryKey: ["crm_ruta_clientes", ruta],
+    enabled: !!ruta,
+    staleTime: 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("ruta_clientes" as never, { _ruta: ruta } as never);
+      if (error) throw error;
+      return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => ({
+        cod_cliente: Number(r.cod_cliente),
+        cliente: String(r.cliente ?? ""),
+        vendedor: (r.vendedor as string) ?? null,
+        telefono: (r.telefono as string) ?? null,
+        localidad: (r.localidad as string) ?? null,
+        latitud: r.latitud == null ? null : Number(r.latitud),
+        longitud: r.longitud == null ? null : Number(r.longitud),
+        importe_actual: Number(r.importe_actual ?? 0),
+        importe_anterior_ytd: Number(r.importe_anterior_ytd ?? 0),
+        dias_sin_comprar: r.dias_sin_comprar == null ? null : Number(r.dias_sin_comprar),
+        ultima_compra: (r.ultima_compra as string) ?? null,
+        ultima_visita: (r.ultima_visita as string) ?? null,
+        situacion_etiqueta: (r.situacion_etiqueta as string) ?? null,
+        situacion_categoria: (r.situacion_categoria as string) ?? null,
+        situacion_efecto: (r.situacion_efecto as string) ?? null,
+      })) as RutaCliente[];
+    },
+  });
+}
+
+/** Vuelca los clientes seleccionados de una ruta a la agenda de un día. */
+export function usePlanificarRuta() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      userId,
+      ruta,
+      fecha,
+      codigos,
+    }: {
+      userId: string;
+      ruta: string;
+      fecha: string;
+      codigos: number[];
+    }) => {
+      const { data: existentes, error: errExist } = await supabase
+        .from("visitas_planificadas")
+        .select("cod_cliente,orden")
+        .eq("user_id", userId)
+        .eq("fecha", fecha);
+      if (errExist) throw errExist;
+      const yaPlanificados = new Set((existentes ?? []).map((e) => Number(e.cod_cliente)));
+      const desde = (existentes ?? []).reduce((m, e) => Math.max(m, Number(e.orden ?? 0)), 0);
+      const nuevos = codigos.filter((c) => !yaPlanificados.has(c));
+      if (nuevos.length === 0) return 0;
+      const { error } = await supabase.from("visitas_planificadas").insert(
+        nuevos.map((cod, i) => ({
+          user_id: userId,
+          cod_cliente: cod,
+          fecha,
+          orden: desde + i + 1,
+          notas: `Ruta ${ruta}`,
+        })),
+      );
+      if (error) throw error;
+      return nuevos.length;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["crm_agenda"] }),
+  });
+}
+
+/** Tendencia de ventas del cliente: crece, estable o baja (umbral ±5 %). */
+export function tendencia(actual: number, anterior: number): "sube" | "baja" | "estable" | "nuevo" {
+  if (anterior <= 0) return actual > 0 ? "nuevo" : "estable";
+  const v = (actual - anterior) / anterior;
+  if (v > 0.05) return "sube";
+  if (v < -0.05) return "baja";
+  return "estable";
+}

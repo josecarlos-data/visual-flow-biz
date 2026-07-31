@@ -95,6 +95,24 @@ export default function NuevaVisita() {
     }
   };
 
+  /** Ubicación del comercial al registrar la visita (opcional, nunca bloquea el guardado). */
+  const obtenerPosicion = () =>
+    new Promise<{ lat: number; lng: number } | null>((resolve) => {
+      if (!("geolocation" in navigator)) return resolve(null);
+      const timer = setTimeout(() => resolve(null), 6000);
+      navigator.geolocation.getCurrentPosition(
+        (p) => {
+          clearTimeout(timer);
+          resolve({ lat: p.coords.latitude, lng: p.coords.longitude });
+        },
+        () => {
+          clearTimeout(timer);
+          resolve(null);
+        },
+        { enableHighAccuracy: true, timeout: 6000 },
+      );
+    });
+
   const guardar = async () => {
     if (!codCliente || !motivo) {
       toast({ title: "Faltan datos", description: "Selecciona cliente y motivo.", variant: "destructive" });
@@ -111,6 +129,7 @@ export default function NuevaVisita() {
     }
 
     setSaving(true);
+    const pos = await obtenerPosicion();
     const { error } = await supabase.from("visitas").insert({
       cod_cliente: Number(codCliente),
       motivo_key: motivo.key,
@@ -122,6 +141,8 @@ export default function NuevaVisita() {
       campos: valores,
       estado: "registrada",
       origen: "app",
+      latitud: pos?.lat ?? null,
+      longitud: pos?.lng ?? null,
     });
     setSaving(false);
 
@@ -129,9 +150,18 @@ export default function NuevaVisita() {
       toast({ title: "No se ha podido guardar", description: error.message, variant: "destructive" });
       return;
     }
+    // Geoposicionamiento progresivo: si el cliente aún no tiene ubicación, se la asignamos.
+    if (pos) {
+      await supabase.rpc("registrar_geo_cliente" as never, {
+        _cod: Number(codCliente),
+        _lat: pos.lat,
+        _lng: pos.lng,
+      } as never);
+    }
     toast({ title: "Visita guardada" });
     navigate(`/clientes/${codCliente}`);
   };
+
 
   const hayResultado = Object.keys(valores).length > 0;
 

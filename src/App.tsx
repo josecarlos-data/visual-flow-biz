@@ -16,6 +16,8 @@ import ClienteDetalle from "./pages/ClienteDetalle";
 import Visitas from "./pages/Visitas";
 import NuevaVisita from "./pages/NuevaVisita";
 import Agenda from "./pages/Agenda";
+import Rutas from "./pages/Rutas";
+import RutaDetalle from "./pages/RutaDetalle";
 import AdminUsers from "./pages/AdminUsers";
 import AdminData from "./pages/AdminData";
 import AdminFunctions from "./pages/AdminFunctions";
@@ -118,6 +120,8 @@ const App = () => (
             <Route path="/visitas/nueva" element={<ProtectedRoute dashboardKey="visitas"><NuevaVisita /></ProtectedRoute>} />
             <Route path="/visitas/revision" element={<ProtectedRoute dashboardKey="visitas"><RevisionVisitas /></ProtectedRoute>} />
             <Route path="/agenda" element={<ProtectedRoute dashboardKey="agenda"><Agenda /></ProtectedRoute>} />
+            <Route path="/rutas" element={<ProtectedRoute dashboardKey="rutas"><Rutas /></ProtectedRoute>} />
+            <Route path="/rutas/:codigo" element={<ProtectedRoute dashboardKey="rutas"><RutaDetalle /></ProtectedRoute>} />
             <Route path="/admin/users" element={<ProtectedRoute adminOnly><AdminUsers /></ProtectedRoute>} />
             <Route path="/admin/data" element={<ProtectedRoute adminOnly><AdminData /></ProtectedRoute>} />
             <Route path="/admin/functions" element={<ProtectedRoute adminOnly><AdminFunctions /></ProtectedRoute>} />
