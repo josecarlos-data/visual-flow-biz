@@ -39,7 +39,7 @@ import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { SituacionBadge } from "@/components/SituacionBadge";
 import { useRutaClientes, usePlanificarRuta, tendencia, eur, fechaCorta, hoyISO, type RutaCliente } from "@/hooks/useCrm";
-import { urlRuta, urlCliente, tramos, tieneGeo } from "@/lib/maps";
+import { urlRuta, urlCliente, tramos, tieneGeo, optimizarRuta, posicionActual, distanciaTotalKm, type Punto } from "@/lib/maps";
 
 const ICONO = { sube: TrendingUp, baja: TrendingDown, estable: Minus, nuevo: TrendingUp } as const;
 const COLOR = {
@@ -49,7 +49,7 @@ const COLOR = {
   nuevo: "text-emerald-600 dark:text-emerald-400",
 } as const;
 
-type Orden = "ventas" | "tendencia" | "visita";
+type Orden = "ventas" | "tendencia" | "visita" | "cercania";
 
 const diasDesde = (iso: string | null) => {
   if (!iso) return null;
@@ -61,7 +61,8 @@ export default function RutaDetalle() {
   const { codigo } = useParams<{ codigo: string }>();
   const ruta = decodeURIComponent(codigo ?? "");
   const { user } = useAuth();
-  const { data: clientes, isLoading } = useRutaClientes(ruta);
+  const [soloActivos, setSoloActivos] = useState(true);
+  const { data: clientes, isLoading } = useRutaClientes(ruta, soloActivos);
   const planificar = usePlanificarRuta();
 
   const [orden, setOrden] = useState<Orden>("ventas");
@@ -69,6 +70,8 @@ export default function RutaDetalle() {
   const [planOpen, setPlanOpen] = useState(false);
   const [mapaOpen, setMapaOpen] = useState(false);
   const [fecha, setFecha] = useState(hoyISO());
+  const [origen, setOrigen] = useState<Punto | null>(null);
+  const [buscandoGps, setBuscandoGps] = useState(false);
 
   const lista = useMemo(() => {
     const rows = [...(clientes ?? [])];
@@ -77,19 +80,30 @@ export default function RutaDetalle() {
       rows.sort((a, b) => peso(a) - peso(b));
     } else if (orden === "visita") {
       rows.sort((a, b) => (a.ultima_visita ?? "").localeCompare(b.ultima_visita ?? ""));
+    } else if (orden === "cercania") {
+      return optimizarRuta(rows, origen);
     }
     return rows;
-  }, [clientes, orden]);
+  }, [clientes, orden, origen]);
 
-  const marcados = useMemo(
-    () => (seleccion.size === 0 ? lista : lista.filter((c) => seleccion.has(c.cod_cliente))),
-    [lista, seleccion],
-  );
-  const sinGeo = marcados.filter((c) => !tieneGeo(c));
-  const bloques = tramos(marcados);
+  const pedirGps = async () => {
+    setBuscandoGps(true);
+    const pos = await posicionActual();
+    setBuscandoGps(false);
+    if (!pos) {
+      toast({
+        title: "Sin ubicación",
+        description: "No hemos podido obtener tu posición; se ordena desde el primer cliente.",
+      });
+    }
+    setOrigen(pos);
+    return pos;
+  };
 
-  const totalActual = lista.reduce((s, c) => s + c.importe_actual, 0);
-  const totalAnterior = lista.reduce((s, c) => s + c.importe_anterior_ytd, 0);
+  const cambiarOrden = async (v: Orden) => {
+    setOrden(v);
+    if (v === "cercania" && !origen) await pedirGps();
+  };
 
   const toggle = (cod: number) =>
     setSeleccion((prev) => {
@@ -98,6 +112,7 @@ export default function RutaDetalle() {
       else next.add(cod);
       return next;
     });
+
 
   const abrirMapa = () => {
     if (bloques.length === 0) {
