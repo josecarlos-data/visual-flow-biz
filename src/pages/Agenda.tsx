@@ -215,10 +215,27 @@ export default function Agenda() {
       </Card>
 
       {plan && plan.length > 0 && (
-        <Button asChild className="w-full">
-          <Link to="/visitas/nueva"><Plus className="mr-2 h-4 w-4" />Registrar visita</Link>
-        </Button>
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={optimizar} disabled={optimizando}>
+              <Route className="mr-2 h-4 w-4" />
+              {optimizando ? "Optimizando…" : "Optimizar recorrido"}
+            </Button>
+            <Button variant="outline" className="flex-1" onClick={abrirMapa}>
+              <Navigation className="mr-2 h-4 w-4" />Ver en el mapa
+            </Button>
+          </div>
+          {conGeo < plan.length && (
+            <p className="text-xs text-muted-foreground">
+              {plan.length - conGeo} clientes sin ubicación registrada quedan al final del recorrido.
+            </p>
+          )}
+          <Button asChild className="w-full">
+            <Link to="/visitas/nueva"><Plus className="mr-2 h-4 w-4" />Registrar visita</Link>
+          </Button>
+        </div>
       )}
+
     </div>
   );
 }
