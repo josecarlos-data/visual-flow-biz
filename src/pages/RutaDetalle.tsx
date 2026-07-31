@@ -113,6 +113,21 @@ export default function RutaDetalle() {
       return next;
     });
 
+  const marcados = useMemo(
+    () => (seleccion.size === 0 ? lista : lista.filter((c) => seleccion.has(c.cod_cliente))),
+    [lista, seleccion],
+  );
+  const ordenadosMapa = useMemo(
+    () => (orden === "cercania" ? marcados : optimizarRuta(marcados, origen)),
+    [marcados, orden, origen],
+  );
+  const sinGeo = marcados.filter((c) => !tieneGeo(c));
+  const bloques = tramos(ordenadosMapa);
+  const kmTotales = distanciaTotalKm(ordenadosMapa, origen);
+
+  const totalActual = lista.reduce((s, c) => s + c.importe_actual, 0);
+  const totalAnterior = lista.reduce((s, c) => s + c.importe_anterior_ytd, 0);
+
 
   const abrirMapa = () => {
     if (bloques.length === 0) {
