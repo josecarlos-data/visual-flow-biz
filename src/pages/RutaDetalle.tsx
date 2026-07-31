@@ -175,27 +175,51 @@ export default function RutaDetalle() {
         <div className="min-w-0">
           <h1 className="truncate text-2xl font-bold tracking-tight">Ruta {ruta}</h1>
           <p className="text-sm text-muted-foreground">
-            {lista.length} clientes · {eur(totalActual)} año actual · {eur(totalAnterior)} año anterior
+            {lista.length} {soloActivos ? "clientes activos" : "clientes"} · {eur(totalActual)} año actual ·{" "}
+            {eur(totalAnterior)} año anterior
           </p>
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Select value={orden} onValueChange={(v) => setOrden(v as Orden)}>
+        <Select value={orden} onValueChange={(v) => cambiarOrden(v as Orden)}>
           <SelectTrigger className="h-8 w-48 text-xs"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="ventas">Por ventas</SelectItem>
             <SelectItem value="tendencia">Primero los que caen</SelectItem>
             <SelectItem value="visita">Más tiempo sin visitar</SelectItem>
+            <SelectItem value="cercania">Ruta más corta (cercanía)</SelectItem>
           </SelectContent>
         </Select>
+        <div className="flex h-8 items-center rounded-md border p-0.5">
+          <button
+            type="button"
+            onClick={() => setSoloActivos(true)}
+            className={`h-7 rounded px-2 text-xs ${soloActivos ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+          >
+            Activos
+          </button>
+          <button
+            type="button"
+            onClick={() => setSoloActivos(false)}
+            className={`h-7 rounded px-2 text-xs ${soloActivos ? "text-muted-foreground" : "bg-primary text-primary-foreground"}`}
+          >
+            Todos
+          </button>
+        </div>
         <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setSeleccion(new Set())}>
           Seleccionar todos
         </Button>
         {seleccion.size > 0 && (
           <span className="text-xs text-muted-foreground">{seleccion.size} seleccionados</span>
         )}
+        {orden === "cercania" && (
+          <span className="text-xs text-muted-foreground">
+            {buscandoGps ? "Buscando tu ubicación…" : `≈ ${kmTotales.toFixed(0)} km`}
+          </span>
+        )}
       </div>
+
 
       {isLoading ? (
         <div className="space-y-2">
