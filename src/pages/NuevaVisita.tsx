@@ -95,6 +95,24 @@ export default function NuevaVisita() {
     }
   };
 
+  /** Ubicación del comercial al registrar la visita (opcional, nunca bloquea el guardado). */
+  const obtenerPosicion = () =>
+    new Promise<{ lat: number; lng: number } | null>((resolve) => {
+      if (!("geolocation" in navigator)) return resolve(null);
+      const timer = setTimeout(() => resolve(null), 6000);
+      navigator.geolocation.getCurrentPosition(
+        (p) => {
+          clearTimeout(timer);
+          resolve({ lat: p.coords.latitude, lng: p.coords.longitude });
+        },
+        () => {
+          clearTimeout(timer);
+          resolve(null);
+        },
+        { enableHighAccuracy: true, timeout: 6000 },
+      );
+    });
+
   const guardar = async () => {
     if (!codCliente || !motivo) {
       toast({ title: "Faltan datos", description: "Selecciona cliente y motivo.", variant: "destructive" });
