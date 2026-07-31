@@ -1495,8 +1495,9 @@ export type Database = {
       }
       reset_maestro_isi_data: { Args: never; Returns: undefined }
       ruta_clientes: {
-        Args: { _ruta: string }
+        Args: { _ruta: string; _solo_activos?: boolean }
         Returns: {
+          activo: boolean
           cliente: string
           cod_cliente: number
           dias_sin_comprar: number
