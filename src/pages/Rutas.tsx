@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRutas, eur, tendencia, fechaCorta } from "@/hooks/useCrm";
 
 const ICONO = {
@@ -21,15 +22,34 @@ const COLOR = {
   nuevo: "text-emerald-600 dark:text-emerald-400",
 } as const;
 
+type Orden = "ventas" | "tendencia" | "visita" | "pendientes" | "nombre";
+
 export default function Rutas() {
   const { data: rutas, isLoading, error } = useRutas();
   const [q, setQ] = useState("");
+  const [orden, setOrden] = useState<Orden>("ventas");
 
   const filtradas = useMemo(() => {
     const term = q.trim().toLowerCase();
-    if (!term) return rutas ?? [];
-    return (rutas ?? []).filter((r) => r.ruta.toLowerCase().includes(term));
-  }, [rutas, q]);
+    const base = term ? (rutas ?? []).filter((r) => r.ruta.toLowerCase().includes(term)) : [...(rutas ?? [])];
+    const rows = [...base];
+    if (orden === "ventas") {
+      rows.sort((a, b) => b.importe_actual - a.importe_actual);
+    } else if (orden === "tendencia") {
+      const peso = (r: typeof rows[number]) => r.importe_actual - r.importe_anterior_ytd;
+      rows.sort((a, b) => peso(a) - peso(b));
+    } else if (orden === "visita") {
+      rows.sort((a, b) => (a.ultima_visita ?? "").localeCompare(b.ultima_visita ?? ""));
+    } else if (orden === "pendientes") {
+      rows.sort((a, b) => b.sin_visitar - a.sin_visitar);
+    } else {
+      rows.sort((a, b) => a.ruta.localeCompare(b.ruta, "es"));
+    }
+    return rows;
+  }, [rutas, q, orden]);
+
+  const totalActual = filtradas.reduce((s, r) => s + r.importe_actual, 0);
+
 
   return (
     <div className="space-y-4">

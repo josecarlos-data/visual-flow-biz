@@ -242,6 +242,15 @@ export default function Agenda() {
         </div>
       )}
 
+      <TramosMapaDialog
+        open={mapaOpen}
+        onOpenChange={setMapaOpen}
+        bloques={bloques}
+        sinGeo={(plan?.length ?? 0) - conGeo}
+      />
+
+
+
     </div>
   );
 }
