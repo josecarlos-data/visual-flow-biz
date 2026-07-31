@@ -1,31 +1,43 @@
-## Objetivo
+## 1. Botón alterno de selección (detalle de ruta)
 
-1. Que al entrar en una ruta se vean **solo los clientes activos** por defecto (con opción "Todos").
-2. Añadir un **optimizador de ruta por cercanía** para ordenar las paradas del día.
+En `/rutas/:codigo` hoy la selección vacía significa "todos marcados" y el botón sólo sirve para limpiar. Cambios:
 
-## 1. Filtro de clientes activos en la ruta
+- Estado explícito de selección: al cargar la lista, todos los clientes visibles quedan seleccionados de verdad (no por convención de conjunto vacío).
+- Un único botón alterno:
+  - Si hay alguno sin marcar → texto "Seleccionar todos".
+  - Si están todos marcados → texto "Quitar selección" (deselecciona todo).
+- Con 0 seleccionados, las acciones "Ver en el mapa" y "Planificar día" se deshabilitan y el contador muestra "0 de N seleccionados".
+- El contador pasa a mostrarse siempre: "X de N seleccionados".
+- Al cambiar el filtro Activos/Todos o el orden, la selección se recalcula sobre los clientes visibles.
 
-Hoy `ruta_clientes(_ruta)` devuelve todos los clientes de la ruta (p. ej. 600 en GU0MO), incluidos los que nunca han comprado.
+Así, para elegir 5 de 70: pulsar "Quitar selección" y marcar sólo esos 5.
 
-- Migración: nueva versión de `ruta_clientes(_ruta text, _solo_activos boolean default true)`. Activo = tiene compra dentro del umbral configurable de `app_settings.anios_cliente_activo` (hoy 3 años), es decir `dias_sin_comprar <= años*365`. Se devuelve también un campo `activo` para poder marcar visualmente los inactivos cuando se ve "Todos".
-- Frontend (`src/hooks/useCrm.ts`, `src/pages/RutaDetalle.tsx`):
-  - `useRutaClientes(ruta, soloActivos)` con `soloActivos = true` por defecto.
-  - Junto al selector de orden (que se mantiene tal cual), un toggle **Activos / Todos**.
-  - La cabecera muestra "X activos de Y" para que se entienda qué se está filtrando.
-  - La selección múltiple, el mapa y "Planificar día" operan sobre la lista visible.
+## 2. Ordenación/prefiltro en el panel principal de Rutas
 
-## 2. Optimizador de ruta por cercanía
+Añadir en `/rutas`, junto al buscador, el mismo tipo de desplegable que ya existe en el detalle (orden en cliente, sin tocar la base de datos):
 
-Nueva utilidad en `src/lib/maps.ts`: ordenación por vecino más próximo (nearest-neighbour con distancia haversine), partiendo de la ubicación GPS actual del comercial si la concede, o del cliente con más ventas si no.
+- Por ventas (año actual, descendente) — por defecto
+- Primero las que caen (mayor caída frente al año anterior)
+- Más tiempo sin visitar (última visita más antigua primero)
+- Más clientes sin visitar (+90 días)
+- Por nombre de ruta
 
-Dónde se usa:
+Se añade también un pequeño resumen bajo el buscador: nº de rutas y total de ventas del año en curso de las rutas mostradas.
 
-- **Detalle de ruta**: nueva opción de orden "Ruta más corta (por cercanía)" y, al pulsar "Ver en el mapa", las paradas ya van optimizadas antes de partirse en tramos de 10.
-- **Agenda del día** (`src/pages/Agenda.tsx`): botón "Optimizar recorrido" que reordena las visitas planificadas del día por cercanía y guarda el nuevo `orden` en `visitas_planificadas`, más un botón para abrir ese recorrido en Google Maps.
-- Los clientes sin coordenadas quedan al final de la lista, señalados como "sin ubicación" (ya existe ese aviso).
+## 3. Google Maps bloqueado (ERR_BLOCKED_BY_RESPONSE)
 
-## Detalles técnicos
+El enlace generado es correcto; el fallo viene de cómo se abre: `window.open(...)` desde dentro del iframe de la app hace que Google rechace la respuesta en esa ventana. Cambios:
 
-- Sin API key de Google: se sigue usando la URL `dir/` de Maps y el cálculo de distancias es local (haversine), suficiente para ordenar paradas urbanas/comarcales.
-- Cambio de firma de RPC con valor por defecto, para no romper llamadas existentes.
-- El umbral de actividad se lee de `app_settings`, no se codifica en duro.
+- Sustituir `window.open` por enlaces reales (`<a target="_blank" rel="noopener noreferrer">`) tanto en la agenda como en el diálogo de tramos y en "Cómo llegar". Un clic de usuario sobre un ancla real abre pestaña de nivel superior y Google no la bloquea.
+- En la agenda, no abrir varias pestañas a la vez (los navegadores bloquean las siguientes): si hay más de un tramo, mostrar el mismo diálogo "Ruta por tramos" que ya existe en el detalle de ruta, con un enlace por tramo.
+- Añadir en ese diálogo un botón "Copiar enlace" por tramo, como salida cuando el navegador o la red corporativa bloquea la apertura directa.
+- Usar el formato de URL `https://www.google.com/maps/dir/lat,lng/lat,lng/...`, más tolerante que `dir/?api=1&waypoints=` y que funciona igual en la app móvil de Google Maps.
+
+## Detalle técnico
+
+- `src/pages/RutaDetalle.tsx`: estado `seleccion` como conjunto real inicializado desde `lista`, `useEffect` de sincronización al cambiar datos, botón alterno, guardas en acciones, enlaces en lugar de `window.open`.
+- `src/pages/Rutas.tsx`: `Select` de orden + `useMemo` de ordenación sobre los datos de `useRutas`.
+- `src/lib/maps.ts`: nueva construcción de URL por segmentos de ruta (`/maps/dir/...`), manteniendo `MAX_PARADAS = 10` y `tramos()`.
+- `src/pages/Agenda.tsx`: diálogo de tramos reutilizando la lógica del detalle de ruta.
+
+Sin cambios en base de datos.
