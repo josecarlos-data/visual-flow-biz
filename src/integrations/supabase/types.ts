@@ -1489,6 +1489,10 @@ export type Database = {
       puede_ver_margen: { Args: { _user_id: string }; Returns: boolean }
       refrescar_resumenes_admin: { Args: never; Returns: undefined }
       refrescar_resumenes_ventas: { Args: never; Returns: undefined }
+      registrar_geo_cliente: {
+        Args: { _cod: number; _lat: number; _lng: number }
+        Returns: boolean
+      }
       reset_maestro_isi_data: { Args: never; Returns: undefined }
       ruta_clientes: {
         Args: { _ruta: string }
