@@ -29,16 +29,10 @@ export function urlRuta(paradas: Parada[]): string | null {
   if (geo.length === 1) {
     return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(coord(geo[0]))}`;
   }
-  const destino = geo[geo.length - 1];
-  const intermedios = geo.slice(0, -1);
-  const params = new URLSearchParams({
-    api: "1",
-    destination: coord(destino),
-    travelmode: "driving",
-  });
-  params.set("waypoints", intermedios.map(coord).join("|"));
-  return `https://www.google.com/maps/dir/?${params.toString()}`;
+  // Formato por segmentos: más tolerante que dir/?api=1&waypoints= y abre igual en la app móvil.
+  return `https://www.google.com/maps/dir/${geo.map(coord).join("/")}/?travelmode=driving`;
 }
+
 
 /** URL para localizar un único cliente. */
 export function urlCliente(p: Parada): string | null {
