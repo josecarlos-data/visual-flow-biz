@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -38,8 +38,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { SituacionBadge } from "@/components/SituacionBadge";
+import { TramosMapaDialog } from "@/components/TramosMapaDialog";
 import { useRutaClientes, usePlanificarRuta, tendencia, eur, fechaCorta, hoyISO, type RutaCliente } from "@/hooks/useCrm";
-import { urlRuta, urlCliente, tramos, tieneGeo, optimizarRuta, posicionActual, distanciaTotalKm, type Punto } from "@/lib/maps";
+import { urlCliente, tramos, tieneGeo, optimizarRuta, posicionActual, distanciaTotalKm, type Punto } from "@/lib/maps";
+
 
 const ICONO = { sube: TrendingUp, baja: TrendingDown, estable: Minus, nuevo: TrendingUp } as const;
 const COLOR = {
@@ -105,16 +107,25 @@ export default function RutaDetalle() {
     if (v === "cercania" && !origen) await pedirGps();
   };
 
+  // La selección se mantiene siempre explícita: por defecto, todos los clientes visibles.
+  useEffect(() => {
+    setSeleccion(new Set(lista.map((c) => c.cod_cliente)));
+  }, [lista]);
+
   const toggle = (cod: number) =>
     setSeleccion((prev) => {
-      const next = new Set(prev.size === 0 ? lista.map((c) => c.cod_cliente) : prev);
+      const next = new Set(prev);
       if (next.has(cod)) next.delete(cod);
       else next.add(cod);
       return next;
     });
 
+  const todosMarcados = lista.length > 0 && seleccion.size === lista.length;
+  const alternarSeleccion = () =>
+    setSeleccion(todosMarcados ? new Set() : new Set(lista.map((c) => c.cod_cliente)));
+
   const marcados = useMemo(
-    () => (seleccion.size === 0 ? lista : lista.filter((c) => seleccion.has(c.cod_cliente))),
+    () => lista.filter((c) => seleccion.has(c.cod_cliente)),
     [lista, seleccion],
   );
   const ordenadosMapa = useMemo(
@@ -138,12 +149,9 @@ export default function RutaDetalle() {
       });
       return;
     }
-    if (bloques.length === 1) {
-      window.open(urlRuta(bloques[0])!, "_blank", "noopener");
-      return;
-    }
     setMapaOpen(true);
   };
+
 
   const confirmarPlan = () => {
     if (!user) return;
@@ -207,12 +215,13 @@ export default function RutaDetalle() {
             Todos
           </button>
         </div>
-        <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setSeleccion(new Set())}>
-          Seleccionar todos
+        <Button size="sm" variant="outline" className="h-8 text-xs" onClick={alternarSeleccion}>
+          {todosMarcados ? "Quitar selección" : "Seleccionar todos"}
         </Button>
-        {seleccion.size > 0 && (
-          <span className="text-xs text-muted-foreground">{seleccion.size} seleccionados</span>
-        )}
+        <span className="text-xs text-muted-foreground">
+          {seleccion.size} de {lista.length} seleccionados
+        </span>
+
         {orden === "cercania" && (
           <span className="text-xs text-muted-foreground">
             {buscandoGps ? "Buscando tu ubicación…" : `≈ ${kmTotales.toFixed(0)} km`}
@@ -237,7 +246,7 @@ export default function RutaDetalle() {
             const t = tendencia(c.importe_actual, c.importe_anterior_ytd);
             const Icono = ICONO[t];
             const dv = diasDesde(c.ultima_visita);
-            const marcado = seleccion.size === 0 || seleccion.has(c.cod_cliente);
+            const marcado = seleccion.has(c.cod_cliente);
             return (
               <div key={c.cod_cliente} className={`rounded-lg border bg-card p-4 ${marcado ? "" : "opacity-50"}`}>
                 <div className="flex items-start gap-3">
@@ -306,12 +315,13 @@ export default function RutaDetalle() {
                           </DropdownMenuItem>
                         )}
                         {tieneGeo(c) && (
-                          <DropdownMenuItem
-                            onClick={() => window.open(urlCliente(c)!, "_blank", "noopener")}
-                          >
-                            <Navigation className="mr-2 h-4 w-4" />Cómo llegar
+                          <DropdownMenuItem asChild>
+                            <a href={urlCliente(c)!} target="_blank" rel="noopener noreferrer">
+                              <Navigation className="mr-2 h-4 w-4" />Cómo llegar
+                            </a>
                           </DropdownMenuItem>
                         )}
+
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -325,12 +335,13 @@ export default function RutaDetalle() {
       {/* Barra de acciones fija */}
       <div className="fixed inset-x-0 bottom-0 z-20 border-t bg-background/95 p-3 backdrop-blur">
         <div className="mx-auto flex max-w-3xl gap-2">
-          <Button variant="outline" className="flex-1" onClick={abrirMapa}>
+          <Button variant="outline" className="flex-1" onClick={abrirMapa} disabled={marcados.length === 0}>
             <Navigation className="mr-2 h-4 w-4" />Ver en el mapa
           </Button>
-          <Button className="flex-1" onClick={() => setPlanOpen(true)}>
+          <Button className="flex-1" onClick={() => setPlanOpen(true)} disabled={marcados.length === 0}>
             <CalendarPlus className="mr-2 h-4 w-4" />Planificar día
           </Button>
+
         </div>
       </div>
 
@@ -355,35 +366,13 @@ export default function RutaDetalle() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={mapaOpen} onOpenChange={setMapaOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Ruta por tramos</DialogTitle>
-            <DialogDescription>
-              Google Maps admite 10 paradas por trayecto. La ruta se divide en {bloques.length} tramos.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            {bloques.map((b, i) => (
-              <Button
-                key={i}
-                variant="outline"
-                className="w-full justify-start"
-                onClick={() => window.open(urlRuta(b)!, "_blank", "noopener")}
-              >
-                <Navigation className="mr-2 h-4 w-4" />
-                Tramo {i + 1} · {b.length} paradas
-              </Button>
-            ))}
-            {sinGeo.length > 0 && (
-              <p className="pt-2 text-xs text-muted-foreground">
-                {sinGeo.length} clientes sin ubicación registrada quedan fuera del mapa. Se geolocalizarán
-                automáticamente al registrar una visita con GPS.
-              </p>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <TramosMapaDialog
+        open={mapaOpen}
+        onOpenChange={setMapaOpen}
+        bloques={bloques}
+        sinGeo={sinGeo.length}
+      />
+
 
       {sinGeo.length > 0 && !mapaOpen && (
         <Badge variant="outline" className="gap-1 border-amber-500/50 text-amber-700 dark:text-amber-400">

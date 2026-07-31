@@ -16,7 +16,9 @@ import {
   useReordenarAgenda,
   hoyISO,
 } from "@/hooks/useCrm";
-import { optimizarRuta, posicionActual, urlRuta, tramos, distanciaTotalKm } from "@/lib/maps";
+import { TramosMapaDialog } from "@/components/TramosMapaDialog";
+import { optimizarRuta, posicionActual, tramos, distanciaTotalKm } from "@/lib/maps";
+
 
 function addDays(iso: string, days: number) {
   const d = new Date(`${iso}T00:00:00`);
@@ -33,6 +35,8 @@ export default function Agenda() {
   const [open, setOpen] = useState(false);
   const [busqueda, setBusqueda] = useState("");
   const [optimizando, setOptimizando] = useState(false);
+  const [mapaOpen, setMapaOpen] = useState(false);
+
 
   const codigosPlan = useMemo(() => (plan ?? []).map((p) => p.cod_cliente), [plan]);
   const { data: coords } = useCoordsClientes(codigosPlan);
@@ -83,8 +87,9 @@ export default function Agenda() {
     }
   };
 
+  const bloques = useMemo(() => tramos(paradas), [paradas]);
+
   const abrirMapa = () => {
-    const bloques = tramos(paradas);
     if (bloques.length === 0) {
       toast({
         title: "Sin ubicaciones",
@@ -93,8 +98,9 @@ export default function Agenda() {
       });
       return;
     }
-    for (const b of bloques) window.open(urlRuta(b)!, "_blank", "noopener");
+    setMapaOpen(true);
   };
+
 
   const opciones = useMemo(() => {
     const term = busqueda.trim().toLowerCase();
@@ -235,6 +241,15 @@ export default function Agenda() {
           </Button>
         </div>
       )}
+
+      <TramosMapaDialog
+        open={mapaOpen}
+        onOpenChange={setMapaOpen}
+        bloques={bloques}
+        sinGeo={(plan?.length ?? 0) - conGeo}
+      />
+
+
 
     </div>
   );
