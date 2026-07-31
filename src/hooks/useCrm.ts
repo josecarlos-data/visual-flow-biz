@@ -761,6 +761,7 @@ export interface RutaCliente {
   situacion_etiqueta: string | null;
   situacion_categoria: string | null;
   situacion_efecto: string | null;
+  activo: boolean;
 }
 
 /** Rutas comerciales visibles para el usuario, con sus indicadores. */
@@ -785,14 +786,17 @@ export function useRutas() {
   });
 }
 
-/** Clientes que pertenecen a una ruta concreta. */
-export function useRutaClientes(ruta: string | undefined) {
+/** Clientes que pertenecen a una ruta concreta (por defecto solo los activos). */
+export function useRutaClientes(ruta: string | undefined, soloActivos = true) {
   return useQuery({
-    queryKey: ["crm_ruta_clientes", ruta],
+    queryKey: ["crm_ruta_clientes", ruta, soloActivos],
     enabled: !!ruta,
     staleTime: 60 * 1000,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("ruta_clientes" as never, { _ruta: ruta } as never);
+      const { data, error } = await supabase.rpc("ruta_clientes" as never, {
+        _ruta: ruta,
+        _solo_activos: soloActivos,
+      } as never);
       if (error) throw error;
       return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => ({
         cod_cliente: Number(r.cod_cliente),
@@ -810,10 +814,55 @@ export function useRutaClientes(ruta: string | undefined) {
         situacion_etiqueta: (r.situacion_etiqueta as string) ?? null,
         situacion_categoria: (r.situacion_categoria as string) ?? null,
         situacion_efecto: (r.situacion_efecto as string) ?? null,
+        activo: Boolean(r.activo),
       })) as RutaCliente[];
     },
   });
 }
+
+/** Coordenadas de un conjunto de clientes (para optimizar recorridos). */
+export function useCoordsClientes(codigos: number[]) {
+  const key = [...codigos].sort((a, b) => a - b).join(",");
+  return useQuery({
+    queryKey: ["crm_coords_clientes", key],
+    enabled: codigos.length > 0,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clientes")
+        .select("cod_cliente,cliente,latitud,longitud")
+        .in("cod_cliente", codigos);
+      if (error) throw error;
+      const m = new Map<number, { latitud: number | null; longitud: number | null }>();
+      for (const r of data ?? []) {
+        m.set(Number(r.cod_cliente), {
+          latitud: r.latitud == null ? null : Number(r.latitud),
+          longitud: r.longitud == null ? null : Number(r.longitud),
+        });
+      }
+      return m;
+    },
+  });
+}
+
+/** Reordena las visitas planificadas de un día. */
+export function useReordenarAgenda() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (items: { id: string; orden: number }[]) => {
+      for (const it of items) {
+        const { error } = await supabase
+          .from("visitas_planificadas")
+          .update({ orden: it.orden })
+          .eq("id", it.id);
+        if (error) throw error;
+      }
+      return items.length;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["crm_agenda"] }),
+  });
+}
+
 
 /** Vuelca los clientes seleccionados de una ruta a la agenda de un día. */
 export function usePlanificarRuta() {

@@ -1,50 +1,31 @@
-## Punto de partida (verificado en la base)
+## Objetivo
 
-- `clientes.ruta` está vacía; la ruta real del ERP está en `clientes.ruta_comercial` (262 rutas, p.ej. GU0MO 621 clientes, AL0MO 521).
-- `clientes.direccion`, `localidad`, `cod_postal` y `provincia` están vacíos en los 11.592 clientes (no se cargaron en el último import) → hoy no hay dirección postal para el mapa.
-- Sí hay coordenadas: `visitas` tiene 13.476 registros con latitud/longitud, que cubren **1.365 clientes distintos**. Esa es la fuente de geoposición de la fase 1.
-- `visitas_planificadas` ya existe (agenda) y está vacía. La tabla `rutas` existe pero está vacía.
+1. Que al entrar en una ruta se vean **solo los clientes activos** por defecto (con opción "Todos").
+2. Añadir un **optimizador de ruta por cercanía** para ordenar las paradas del día.
 
-## Concepto
+## 1. Filtro de clientes activos en la ruta
 
-La ruta comercial del ERP es la base. El comercial entra en **Rutas**, ve sus rutas, abre una y trabaja sobre la lista de clientes: ve de un vistazo quién sube/baja, lanza acciones y vuelca la ruta a su agenda del día. Nada se cierra: puede quitar clientes del día, añadir otros o posponer.
+Hoy `ruta_clientes(_ruta)` devuelve todos los clientes de la ruta (p. ej. 600 en GU0MO), incluidos los que nunca han comprado.
 
-## Fase 1 — Lo que se construye
+- Migración: nueva versión de `ruta_clientes(_ruta text, _solo_activos boolean default true)`. Activo = tiene compra dentro del umbral configurable de `app_settings.anios_cliente_activo` (hoy 3 años), es decir `dias_sin_comprar <= años*365`. Se devuelve también un campo `activo` para poder marcar visualmente los inactivos cuando se ve "Todos".
+- Frontend (`src/hooks/useCrm.ts`, `src/pages/RutaDetalle.tsx`):
+  - `useRutaClientes(ruta, soloActivos)` con `soloActivos = true` por defecto.
+  - Junto al selector de orden (que se mantiene tal cual), un toggle **Activos / Todos**.
+  - La cabecera muestra "X activos de Y" para que se entienda qué se está filtrando.
+  - La selección múltiple, el mapa y "Planificar día" operan sobre la lista visible.
 
-**1. Datos**
-- Rellenar `clientes.ruta` desde `ruta_comercial` (una sola pasada) y usar `ruta` como campo único de ruta en toda la app, para no duplicar lógica.
-- Nuevas columnas `latitud`/`longitud` en `clientes` + función que las siembra con la última visita geolocalizada de cada cliente (1.365 clientes de salida). A partir de ahí, cada visita nueva con GPS actualiza el cliente si aún no tiene coordenadas.
-- Nuevo RPC `rutas_visibles()`: devuelve las rutas del usuario (según sus permisos actuales) con nº de clientes, importe año actual vs año anterior YTD, clientes sin visitar en X días y cuántos tienen geoposición.
-- Nuevo RPC `ruta_clientes(_ruta)`: clientes de la ruta con nombre, importe actual/anterior, tendencia, días sin comprar, última visita, situación especial y coordenadas.
-- Registro del dashboard `rutas` para que el admin lo asigne por usuario como el resto.
+## 2. Optimizador de ruta por cercanía
 
-**2. Listado de rutas** (`/rutas`)
-Tarjetas por ruta: código, nº de clientes, ventas del año vs anterior con flecha de tendencia, y cuántos clientes llevan más de N días sin visita. Buscador por código.
+Nueva utilidad en `src/lib/maps.ts`: ordenación por vecino más próximo (nearest-neighbour con distancia haversine), partiendo de la ubicación GPS actual del comercial si la concede, o del cliente con más ventas si no.
 
-**3. Ficha de ruta** (`/rutas/:codigo`)
-- Cabecera con totales de la ruta y dos acciones principales: **Abrir en Google Maps** y **Planificar día**.
-- Lista de clientes con: nombre, código, importe año actual vs anterior, indicador de tendencia sobrio (▲ crece / ▬ estable / ▼ baja, umbral ±5 %), días desde la última compra y desde la última visita, badge de situación especial (concurso, caída justificada…) reutilizando `SituacionBadge`, e icono de "sin geoposición".
-- Orden configurable: por importe, por tendencia (primero los que caen) o por días sin visitar.
-- Menú de acción por cliente: **Programar visita** (a la agenda, con fecha), **Registrar visita ahora** (va a `/visitas/nueva` con el cliente precargado), **Ver ficha**, **Llamar** (si hay teléfono).
+Dónde se usa:
 
-**4. Volcar ruta a la agenda**
-Diálogo "Planificar día": fecha, motivo de visita y selección de clientes (todos marcados por defecto, se desmarcan los que no interesan). Crea las `visitas_planificadas` del día respetando el orden elegido. Si ya hay planificadas de esa ruta y fecha, no se duplican.
-
-**5. Mapa / navegación**
-Botón que abre Google Maps en una pestaña nueva con las paradas geolocalizadas de la ruta (o de los clientes marcados), usando la URL pública de direcciones — sin API key ni conector. Se limita a 9 paradas por enlace (límite de Google) y, si hay más, se ofrece por tramos. Los clientes sin coordenadas se listan aparte con un aviso "sin geoposición".
-
-**6. Cliente potencial / no creado**
-En la ficha de ruta y en la agenda se permite añadir una parada como **cliente potencial** (solo nombre y localidad), que ya está soportada en `visitas.cliente_externo`. Cuando el jefe de zona revisa la visita, podrá vincularla al código de cliente definitivo una vez creado en el ERP — esto lo añado como campo en la pantalla de revisión.
-
-## Mejoras que propongo (incluidas)
-
-- **Geoposicionamiento progresivo**: cada visita registrada con GPS rellena las coordenadas del cliente si faltan. En pocas semanas la cobertura sube sola sin depender del ERP.
-- **Semáforo de atención en vez de "en negativo"**: en lugar de un rojo genérico, el indicador combina caída de ventas + días sin visita, y respeta las situaciones justificadas ya implementadas.
-- **Contador "sin visitar hace X"** por ruta, que es lo que realmente decide qué ruta hacer mañana.
-- Sin pedidos ni depósitos en esta fase (no hay datos de pedidos en el CRM todavía).
+- **Detalle de ruta**: nueva opción de orden "Ruta más corta (por cercanía)" y, al pulsar "Ver en el mapa", las paradas ya van optimizadas antes de partirse en tramos de 10.
+- **Agenda del día** (`src/pages/Agenda.tsx`): botón "Optimizar recorrido" que reordena las visitas planificadas del día por cercanía y guarda el nuevo `orden` en `visitas_planificadas`, más un botón para abrir ese recorrido en Google Maps.
+- Los clientes sin coordenadas quedan al final de la lista, señalados como "sin ubicación" (ya existe ese aviso).
 
 ## Detalles técnicos
 
-- Migración: `UPDATE clientes SET ruta = ruta_comercial`, `ALTER TABLE clientes ADD latitud/longitud numeric`, función de siembra desde `visitas`, RPCs `rutas_visibles()` y `ruta_clientes(_ruta)` como `SECURITY DEFINER` filtradas por `clientes_permitidos(auth.uid())`, con `GRANT EXECUTE` solo a `authenticated`. Alta del dashboard `rutas` en `dashboards`.
-- Frontend: `src/pages/Rutas.tsx`, `src/pages/RutaDetalle.tsx`, hooks `useRutas`, `useRutaClientes`, `usePlanificarRuta` en `src/hooks/useCrm.ts`, helper `src/lib/maps.ts` para construir el enlace de Google Maps. Entrada en `AppSidebar` y rutas en `App.tsx` protegidas por `dashboardKey="rutas"`.
-- Diseño mobile-first (el comercial va en coche): tarjetas grandes, acciones al alcance del pulgar, formato es-ES ya existente.
+- Sin API key de Google: se sigue usando la URL `dir/` de Maps y el cálculo de distancias es local (haversine), suficiente para ordenar paradas urbanas/comarcales.
+- Cambio de firma de RPC con valor por defecto, para no romper llamadas existentes.
+- El umbral de actividad se lee de `app_settings`, no se codifica en duro.

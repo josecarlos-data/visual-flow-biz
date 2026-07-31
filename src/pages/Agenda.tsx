@@ -1,13 +1,22 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { CalendarDays, Plus, Check, Trash2, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
+import { CalendarDays, Plus, Check, Trash2, ChevronLeft, ChevronRight, MapPin, Route, Navigation } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { useAgenda, useAgendaMutations, useClientes, hoyISO } from "@/hooks/useCrm";
+import {
+  useAgenda,
+  useAgendaMutations,
+  useClientes,
+  useCoordsClientes,
+  useReordenarAgenda,
+  hoyISO,
+} from "@/hooks/useCrm";
+import { optimizarRuta, posicionActual, urlRuta, tramos, distanciaTotalKm } from "@/lib/maps";
 
 function addDays(iso: string, days: number) {
   const d = new Date(`${iso}T00:00:00`);
@@ -23,12 +32,69 @@ export default function Agenda() {
   const { data: clientes } = useClientes();
   const [open, setOpen] = useState(false);
   const [busqueda, setBusqueda] = useState("");
+  const [optimizando, setOptimizando] = useState(false);
+
+  const codigosPlan = useMemo(() => (plan ?? []).map((p) => p.cod_cliente), [plan]);
+  const { data: coords } = useCoordsClientes(codigosPlan);
+  const reordenar = useReordenarAgenda();
 
   const clienteMap = useMemo(() => {
     const m = new Map<number, { cliente: string; localidad: string | null; ruta: string | null }>();
     for (const c of clientes ?? []) m.set(c.cod_cliente, { cliente: c.cliente, localidad: c.localidad, ruta: c.ruta });
     return m;
   }, [clientes]);
+
+  const paradas = useMemo(
+    () =>
+      (plan ?? []).map((p) => ({
+        id: p.id,
+        cod_cliente: p.cod_cliente,
+        cliente: clienteMap.get(p.cod_cliente)?.cliente ?? `Cliente #${p.cod_cliente}`,
+        latitud: coords?.get(p.cod_cliente)?.latitud ?? null,
+        longitud: coords?.get(p.cod_cliente)?.longitud ?? null,
+      })),
+    [plan, coords, clienteMap],
+  );
+
+  const conGeo = paradas.filter((p) => p.latitud != null && p.longitud != null).length;
+
+  const optimizar = async () => {
+    if (conGeo < 2) {
+      toast({
+        title: "Faltan ubicaciones",
+        description: "Necesitas al menos dos clientes con ubicación registrada para optimizar el recorrido.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setOptimizando(true);
+    const origen = await posicionActual();
+    const ordenadas = optimizarRuta(paradas, origen);
+    try {
+      await reordenar.mutateAsync(ordenadas.map((p, i) => ({ id: p.id, orden: i + 1 })));
+      toast({
+        title: "Recorrido optimizado",
+        description: `${conGeo} paradas ordenadas por cercanía · ≈ ${distanciaTotalKm(ordenadas, origen).toFixed(0)} km.`,
+      });
+    } catch (e) {
+      toast({ title: "No se ha podido reordenar", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setOptimizando(false);
+    }
+  };
+
+  const abrirMapa = () => {
+    const bloques = tramos(paradas);
+    if (bloques.length === 0) {
+      toast({
+        title: "Sin ubicaciones",
+        description: "Ningún cliente del día tiene ubicación registrada.",
+        variant: "destructive",
+      });
+      return;
+    }
+    for (const b of bloques) window.open(urlRuta(b)!, "_blank", "noopener");
+  };
 
   const opciones = useMemo(() => {
     const term = busqueda.trim().toLowerCase();
@@ -51,6 +117,7 @@ export default function Agenda() {
     setOpen(false);
     setBusqueda("");
   };
+
 
   return (
     <div className="space-y-4">
@@ -148,10 +215,27 @@ export default function Agenda() {
       </Card>
 
       {plan && plan.length > 0 && (
-        <Button asChild className="w-full">
-          <Link to="/visitas/nueva"><Plus className="mr-2 h-4 w-4" />Registrar visita</Link>
-        </Button>
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <Button variant="outline" className="flex-1" onClick={optimizar} disabled={optimizando}>
+              <Route className="mr-2 h-4 w-4" />
+              {optimizando ? "Optimizando…" : "Optimizar recorrido"}
+            </Button>
+            <Button variant="outline" className="flex-1" onClick={abrirMapa}>
+              <Navigation className="mr-2 h-4 w-4" />Ver en el mapa
+            </Button>
+          </div>
+          {conGeo < plan.length && (
+            <p className="text-xs text-muted-foreground">
+              {plan.length - conGeo} clientes sin ubicación registrada quedan al final del recorrido.
+            </p>
+          )}
+          <Button asChild className="w-full">
+            <Link to="/visitas/nueva"><Plus className="mr-2 h-4 w-4" />Registrar visita</Link>
+          </Button>
+        </div>
       )}
+
     </div>
   );
 }

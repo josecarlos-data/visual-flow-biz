@@ -39,7 +39,7 @@ import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { SituacionBadge } from "@/components/SituacionBadge";
 import { useRutaClientes, usePlanificarRuta, tendencia, eur, fechaCorta, hoyISO, type RutaCliente } from "@/hooks/useCrm";
-import { urlRuta, urlCliente, tramos, tieneGeo } from "@/lib/maps";
+import { urlRuta, urlCliente, tramos, tieneGeo, optimizarRuta, posicionActual, distanciaTotalKm, type Punto } from "@/lib/maps";
 
 const ICONO = { sube: TrendingUp, baja: TrendingDown, estable: Minus, nuevo: TrendingUp } as const;
 const COLOR = {
@@ -49,7 +49,7 @@ const COLOR = {
   nuevo: "text-emerald-600 dark:text-emerald-400",
 } as const;
 
-type Orden = "ventas" | "tendencia" | "visita";
+type Orden = "ventas" | "tendencia" | "visita" | "cercania";
 
 const diasDesde = (iso: string | null) => {
   if (!iso) return null;
@@ -61,7 +61,8 @@ export default function RutaDetalle() {
   const { codigo } = useParams<{ codigo: string }>();
   const ruta = decodeURIComponent(codigo ?? "");
   const { user } = useAuth();
-  const { data: clientes, isLoading } = useRutaClientes(ruta);
+  const [soloActivos, setSoloActivos] = useState(true);
+  const { data: clientes, isLoading } = useRutaClientes(ruta, soloActivos);
   const planificar = usePlanificarRuta();
 
   const [orden, setOrden] = useState<Orden>("ventas");
@@ -69,6 +70,8 @@ export default function RutaDetalle() {
   const [planOpen, setPlanOpen] = useState(false);
   const [mapaOpen, setMapaOpen] = useState(false);
   const [fecha, setFecha] = useState(hoyISO());
+  const [origen, setOrigen] = useState<Punto | null>(null);
+  const [buscandoGps, setBuscandoGps] = useState(false);
 
   const lista = useMemo(() => {
     const rows = [...(clientes ?? [])];
@@ -77,19 +80,30 @@ export default function RutaDetalle() {
       rows.sort((a, b) => peso(a) - peso(b));
     } else if (orden === "visita") {
       rows.sort((a, b) => (a.ultima_visita ?? "").localeCompare(b.ultima_visita ?? ""));
+    } else if (orden === "cercania") {
+      return optimizarRuta(rows, origen);
     }
     return rows;
-  }, [clientes, orden]);
+  }, [clientes, orden, origen]);
 
-  const marcados = useMemo(
-    () => (seleccion.size === 0 ? lista : lista.filter((c) => seleccion.has(c.cod_cliente))),
-    [lista, seleccion],
-  );
-  const sinGeo = marcados.filter((c) => !tieneGeo(c));
-  const bloques = tramos(marcados);
+  const pedirGps = async () => {
+    setBuscandoGps(true);
+    const pos = await posicionActual();
+    setBuscandoGps(false);
+    if (!pos) {
+      toast({
+        title: "Sin ubicación",
+        description: "No hemos podido obtener tu posición; se ordena desde el primer cliente.",
+      });
+    }
+    setOrigen(pos);
+    return pos;
+  };
 
-  const totalActual = lista.reduce((s, c) => s + c.importe_actual, 0);
-  const totalAnterior = lista.reduce((s, c) => s + c.importe_anterior_ytd, 0);
+  const cambiarOrden = async (v: Orden) => {
+    setOrden(v);
+    if (v === "cercania" && !origen) await pedirGps();
+  };
 
   const toggle = (cod: number) =>
     setSeleccion((prev) => {
@@ -98,6 +112,22 @@ export default function RutaDetalle() {
       else next.add(cod);
       return next;
     });
+
+  const marcados = useMemo(
+    () => (seleccion.size === 0 ? lista : lista.filter((c) => seleccion.has(c.cod_cliente))),
+    [lista, seleccion],
+  );
+  const ordenadosMapa = useMemo(
+    () => (orden === "cercania" ? marcados : optimizarRuta(marcados, origen)),
+    [marcados, orden, origen],
+  );
+  const sinGeo = marcados.filter((c) => !tieneGeo(c));
+  const bloques = tramos(ordenadosMapa);
+  const kmTotales = distanciaTotalKm(ordenadosMapa, origen);
+
+  const totalActual = lista.reduce((s, c) => s + c.importe_actual, 0);
+  const totalAnterior = lista.reduce((s, c) => s + c.importe_anterior_ytd, 0);
+
 
   const abrirMapa = () => {
     if (bloques.length === 0) {
@@ -145,27 +175,51 @@ export default function RutaDetalle() {
         <div className="min-w-0">
           <h1 className="truncate text-2xl font-bold tracking-tight">Ruta {ruta}</h1>
           <p className="text-sm text-muted-foreground">
-            {lista.length} clientes · {eur(totalActual)} año actual · {eur(totalAnterior)} año anterior
+            {lista.length} {soloActivos ? "clientes activos" : "clientes"} · {eur(totalActual)} año actual ·{" "}
+            {eur(totalAnterior)} año anterior
           </p>
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Select value={orden} onValueChange={(v) => setOrden(v as Orden)}>
+        <Select value={orden} onValueChange={(v) => cambiarOrden(v as Orden)}>
           <SelectTrigger className="h-8 w-48 text-xs"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="ventas">Por ventas</SelectItem>
             <SelectItem value="tendencia">Primero los que caen</SelectItem>
             <SelectItem value="visita">Más tiempo sin visitar</SelectItem>
+            <SelectItem value="cercania">Ruta más corta (cercanía)</SelectItem>
           </SelectContent>
         </Select>
+        <div className="flex h-8 items-center rounded-md border p-0.5">
+          <button
+            type="button"
+            onClick={() => setSoloActivos(true)}
+            className={`h-7 rounded px-2 text-xs ${soloActivos ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+          >
+            Activos
+          </button>
+          <button
+            type="button"
+            onClick={() => setSoloActivos(false)}
+            className={`h-7 rounded px-2 text-xs ${soloActivos ? "text-muted-foreground" : "bg-primary text-primary-foreground"}`}
+          >
+            Todos
+          </button>
+        </div>
         <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setSeleccion(new Set())}>
           Seleccionar todos
         </Button>
         {seleccion.size > 0 && (
           <span className="text-xs text-muted-foreground">{seleccion.size} seleccionados</span>
         )}
+        {orden === "cercania" && (
+          <span className="text-xs text-muted-foreground">
+            {buscandoGps ? "Buscando tu ubicación…" : `≈ ${kmTotales.toFixed(0)} km`}
+          </span>
+        )}
       </div>
+
 
       {isLoading ? (
         <div className="space-y-2">
@@ -202,7 +256,11 @@ export default function RutaDetalle() {
                           }}
                         />
                       )}
+                      {!c.activo && (
+                        <Badge variant="outline" className="shrink-0 text-[10px]">inactivo</Badge>
+                      )}
                     </p>
+
                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                       <span>#{c.cod_cliente}</span>
                       {c.localidad && <span>{c.localidad}</span>}
