@@ -217,7 +217,9 @@ export type Database = {
           gsmart_comercial: string | null
           gsmart_delegacion: string | null
           id: string
+          latitud: number | null
           localidad: string | null
+          longitud: number | null
           num_empleados_taller: number | null
           observaciones_almacen: string | null
           persona_contacto: string | null
@@ -260,7 +262,9 @@ export type Database = {
           gsmart_comercial?: string | null
           gsmart_delegacion?: string | null
           id?: string
+          latitud?: number | null
           localidad?: string | null
+          longitud?: number | null
           num_empleados_taller?: number | null
           observaciones_almacen?: string | null
           persona_contacto?: string | null
@@ -303,7 +307,9 @@ export type Database = {
           gsmart_comercial?: string | null
           gsmart_delegacion?: string | null
           id?: string
+          latitud?: number | null
           localidad?: string | null
+          longitud?: number | null
           num_empleados_taller?: number | null
           observaciones_almacen?: string | null
           persona_contacto?: string | null
@@ -1484,6 +1490,40 @@ export type Database = {
       refrescar_resumenes_admin: { Args: never; Returns: undefined }
       refrescar_resumenes_ventas: { Args: never; Returns: undefined }
       reset_maestro_isi_data: { Args: never; Returns: undefined }
+      ruta_clientes: {
+        Args: { _ruta: string }
+        Returns: {
+          cliente: string
+          cod_cliente: number
+          dias_sin_comprar: number
+          importe_actual: number
+          importe_anterior_ytd: number
+          latitud: number
+          localidad: string
+          longitud: number
+          situacion_categoria: string
+          situacion_efecto: string
+          situacion_etiqueta: string
+          telefono: string
+          ultima_compra: string
+          ultima_visita: string
+          vendedor: string
+        }[]
+      }
+      rutas_visibles: {
+        Args: never
+        Returns: {
+          clientes: number
+          clientes_activos: number
+          con_geo: number
+          importe_actual: number
+          importe_anterior_ytd: number
+          ruta: string
+          sin_visitar: number
+          ultima_visita: string
+        }[]
+      }
+      sembrar_geo_clientes: { Args: never; Returns: number }
       situaciones_activas: {
         Args: never
         Returns: {
