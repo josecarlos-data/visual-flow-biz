@@ -65,6 +65,18 @@ export default function Rutas() {
         <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar ruta…" className="pl-9" />
       </div>
 
+      <Select value={orden} onValueChange={(v) => setOrden(v as Orden)}>
+        <SelectTrigger className="h-8 w-60 text-xs"><SelectValue /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="ventas">Por ventas</SelectItem>
+          <SelectItem value="tendencia">Primero las que caen</SelectItem>
+          <SelectItem value="visita">Más tiempo sin visitar</SelectItem>
+          <SelectItem value="pendientes">Más clientes sin visitar (+90 días)</SelectItem>
+          <SelectItem value="nombre">Por nombre de ruta</SelectItem>
+        </SelectContent>
+      </Select>
+
+
       {error ? (
         <Card>
           <CardContent className="py-8 text-center text-sm text-destructive">
@@ -85,7 +97,10 @@ export default function Rutas() {
         </Card>
       ) : (
         <>
-          <p className="text-xs text-muted-foreground">{filtradas.length} rutas</p>
+          <p className="text-xs text-muted-foreground">
+            {filtradas.length} rutas · {eur(totalActual)} año actual
+          </p>
+
           <div className="space-y-2">
             {filtradas.map((r) => {
               const t = tendencia(r.importe_actual, r.importe_anterior_ytd);
