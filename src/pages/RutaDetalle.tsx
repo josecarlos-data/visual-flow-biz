@@ -107,16 +107,25 @@ export default function RutaDetalle() {
     if (v === "cercania" && !origen) await pedirGps();
   };
 
+  // La selección se mantiene siempre explícita: por defecto, todos los clientes visibles.
+  useEffect(() => {
+    setSeleccion(new Set(lista.map((c) => c.cod_cliente)));
+  }, [lista]);
+
   const toggle = (cod: number) =>
     setSeleccion((prev) => {
-      const next = new Set(prev.size === 0 ? lista.map((c) => c.cod_cliente) : prev);
+      const next = new Set(prev);
       if (next.has(cod)) next.delete(cod);
       else next.add(cod);
       return next;
     });
 
+  const todosMarcados = lista.length > 0 && seleccion.size === lista.length;
+  const alternarSeleccion = () =>
+    setSeleccion(todosMarcados ? new Set() : new Set(lista.map((c) => c.cod_cliente)));
+
   const marcados = useMemo(
-    () => (seleccion.size === 0 ? lista : lista.filter((c) => seleccion.has(c.cod_cliente))),
+    () => lista.filter((c) => seleccion.has(c.cod_cliente)),
     [lista, seleccion],
   );
   const ordenadosMapa = useMemo(
@@ -140,12 +149,9 @@ export default function RutaDetalle() {
       });
       return;
     }
-    if (bloques.length === 1) {
-      window.open(urlRuta(bloques[0])!, "_blank", "noopener");
-      return;
-    }
     setMapaOpen(true);
   };
+
 
   const confirmarPlan = () => {
     if (!user) return;
