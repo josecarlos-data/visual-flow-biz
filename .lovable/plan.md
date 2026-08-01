@@ -1,43 +1,55 @@
-## 1. Botón alterno de selección (detalle de ruta)
+## Objetivo
 
-En `/rutas/:codigo` hoy la selección vacía significa "todos marcados" y el botón sólo sirve para limpiar. Cambios:
+Nueva sección **Objetivos**: el administrador y el jefe de ventas (director comercial) fijan importes anuales por comercial, y cada comercial ve su avance YTD y su proyección de cierre con un motor quincenal alineado con los períodos de facturación.
 
-- Estado explícito de selección: al cargar la lista, todos los clientes visibles quedan seleccionados de verdad (no por convención de conjunto vacío).
-- Un único botón alterno:
-  - Si hay alguno sin marcar → texto "Seleccionar todos".
-  - Si están todos marcados → texto "Quitar selección" (deselecciona todo).
-- Con 0 seleccionados, las acciones "Ver en el mapa" y "Planificar día" se deshabilitan y el contador muestra "0 de N seleccionados".
-- El contador pasa a mostrarse siempre: "X de N seleccionados".
-- Al cambiar el filtro Activos/Todos o el orden, la selección se recalcula sobre los clientes visibles.
+## 0. Motor de proyección quincenal (base de todo lo demás)
 
-Así, para elegir 5 de 70: pulsar "Quitar selección" y marcar sólo esos 5.
+Sustituye al cálculo mensual actual para objetivos (y queda disponible para el resto de la app):
 
-## 2. Ordenación/prefiltro en el panel principal de Rutas
+- El año se divide en **24 quincenas** (día 1-15 y 16-fin de cada mes).
+- El **corte** no se toma del calendario del navegador sino de la **última fecha de venta cargada** en la base de datos: se usa la última quincena completamente cerrada y cargada. Ejemplos: datos hasta 28-feb → 4 quincenas; datos hasta 15-jul → quincena 13 de 24.
+- Perfil estacional: peso de cada quincena del año anterior sobre su total.
+- Proyección de cierre = ventas reales acumuladas hasta el corte ÷ suma de pesos de esas mismas quincenas × 1 (peso total del año). Sin duplicar medias quincenas ni inventar datos parciales.
+- Si no hay año anterior suficiente, reparto uniforme de 1/24 por quincena.
+- Se muestra siempre el corte usado ("datos hasta 15/07 · quincena 13 de 24") para que la cifra sea explicable ante gerencia o cliente.
 
-Añadir en `/rutas`, junto al buscador, el mismo tipo de desplegable que ya existe en el detalle (orden en cliente, sin tocar la base de datos):
+## Tipos de objetivo
 
-- Por ventas (año actual, descendente) — por defecto
-- Primero las que caen (mayor caída frente al año anterior)
-- Más tiempo sin visitar (última visita más antigua primero)
-- Más clientes sin visitar (+90 días)
-- Por nombre de ruta
+1. **Objetivo de cartera** — importe anual del comercial con sus clientes habituales. Excluye siempre las ventas de las rutas especiales con objetivo particular activo (RC2026, MAG2026, MV2026, MS2026, DM2026, JAB2026).
+2. **Objetivo particular por ruta especial** — importe anual independiente sobre los clientes de esa ruta. No suma en el objetivo de cartera.
 
-Se añade también un pequeño resumen bajo el buscador: nº de rutas y total de ventas del año en curso de las rutas mostradas.
+La estructura queda preparada para añadir más tipos después (por producto, por cliente concreto) sin rehacer nada.
 
-## 3. Google Maps bloqueado (ERR_BLOCKED_BY_RESPONSE)
+## Panel de administración (`/admin/objetivos`)
 
-El enlace generado es correcto; el fallo viene de cómo se abre: `window.open(...)` desde dentro del iframe de la app hace que Google rechace la respuesta en esa ventana. Cambios:
+- Tabla con todos los comerciales del año en curso: objetivo de cartera, objetivos particulares, vendido y avance.
+- Al crear un objetivo de cartera, la app **propone** el importe = ventas del año anterior de su cartera × (1 + % configurable, por defecto 5%). El importe queda **siempre editable a mano**.
+- Al crear un objetivo particular se elige una ruta especial y se propone el importe = ventas del año anterior de los clientes de esa ruta (criterio "mantener cifra"). También editable.
+- Acciones: crear, editar importe/nota, activar/desactivar y generar propuestas para todos los comerciales de golpe, revisables antes de guardar.
+- Acceso: admin y director comercial.
 
-- Sustituir `window.open` por enlaces reales (`<a target="_blank" rel="noopener noreferrer">`) tanto en la agenda como en el diálogo de tramos y en "Cómo llegar". Un clic de usuario sobre un ancla real abre pestaña de nivel superior y Google no la bloquea.
-- En la agenda, no abrir varias pestañas a la vez (los navegadores bloquean las siguientes): si hay más de un tramo, mostrar el mismo diálogo "Ruta por tramos" que ya existe en el detalle de ruta, con un enlace por tramo.
-- Añadir en ese diálogo un botón "Copiar enlace" por tramo, como salida cuando el navegador o la red corporativa bloquea la apertura directa.
-- Usar el formato de URL `https://www.google.com/maps/dir/lat,lng/lat,lng/...`, más tolerante que `dir/?api=1&waypoints=` y que funciona igual en la app móvil de Google Maps.
+## Vista del comercial
+
+- **Nueva página `/objetivos`** en el menú lateral (sujeta al permiso de dashboard existente):
+  - Tarjeta grande "Objetivo de cartera": importe objetivo, vendido a la fecha de corte, % conseguido, barra de progreso, proyección de cierre quincenal y semáforo verde/ámbar/rojo según si la proyección alcanza el objetivo.
+  - "Ritmo necesario": lo que debería llevar vendido a esta quincena frente a lo real, y euros/quincena necesarios para llegar.
+  - Una tarjeta por cada objetivo particular con la misma información, más el listado de clientes de esa ruta con venta actual frente al año anterior, para ver quién lastra el objetivo.
+- **Resumen compacto en el dashboard de Ventas**: mini-tarjetas (objetivo, % logrado, proyección) enlazadas a `/objetivos`, que es donde el comercial entra a diario.
+- Admin/director ven el mismo panel con selector de comercial y un ranking de cumplimiento.
 
 ## Detalle técnico
 
-- `src/pages/RutaDetalle.tsx`: estado `seleccion` como conjunto real inicializado desde `lista`, `useEffect` de sincronización al cambiar datos, botón alterno, guardas en acciones, enlaces en lugar de `window.open`.
-- `src/pages/Rutas.tsx`: `Select` de orden + `useMemo` de ordenación sobre los datos de `useRutas`.
-- `src/lib/maps.ts`: nueva construcción de URL por segmentos de ruta (`/maps/dir/...`), manteniendo `MAX_PARADAS = 10` y `tramos()`.
-- `src/pages/Agenda.tsx`: diálogo de tramos reutilizando la lógica del detalle de ruta.
+Base de datos (una migración):
 
-Sin cambios en base de datos.
+- `objetivos` (`anio`, `tipo` `'cartera'|'ruta'`, `cod_vendedor`, `vendedor`, `ruta` nullable, `importe_objetivo`, `base_anio_anterior`, `porcentaje`, `nota`, `activo`, `created_by`, timestamps), único por (`anio`,`tipo`,`cod_vendedor`,`ruta`).
+- GRANTs a `authenticated` y `service_role`; RLS: lectura para admin/director y para el comercial dueño (vía `get_user_employee_code`); escritura sólo admin/director.
+- RPC `objetivos_seguimiento(_anio int)` (security definer): por objetivo devuelve importe, vendido hasta el corte, serie quincenal del año actual y del anterior, y la fecha de corte. La cartera excluye clientes con `ruta_especial` que tenga objetivo particular activo.
+- RPC `objetivos_propuesta(_anio int, _pct numeric)`: importes sugeridos por comercial y por ruta especial a partir de `ventas_diarias`.
+- Fila en `dashboards` con clave `objetivos` para el control de permisos.
+
+Frontend:
+
+- `src/lib/projectionQuincenal.ts`: nuevo motor (índice de quincena a partir de una fecha, pesos, corte por última quincena cargada, proyección). Con tests en `src/test`.
+- `src/hooks/useObjetivos.ts`, `src/pages/Objetivos.tsx`, `src/pages/AdminObjetivos.tsx`, componente `ObjetivoCard` reutilizable, resumen en `src/pages/Ventas.tsx`.
+- Rutas nuevas en `src/App.tsx` y entrada de administración en `AppSidebar.tsx`.
+- `src/lib/projection.ts` se mantiene intacto para los gráficos actuales; la migración del resto de la app al motor quincenal se valorará después.
