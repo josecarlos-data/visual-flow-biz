@@ -59,10 +59,12 @@ function AuthErrorScreen({ message, onSignOut }: { message: string; onSignOut: (
 function ProtectedRoute({
   children,
   adminOnly = false,
+  allowedRoles,
   dashboardKey,
 }: {
   children: React.ReactNode;
   adminOnly?: boolean;
+  allowedRoles?: string[];
   dashboardKey?: string;
 }) {
   const { user, isApproved, role, isLoading, hasDashboard, dashboards, authError, signOut } = useAuth();
@@ -73,7 +75,9 @@ function ProtectedRoute({
   if (!user) return <Navigate to="/auth" replace />;
   if (authError) return <AuthErrorScreen message={authError} onSignOut={signOut} />;
   if (!isApproved) return <Navigate to="/pending" replace />;
-  if (adminOnly && role !== "admin") return <Navigate to="/" replace />;
+  if (adminOnly && role !== "admin" && !(allowedRoles ?? []).includes(role ?? "")) {
+    return <Navigate to="/" replace />;
+  }
   if (dashboardKey && !hasDashboard(dashboardKey)) {
     // Fallback to first available dashboard, or pending if none
     const fallback = dashboards[0]?.route;
