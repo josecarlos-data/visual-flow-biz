@@ -523,6 +523,57 @@ export type Database = {
         }
         Relationships: []
       }
+      objetivos: {
+        Row: {
+          activo: boolean
+          anio: number
+          base_anio_anterior: number
+          cod_vendedor: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          importe_objetivo: number
+          nota: string | null
+          porcentaje: number
+          ruta: string | null
+          tipo: string
+          updated_at: string
+          vendedor: string
+        }
+        Insert: {
+          activo?: boolean
+          anio: number
+          base_anio_anterior?: number
+          cod_vendedor?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          importe_objetivo?: number
+          nota?: string | null
+          porcentaje?: number
+          ruta?: string | null
+          tipo?: string
+          updated_at?: string
+          vendedor: string
+        }
+        Update: {
+          activo?: boolean
+          anio?: number
+          base_anio_anterior?: number
+          cod_vendedor?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          importe_objetivo?: number
+          nota?: string | null
+          porcentaje?: number
+          ruta?: string | null
+          tipo?: string
+          updated_at?: string
+          vendedor?: string
+        }
+        Relationships: []
+      }
       productos: {
         Row: {
           cod_proveedor: string | null
@@ -1349,6 +1400,7 @@ export type Database = {
           vendedor: string
         }[]
       }
+      fecha_corte_datos: { Args: never; Returns: string }
       get_distinct_delegaciones: {
         Args: never
         Returns: {
@@ -1385,6 +1437,36 @@ export type Database = {
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_approved: { Args: { _user_id: string }; Returns: boolean }
+      objetivos_propuesta: {
+        Args: { _anio: number; _pct?: number }
+        Returns: {
+          base_anio_anterior: number
+          cod_vendedor: string
+          importe_sugerido: number
+          ruta: string
+          tipo: string
+          vendedor: string
+        }[]
+      }
+      objetivos_seguimiento: {
+        Args: { _anio: number }
+        Returns: {
+          activo: boolean
+          cod_vendedor: string
+          fecha_corte: string
+          id: string
+          importe_objetivo: number
+          nota: string
+          quincena_corte: number
+          ruta: string
+          series: Json
+          tipo: string
+          total_anterior: number
+          vendedor: string
+          vendido: number
+          vendido_anterior_ytd: number
+        }[]
+      }
       panel_alertas: {
         Args: { _incluir_excluidos?: boolean; _limite?: number }
         Returns: {
@@ -1487,6 +1569,8 @@ export type Database = {
       }
       puede_revisar_visitas: { Args: { _user_id: string }; Returns: boolean }
       puede_ver_margen: { Args: { _user_id: string }; Returns: boolean }
+      quincena_corte: { Args: { _anio: number }; Returns: number }
+      quincena_de: { Args: { _f: string }; Returns: number }
       refrescar_resumenes_admin: { Args: never; Returns: undefined }
       refrescar_resumenes_ventas: { Args: never; Returns: undefined }
       registrar_geo_cliente: {
@@ -1541,6 +1625,15 @@ export type Database = {
       }
       upsert_clientes_maestro: { Args: { _rows: Json }; Returns: number }
       upsert_productos_maestro: { Args: { _rows: Json }; Returns: number }
+      vendedores_objetivos: {
+        Args: never
+        Returns: {
+          clientes: number
+          cod_vendedor: string
+          ruta_especial: string
+          vendedor: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "director_comercial" | "jefe_de_zona" | "comercial"
