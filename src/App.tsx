@@ -24,6 +24,8 @@ import AdminFunctions from "./pages/AdminFunctions";
 import AdminVisitas from "./pages/AdminVisitas";
 import RevisionVisitas from "./pages/RevisionVisitas";
 import AdminSituaciones from "./pages/AdminSituaciones";
+import AdminObjetivos from "./pages/AdminObjetivos";
+import Objetivos from "./pages/Objetivos";
 
 import NotFound from "./pages/NotFound";
 
