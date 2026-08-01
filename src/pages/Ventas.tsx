@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SituacionBadge } from "@/components/SituacionBadge";
+import { ResumenObjetivos } from "@/components/ResumenObjetivos";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Bar,
@@ -225,7 +226,7 @@ export default function Ventas() {
           <span>No se han podido cargar algunos datos: {errorMsg}</span>
         </div>
       )}
-
+      <ResumenObjetivos />
 
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
