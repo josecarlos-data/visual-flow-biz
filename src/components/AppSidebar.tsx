@@ -31,6 +31,7 @@ export function AppSidebar() {
     { title: "Datos", url: "/admin/data", icon: Database },
     { title: "Plantillas de visita", url: "/admin/visitas", icon: Icons.ClipboardList },
     { title: "Situaciones de cliente", url: "/admin/situaciones", icon: Icons.ShieldAlert },
+    { title: "Objetivos", url: "/admin/objetivos", icon: Icons.Target },
     { title: "Funciones", url: "/admin/functions", icon: Settings },
   ];
 
