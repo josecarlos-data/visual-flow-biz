@@ -225,7 +225,7 @@ export default function Ventas() {
           <span>No se han podido cargar algunos datos: {errorMsg}</span>
         </div>
       )}
-
+      <ResumenObjetivos />
 
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
