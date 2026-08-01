@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Target } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useObjetivosSeguimiento, anioActual } from "@/hooks/useObjetivos";
+import { useObjetivosSeguimiento, useQuincenaCorte, anioActual } from "@/hooks/useObjetivos";
 import { ObjetivoCard } from "@/components/ObjetivoCard";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -28,7 +28,8 @@ export default function Objetivos() {
 
   const cartera = visibles.filter((o) => o.tipo === "cartera");
   const rutas = visibles.filter((o) => o.tipo === "ruta");
-  const corte = data?.[0]?.quincena_corte ?? 0;
+  const { data: corteRpc } = useQuincenaCorte(anio);
+  const corte = data?.[0]?.quincena_corte ?? corteRpc ?? 0;
 
   const anios = [anioActual() + 1, anioActual(), anioActual() - 1];
 
