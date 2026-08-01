@@ -19,21 +19,28 @@ import { Button } from "@/components/ui/button";
 export function AppSidebar() {
   const { role, user, signOut, dashboards } = useAuth();
   const isAdmin = role === "admin";
-  const puedeRevisar = isAdmin || role === "director_comercial" || role === "jefe_de_zona";
+  const esDireccion = role === "director_comercial";
+  const puedeRevisar = isAdmin || esDireccion || role === "jefe_de_zona";
 
   const mainItems = dashboards.map((d) => {
     const IconComp = (d.icon && (Icons as any)[d.icon]) || BarChart3;
     return { title: d.name, url: d.route, icon: IconComp, end: d.route === "/" };
   });
 
-  const adminItems = [
-    { title: "Usuarios", url: "/admin/users", icon: Users },
-    { title: "Datos", url: "/admin/data", icon: Database },
-    { title: "Plantillas de visita", url: "/admin/visitas", icon: Icons.ClipboardList },
-    { title: "Situaciones de cliente", url: "/admin/situaciones", icon: Icons.ShieldAlert },
-    { title: "Objetivos", url: "/admin/objetivos", icon: Icons.Target },
-    { title: "Funciones", url: "/admin/functions", icon: Settings },
-  ];
+  const objetivosItem = { title: "Objetivos", url: "/admin/objetivos", icon: Icons.Target };
+
+  const adminItems = isAdmin
+    ? [
+        { title: "Usuarios", url: "/admin/users", icon: Users },
+        { title: "Datos", url: "/admin/data", icon: Database },
+        { title: "Plantillas de visita", url: "/admin/visitas", icon: Icons.ClipboardList },
+        { title: "Situaciones de cliente", url: "/admin/situaciones", icon: Icons.ShieldAlert },
+        objetivosItem,
+        { title: "Funciones", url: "/admin/functions", icon: Settings },
+      ]
+    : esDireccion
+      ? [objetivosItem]
+      : [];
 
 
   return (
