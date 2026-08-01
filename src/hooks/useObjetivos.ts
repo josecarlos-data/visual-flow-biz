@@ -185,3 +185,15 @@ export function useObjetivosMutations() {
 
   return { guardar, guardarLote, borrar };
 }
+
+/** Última quincena cerrada y cargada según los datos de ventas. */
+export function useQuincenaCorte(anio: number) {
+  return useQuery({
+    queryKey: ["quincena-corte", anio],
+    queryFn: async (): Promise<number> => {
+      const { data, error } = await supabase.rpc("quincena_corte", { _anio: anio });
+      if (error) throw error;
+      return Number(data ?? 0);
+    },
+  });
+}
