@@ -188,12 +188,12 @@ export function agruparPorMes(puntos: PuntoProyeccion[]): PuntoMes[] {
     if (nReal[m] > 0) {
       mes.real = acumReal[m];
       mes.parcial = nProy[m] > 0;
-      ultimoMesReal = m;
+      if (nProy[m] === 0) ultimoMesReal = m;
     }
     if (nProy[m] > 0) mes.proyectado = acumTotal[m];
   }
 
-  // Enlaza la línea discontinua con el último punto real
+  // Enlaza la línea discontinua con el último mes completamente facturado
   if (ultimoMesReal > 0 && meses[ultimoMesReal - 1].proyectado === null) {
     meses[ultimoMesReal - 1].proyectado = meses[ultimoMesReal - 1].real;
   }
