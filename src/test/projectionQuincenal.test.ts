@@ -77,3 +77,35 @@ describe("ritmoNecesario", () => {
     expect(r.porQuincena).toBeCloseTo(100);
   });
 });
+
+describe("agruparPorMes", () => {
+  it("agrupa 24 quincenas en 12 meses y enlaza la proyección", async () => {
+    const { agruparPorMes, calcularProyeccionQuincenal } = await import("@/lib/projectionQuincenal");
+    const previo = Array.from({ length: 24 }, (_, i) => ({ q: i + 1, valor: 100 }));
+    const actual = Array.from({ length: 24 }, (_, i) => ({ q: i + 1, valor: 120 }));
+    const calc = calcularProyeccionQuincenal(actual, previo, 6); // corte fin de marzo
+    const meses = agruparPorMes(calc.puntos);
+
+    expect(meses).toHaveLength(12);
+    expect(meses[0].etiqueta).toBe("Ene");
+    expect(meses[0].real).toBe(240);
+    expect(meses[0].anterior).toBe(200);
+    expect(meses[0].parcial).toBe(false);
+    // Marzo es el último mes real y sirve de enlace con la línea discontinua
+    expect(meses[2].real).toBe(240);
+    expect(meses[2].proyectado).toBe(240);
+    expect(meses[3].real).toBeNull();
+    expect(meses[3].proyectado).toBeGreaterThan(0);
+  });
+
+  it("marca como parcial el mes con solo la primera quincena facturada", async () => {
+    const { agruparPorMes, calcularProyeccionQuincenal } = await import("@/lib/projectionQuincenal");
+    const previo = Array.from({ length: 24 }, (_, i) => ({ q: i + 1, valor: 100 }));
+    const actual = Array.from({ length: 24 }, (_, i) => ({ q: i + 1, valor: 120 }));
+    const calc = calcularProyeccionQuincenal(actual, previo, 13); // hasta 15 de julio
+    const meses = agruparPorMes(calc.puntos);
+    expect(meses[6].parcial).toBe(true);
+    expect(meses[6].real).toBe(120);
+    expect(meses[5].proyectado).toBe(meses[5].real);
+  });
+});

@@ -10,7 +10,7 @@ import { etiquetaCorte } from "@/lib/projectionQuincenal";
 
 export default function Objetivos() {
   const { role } = useAuth();
-  const esDireccion = role === "admin" || role === "director_comercial" || role === "jefe_de_zona";
+  const esDireccion = role === "admin" || role === "director_comercial";
   const [anio, setAnio] = useState(anioActual());
   const [vendedorSel, setVendedorSel] = useState("todos");
 
