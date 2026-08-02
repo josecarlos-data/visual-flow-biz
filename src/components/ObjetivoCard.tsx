@@ -4,9 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
   Bar,
-  BarChart,
   CartesianGrid,
+  ComposedChart,
   Legend,
+  Line,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -14,6 +15,7 @@ import {
 } from "recharts";
 import { eur, eurK, pct } from "@/lib/format";
 import {
+  agruparPorMes,
   calcularProyeccionQuincenal,
   etiquetaCorte,
   ritmoNecesario,
@@ -47,12 +49,7 @@ export function ObjetivoCard({ objetivo, anio, compacto = false }: Props) {
 
   const titulo = objetivo.tipo === "cartera" ? "Objetivo de cartera" : `Objetivo ruta ${objetivo.ruta}`;
 
-  const datosGrafico = calc.puntos.map((p) => ({
-    etiqueta: p.etiqueta,
-    real: p.proyectado ? null : p.valor,
-    proyectado: p.proyectado ? p.valor : null,
-    anterior: p.anterior,
-  }));
+  const datosGrafico = agruparPorMes(calc.puntos);
 
   const variacion =
     objetivo.vendido_anterior_ytd > 0
@@ -94,18 +91,48 @@ export function ObjetivoCard({ objetivo, anio, compacto = false }: Props) {
         </div>
 
         {!compacto && (
-          <div className="h-56">
+          <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={datosGrafico} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="etiqueta" tick={{ fontSize: 10 }} interval={1} />
-                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => eurK(v)} width={54} />
-                <Tooltip formatter={(v: number) => eur(v)} />
+              <ComposedChart data={datosGrafico} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
+                <XAxis dataKey="etiqueta" tick={{ fontSize: 10 }} interval={0} />
+                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => eurK(v)} width={48} />
+                <Tooltip
+                  formatter={(v: number, name: string) => [eur(v), name]}
+                  labelFormatter={(l: string) => {
+                    const m = datosGrafico.find((d) => d.etiqueta === l);
+                    return m?.parcial ? `${l} (quincena parcial)` : l;
+                  }}
+                />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="anterior" name={`${anio - 1}`} fill="hsl(var(--muted-foreground))" fillOpacity={0.35} />
-                <Bar dataKey="real" name={`${anio} real`} fill="hsl(var(--primary))" />
-                <Bar dataKey="proyectado" name="Proyectado" fill="hsl(var(--primary))" fillOpacity={0.35} />
-              </BarChart>
+                <Bar
+                  dataKey="anterior"
+                  name={`${anio - 1}`}
+                  fill="hsl(var(--muted-foreground))"
+                  fillOpacity={0.28}
+                  radius={[3, 3, 0, 0]}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="real"
+                  name={`${anio}`}
+                  stroke="hsl(var(--primary))"
+                  strokeWidth={2.5}
+                  dot={{ r: 3, strokeWidth: 0, fill: "hsl(var(--primary))" }}
+                  connectNulls
+                />
+                <Line
+                  type="monotone"
+                  dataKey="proyectado"
+                  name="Proyección"
+                  stroke="hsl(var(--primary))"
+                  strokeWidth={2}
+                  strokeDasharray="4 4"
+                  strokeOpacity={0.75}
+                  dot={{ r: 2, strokeWidth: 0, fill: "hsl(var(--primary))", fillOpacity: 0.6 }}
+                  connectNulls
+                />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         )}

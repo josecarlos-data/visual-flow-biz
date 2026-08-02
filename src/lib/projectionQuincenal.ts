@@ -137,3 +137,66 @@ export function ritmoNecesario(objetivo: number, vendido: number, quincenaCorte:
     porQuincena: restantes > 0 ? pendiente / restantes : pendiente,
   };
 }
+
+export interface PuntoMes {
+  mes: number; // 1..12
+  etiqueta: string; // "Ene"
+  anterior: number;
+  real: number | null;
+  proyectado: number | null;
+  parcial: boolean;
+}
+
+/**
+ * Agrupa los 24 puntos quincenales en 12 meses para visualización móvil.
+ * - `real`: suma de las quincenas ya facturadas del mes (null si el mes no tiene datos reales).
+ * - `proyectado`: valor total estimado del mes (real + quincenas proyectadas). Se rellena
+ *   también en el último mes con datos reales para que la línea discontinua enlace sin hueco.
+ * - `parcial`: el mes tiene una quincena real y otra aún no facturada.
+ */
+export function agruparPorMes(puntos: PuntoProyeccion[]): PuntoMes[] {
+  const meses: PuntoMes[] = MESES.map((etiqueta, i) => ({
+    mes: i + 1,
+    etiqueta,
+    anterior: 0,
+    real: null,
+    proyectado: null,
+    parcial: false,
+  }));
+
+  const acumReal = new Array(13).fill(0);
+  const acumTotal = new Array(13).fill(0);
+  const nReal = new Array(13).fill(0);
+  const nProy = new Array(13).fill(0);
+
+  for (const p of puntos) {
+    const m = Math.ceil(p.q / 2);
+    if (m < 1 || m > 12) continue;
+    meses[m - 1].anterior += p.anterior;
+    acumTotal[m] += p.valor;
+    if (p.proyectado) {
+      nProy[m] += 1;
+    } else {
+      acumReal[m] += p.valor;
+      nReal[m] += 1;
+    }
+  }
+
+  let ultimoMesReal = 0;
+  for (let m = 1; m <= 12; m++) {
+    const mes = meses[m - 1];
+    if (nReal[m] > 0) {
+      mes.real = acumReal[m];
+      mes.parcial = nProy[m] > 0;
+      if (nProy[m] === 0) ultimoMesReal = m;
+    }
+    if (nProy[m] > 0) mes.proyectado = acumTotal[m];
+  }
+
+  // Enlaza la línea discontinua con el último mes completamente facturado
+  if (ultimoMesReal > 0 && meses[ultimoMesReal - 1].proyectado === null) {
+    meses[ultimoMesReal - 1].proyectado = meses[ultimoMesReal - 1].real;
+  }
+
+  return meses;
+}
