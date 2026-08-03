@@ -36,9 +36,11 @@ export function ObjetivoCard({ objetivo, anio, compacto = false }: Props) {
   }, [objetivo, anio]);
 
   const meta = objetivo.importe_objetivo;
-  const logrado = meta > 0 ? (calc.vendido / meta) * 100 : 0;
+  const vendido = calc.vendidoTotal;
+  const logrado = meta > 0 ? (vendido / meta) * 100 : 0;
   const cumpleProyeccion = meta > 0 ? (calc.proyeccion / meta) * 100 : 0;
-  const ritmo = ritmoNecesario(meta, calc.vendido, objetivo.quincena_corte);
+  const ritmo = ritmoNecesario(meta, vendido, objetivo.quincena_corte);
+
 
   const semaforo =
     cumpleProyeccion >= 100
