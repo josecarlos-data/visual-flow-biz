@@ -165,11 +165,6 @@ function docFor(name: string): Doc | null {
   return hit ? hit.doc : null;
 }
 
-const KNOWN_VARIABLES = [
-  "ventasActual", "ventasPrevio", "mesesConDatos", "mesesRestantes",
-  "clientesActivos", "clientesActivosPrev", "totalReal", "sumWeightsReal",
-  "peso_mes", "proyeccion_mes", "totalPrevio", "mes",
-];
 
 function validateFormula(formula: string): { valid: boolean; suggestion?: string; warning?: string } {
   const trimmed = formula.trim();
