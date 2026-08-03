@@ -36,11 +36,17 @@ export interface PuntoProyeccion {
 
 export interface ResultadoProyeccion {
   quincenaCorte: number;
+  /** Vendido en quincenas cerradas (base del cálculo de proyección). */
   vendido: number;
+  /** Vendido real acumulado incluyendo la quincena en curso. Cuadra con la facturación. */
+  vendidoTotal: number;
+  /** Importe ya facturado de quincenas posteriores al corte (quincena en curso). */
+  parcialImporte: number;
   proyeccion: number;
   pesoAcumulado: number;
   puntos: PuntoProyeccion[];
 }
+
 
 /** Índice de quincena (1..24) de una fecha. */
 export function indiceQuincena(fecha: Date | string): number {
