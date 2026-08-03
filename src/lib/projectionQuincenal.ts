@@ -193,13 +193,13 @@ export function agruparPorMes(puntos: PuntoProyeccion[]): PuntoMes[] {
     if (m < 1 || m > 12) continue;
     meses[m - 1].anterior += p.anterior;
     acumTotal[m] += p.valor;
-    if (p.proyectado) {
-      nProy[m] += 1;
-    } else {
-      acumReal[m] += p.valor;
+    if (p.real !== null) {
+      acumReal[m] += p.real;
       nReal[m] += 1;
     }
+    if (p.proyectado) nProy[m] += 1;
   }
+
 
   let ultimoMesReal = 0;
   for (let m = 1; m <= 12; m++) {
