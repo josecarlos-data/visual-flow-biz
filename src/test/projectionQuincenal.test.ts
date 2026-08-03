@@ -52,15 +52,19 @@ describe("calcularProyeccionQuincenal", () => {
     expect(r.puntos.filter((p) => p.proyectado)).toHaveLength(11);
   });
 
-  it("ignora ventas posteriores al corte", () => {
+  it("no usa las ventas posteriores al corte para calcular el ritmo, pero sí las acumula", () => {
     const actual = [
       ...Array.from({ length: 13 }, (_, i) => ({ q: i + 1, valor: 100 })),
-      { q: 14, valor: 999999 },
+      { q: 14, valor: 500 },
     ];
     const r = calcularProyeccionQuincenal(actual, previo, 13);
     expect(r.vendido).toBe(1300);
-    expect(r.proyeccion).toBeCloseTo(2400);
+    expect(r.vendidoTotal).toBe(1800);
+    expect(r.parcialImporte).toBe(500);
+    // ritmo anual 2400 → quincenas 15..24 a 100 cada una, y la 14 ya facturada a 500
+    expect(r.proyeccion).toBeCloseTo(1300 + 500 + 1000);
   });
+
 
   it("devuelve cero sin datos", () => {
     const r = calcularProyeccionQuincenal([], previo, 0);
