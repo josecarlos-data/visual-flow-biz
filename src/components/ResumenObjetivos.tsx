@@ -24,7 +24,7 @@ export function ResumenObjetivos() {
             id: o.id,
             titulo: o.tipo === "cartera" ? `Cartera · ${o.vendedor}` : `Ruta ${o.ruta} · ${o.vendedor}`,
             objetivo: o.importe_objetivo,
-            vendido: calc.vendido,
+            vendido: calc.vendidoTotal,
             proyeccion: calc.proyeccion,
             corte: o.quincena_corte,
           };

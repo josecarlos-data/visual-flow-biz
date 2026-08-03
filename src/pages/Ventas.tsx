@@ -205,9 +205,10 @@ export default function Ventas() {
     return (
       <div className="space-y-4">
         <Skeleton className="h-10 w-64" />
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-28" />)}
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-24" />)}
         </div>
+
         <Skeleton className="h-80" />
       </div>
     );
@@ -229,7 +230,8 @@ export default function Ventas() {
       <ResumenObjetivos />
 
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
+
         <Kpi
           icon={<Euro className="h-4 w-4" />}
           label={`Facturación ${anioActual}`}
@@ -494,16 +496,20 @@ export default function Ventas() {
 function Kpi({ icon, label, value, hint, positive }: { icon: React.ReactNode; label: string; value: string; hint?: string; positive?: boolean }) {
   return (
     <Card>
-      <CardContent className="p-4">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">{icon}{label}</div>
-        <div className="mt-1 text-2xl font-bold tracking-tight">{value}</div>
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex items-center gap-1.5 text-[11px] leading-tight text-muted-foreground sm:gap-2 sm:text-xs">
+          <span className="shrink-0">{icon}</span>
+          <span className="truncate">{label}</span>
+        </div>
+        <div className="mt-1 truncate text-xl font-bold tracking-tight sm:text-2xl">{value}</div>
         {hint && (
-          <div className={`mt-1 text-xs ${positive === undefined ? "text-muted-foreground" : positive ? "text-primary" : "text-destructive"}`}>{hint}</div>
+          <div className={`mt-0.5 truncate text-[11px] sm:text-xs ${positive === undefined ? "text-muted-foreground" : positive ? "text-primary" : "text-destructive"}`}>{hint}</div>
         )}
       </CardContent>
     </Card>
   );
 }
+
 
 function FilaAlerta({ a, detalle, badge }: { a: AlertaRow; detalle: string; badge: React.ReactNode }) {
   const atenuada = a.situacion_efecto === "justificada" || a.situacion_efecto === "ocultar";

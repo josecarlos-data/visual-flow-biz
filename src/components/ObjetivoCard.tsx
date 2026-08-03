@@ -55,8 +55,9 @@ export function ObjetivoCard({ objetivo, anio, compacto = false }: Props) {
 
   const variacion =
     objetivo.vendido_anterior_ytd > 0
-      ? ((calc.vendido - objetivo.vendido_anterior_ytd) / objetivo.vendido_anterior_ytd) * 100
+      ? ((vendido - objetivo.vendido_anterior_ytd) / objetivo.vendido_anterior_ytd) * 100
       : null;
+
 
   return (
     <Card>
@@ -79,7 +80,7 @@ export function ObjetivoCard({ objetivo, anio, compacto = false }: Props) {
       <CardContent className="space-y-4">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Dato label="Objetivo" valor={eur(meta)} />
-          <Dato label="Vendido" valor={eur(calc.vendido)} sub={variacion !== null ? `${variacion >= 0 ? "+" : ""}${pct(variacion)} vs ${anio - 1}` : undefined} />
+          <Dato label="Vendido" valor={eur(vendido)} sub={variacion !== null ? `${variacion >= 0 ? "+" : ""}${pct(variacion)} vs ${anio - 1}` : undefined} />
           <Dato label="Proyección cierre" valor={eur(calc.proyeccion)} sub={meta > 0 ? `${pct(cumpleProyeccion)} del objetivo` : undefined} />
           <Dato label="Falta" valor={eur(ritmo.pendiente)} sub={ritmo.restantes > 0 ? `${eur(ritmo.porQuincena)} / quincena` : "año cerrado"} />
         </div>
