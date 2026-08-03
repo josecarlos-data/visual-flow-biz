@@ -1,42 +1,44 @@
-## Objetivo
+## Diagnóstico (verificado en datos, J. Antonio Bautista, 2026)
 
-Dos arreglos en la sección Objetivos: que cada comercial vea solo lo suyo, y rehacer el gráfico para que sea legible en móvil.
+- Facturación panel de ventas: **891.956 €**
+- Objetivos: cartera 667.622 € + ruta JAB2026 169.191 € = **836.813 €**
+- Diferencia: **55.143 €**
 
-## 1. Visibilidad por comercial
+Las ventas reales de 2026 de ese comercial son 707.042 € (cartera) + 184.914 € (JAB2026) = 891.956 €, o sea el reparto por objetivo es correcto y cuadra con la facturación.
 
-Hoy `objetivos_seguimiento` devuelve todos los objetivos del año a cualquier usuario aprobado, por eso Bautista ve a sus compañeros.
+La diferencia es exactamente lo facturado entre el **16 y el 29 de julio** (última fecha cargada): 39.419 € cartera + 15.724 € JAB2026 = 55.143 €. La tarjeta de objetivo suma solo quincenas **cerradas** (corte quincena 13, hasta 15/07); el KPI de facturación suma todo lo cargado.
 
-Regla nueva:
-- **Admin** y **Director comercial** (jefe de ventas / gerencia): ven todos los objetivos, con el filtro de comercial que ya existe.
-- **Cualquier otro rol** (comercial, encargado de tienda, jefe de zona): ve únicamente los objetivos cuyo vendedor coincide con su ficha de usuario (el mismo campo que ya filtra clientes y ventas, p. ej. "J. Antonio Bautista").
+## 1. Cuadrar los totales de objetivos
 
-Se aplica en la base de datos, no solo en pantalla, así que también quedan protegidos `objetivos_propuesta` y la lectura directa de la tabla `objetivos` (edición solo admin/director).
+- "Vendido" en la tarjeta de objetivo y en el resumen del panel pasa a ser el **acumulado real completo del año**, incluida la quincena en curso. Así la suma de objetivos cuadra siempre con la facturación.
+- La proyección sigue calculándose **solo con quincenas cerradas** (criterio correcto), sumándole después lo ya facturado de la quincena abierta sin duplicar.
+- % logrado, progreso, variación vs año anterior y "Falta" se recalculan sobre el vendido real.
+- El gráfico mensual muestra la parte real de la quincena abierta como dato real (mes marcado como parcial en el tooltip), no como proyección.
+- **Sin subtexto explicativo** en la tarjeta: nada de "incluye X € de la quincena en curso". La explicación vivirá en Funciones.
 
-En la pantalla de Objetivos, el selector "Todos los comerciales" solo aparece para admin/director.
+## 2. KPIs del panel de ventas en móvil
 
-## 2. Gráfico mensual combinado
+- Rejilla de 2 columnas en móvil (hoy 1 por fila), 3–4 en escritorio.
+- Tarjetas KPI compactas: paddings y tipografía reducidos en móvil, icono + etiqueta en una línea, valor destacado y subtexto en una línea con truncado.
+- Escalado del tamaño del valor para importes largos (891.956 €) sin cortes.
+- Mismo tratamiento en las tarjetas del resumen de objetivos.
 
-El gráfico actual dibuja 24 quincenas × 3 barras: en 411 px cada barra queda por debajo de 1 px, por eso se ve en blanco aunque el tooltip sí muestre importes.
+## 3. Sección Funciones: explicación clara, sin Excel
 
-Nuevo diseño (12 puntos, uno por mes):
-- **2025**: barras grises suaves de fondo.
-- **2026 real**: línea continua en el turquesa corporativo, con puntos en cada mes.
-- **2026 proyectado**: la misma línea continuada en discontinuo (guiones/puntos), arrancando desde el último mes real para que no haya hueco.
-- Mes parcial (primera quincena facturada, segunda no): se muestra el real acumulado y el tooltip lo marca como "parcial".
-- Ejes Ene…Dic, importes en miles, altura algo mayor y leyenda compacta.
+- **Se elimina por completo la equivalencia en fórmula de Excel** de la interfaz (campo, editor y copiado). El dato de la base se deja de mostrar y de editar.
+- Cada función pasa a mostrar tres bloques:
+  1. **Qué calcula** — explicación en lenguaje llano, una o dos frases.
+  2. **Cómo se calcula** — la fórmula interna (editable por admin, como ahora).
+  3. **Ejemplo** — caso numérico sencillo y realista con el resultado, listo para explicárselo a un compañero.
+- Se documentan las funciones en uso, incluida la **proyección de ventas quincenal**: qué es el corte de quincena, por qué solo se usan quincenas cerradas para proyectar, y ejemplo del tipo "vendido hasta 15/07 = 667.622 €, ese periodo pesó el 51,3 % del año anterior → proyección de cierre ≈ 1.300.000 €".
+- También: clientes activos, ticket medio, tasa de devolución, variación YTD, ritmo necesario por quincena y objetivo de cartera vs rutas especiales.
 
-El motor de proyección sigue calculando internamente por quincenas; solo cambia la presentación.
+## Detalles técnicos
 
-Mismo criterio en la tarjeta resumen del panel de Ventas.
-
-## Sobre los roles
-
-No toco el catálogo de roles todavía. Este cambio ya deja la jerarquía práctica que describes: comercial/encargado = solo lo suyo, director comercial = todo, admin = todo + configuración. `jefe_de_zona` pasa a comportarse como comercial en Objetivos; cuando quieras lo retiramos en una limpieza aparte.
-
-## Detalle técnico
-
-- Migración: recrear `public.objetivos_seguimiento(_anio)` filtrando por `public.get_user_employee_code(auth.uid())` salvo `is_admin` / `has_role('director_comercial')`; alinear las políticas RLS de `objetivos`.
-- `src/lib/projectionQuincenal.ts`: helper `agruparPorMes(puntos)` → 12 registros con `anterior`, `real`, `proyectado` (con solape en el mes de corte) y flag `parcial`.
-- `src/components/ObjetivoCard.tsx`: `ComposedChart` de recharts (Bar 2025 + Line real + Line dashed proyección), colores por tokens del design system.
-- `src/pages/Objetivos.tsx`: ocultar el selector de comercial a quien no sea admin/director.
-- Pruebas unitarias de `agruparPorMes` en `src/test/projectionQuincenal.test.ts`.
+- `src/lib/projectionQuincenal.ts`: `calcularProyeccionQuincenal` devuelve además `vendidoTotal` (todas las quincenas con dato) y `parcialImporte`; `vendido` sigue siendo el cerrado para el cálculo de pesos.
+- `src/components/ObjetivoCard.tsx` y `src/components/ResumenObjetivos.tsx`: usar `vendidoTotal` en KPI, progreso, variación y "Falta".
+- `agruparPorMes`: incorporar la quincena parcial como real en su mes.
+- `src/pages/Ventas.tsx`: rejilla `grid-cols-2 sm:grid-cols-3 lg:grid-cols-4` y variante compacta de la tarjeta KPI.
+- `src/pages/AdminFunctions.tsx`: quitar `excel_equivalent` de UI, editor y guardado; añadir bloques de explicación y ejemplo (usando `description` para la explicación y un campo/`ejemplo` para el caso práctico).
+- Migración mínima si hace falta: columna `ejemplo` en `system_functions` y relleno de explicaciones/ejemplos por función.
+- Ampliar `src/test/projectionQuincenal.test.ts` con el caso de quincena parcial.
