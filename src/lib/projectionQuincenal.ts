@@ -115,22 +115,35 @@ export function calcularProyeccionQuincenal(
     pesoAcumulado += pesos[q];
   }
 
-  const proyeccion = pesoAcumulado > 0 ? vendido / pesoAcumulado : vendido;
+  // Lo ya facturado de la quincena en curso (posterior al corte): cuenta como real,
+  // pero no interviene en el cálculo de pesos de la proyección.
+  let parcialImporte = 0;
+  for (let q = corte + 1; q <= TOTAL_QUINCENAS; q++) parcialImporte += realMap[q];
+  const vendidoTotal = vendido + parcialImporte;
+
+  const ritmoAnual = pesoAcumulado > 0 ? vendido / pesoAcumulado : vendido;
 
   const puntos: PuntoProyeccion[] = [];
+  let restanteEstimado = 0;
   for (let q = 1; q <= TOTAL_QUINCENAS; q++) {
     const esReal = q <= corte;
+    // En quincenas abiertas se toma lo mayor entre lo estimado y lo ya facturado (sin duplicar).
+    const estimado = esReal ? realMap[q] : Math.max(ritmoAnual * pesos[q], realMap[q]);
+    if (!esReal) restanteEstimado += estimado;
     puntos.push({
       q,
       etiqueta: etiquetaQuincena(q),
-      real: esReal ? realMap[q] : null,
-      valor: esReal ? realMap[q] : proyeccion * pesos[q],
+      real: esReal || realMap[q] > 0 ? realMap[q] : null,
+      valor: estimado,
       proyectado: !esReal,
       anterior: antMap[q],
     });
   }
 
-  return { quincenaCorte: corte, vendido, proyeccion, pesoAcumulado, puntos };
+  const proyeccion = vendido + restanteEstimado;
+
+  return { quincenaCorte: corte, vendido, vendidoTotal, parcialImporte, proyeccion, pesoAcumulado, puntos };
+
 }
 
 /** Ritmo necesario para alcanzar un objetivo en las quincenas que quedan. */
