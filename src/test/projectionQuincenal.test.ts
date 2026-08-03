@@ -52,15 +52,19 @@ describe("calcularProyeccionQuincenal", () => {
     expect(r.puntos.filter((p) => p.proyectado)).toHaveLength(11);
   });
 
-  it("ignora ventas posteriores al corte", () => {
+  it("no usa las ventas posteriores al corte para calcular el ritmo, pero sí las acumula", () => {
     const actual = [
       ...Array.from({ length: 13 }, (_, i) => ({ q: i + 1, valor: 100 })),
-      { q: 14, valor: 999999 },
+      { q: 14, valor: 500 },
     ];
     const r = calcularProyeccionQuincenal(actual, previo, 13);
     expect(r.vendido).toBe(1300);
-    expect(r.proyeccion).toBeCloseTo(2400);
+    expect(r.vendidoTotal).toBe(1800);
+    expect(r.parcialImporte).toBe(500);
+    // ritmo anual 2400 → quincenas 15..24 a 100 cada una, y la 14 ya facturada a 500
+    expect(r.proyeccion).toBeCloseTo(1300 + 500 + 1000);
   });
+
 
   it("devuelve cero sin datos", () => {
     const r = calcularProyeccionQuincenal([], previo, 0);
@@ -82,7 +86,7 @@ describe("agruparPorMes", () => {
   it("agrupa 24 quincenas en 12 meses y enlaza la proyección", async () => {
     const { agruparPorMes, calcularProyeccionQuincenal } = await import("@/lib/projectionQuincenal");
     const previo = Array.from({ length: 24 }, (_, i) => ({ q: i + 1, valor: 100 }));
-    const actual = Array.from({ length: 24 }, (_, i) => ({ q: i + 1, valor: 120 }));
+    const actual = Array.from({ length: 6 }, (_, i) => ({ q: i + 1, valor: 120 }));
     const calc = calcularProyeccionQuincenal(actual, previo, 6); // corte fin de marzo
     const meses = agruparPorMes(calc.puntos);
 
@@ -98,14 +102,19 @@ describe("agruparPorMes", () => {
     expect(meses[3].proyectado).toBeGreaterThan(0);
   });
 
-  it("marca como parcial el mes con solo la primera quincena facturada", async () => {
+  it("cuenta como real la quincena en curso y marca el mes como parcial", async () => {
     const { agruparPorMes, calcularProyeccionQuincenal } = await import("@/lib/projectionQuincenal");
     const previo = Array.from({ length: 24 }, (_, i) => ({ q: i + 1, valor: 100 }));
-    const actual = Array.from({ length: 24 }, (_, i) => ({ q: i + 1, valor: 120 }));
+    const actual = [
+      ...Array.from({ length: 13 }, (_, i) => ({ q: i + 1, valor: 120 })),
+      { q: 14, valor: 45 }, // quincena en curso, aún abierta
+    ];
     const calc = calcularProyeccionQuincenal(actual, previo, 13); // hasta 15 de julio
     const meses = agruparPorMes(calc.puntos);
+    expect(calc.vendidoTotal).toBe(calc.vendido + 45);
     expect(meses[6].parcial).toBe(true);
-    expect(meses[6].real).toBe(120);
+    expect(meses[6].real).toBe(165); // 120 cerrado + 45 en curso
     expect(meses[5].proyectado).toBe(meses[5].real);
+
   });
 });

@@ -24,7 +24,7 @@ export function ResumenObjetivos() {
             id: o.id,
             titulo: o.tipo === "cartera" ? `Cartera · ${o.vendedor}` : `Ruta ${o.ruta} · ${o.vendedor}`,
             objetivo: o.importe_objetivo,
-            vendido: calc.vendido,
+            vendido: calc.vendidoTotal,
             proyeccion: calc.proyeccion,
             corte: o.quincena_corte,
           };
@@ -50,7 +50,7 @@ export function ResumenObjetivos() {
           </Link>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
           {filas.map((f) => {
             const logrado = f.objetivo > 0 ? (f.vendido / f.objetivo) * 100 : 0;
             const cierre = f.objetivo > 0 ? (f.proyeccion / f.objetivo) * 100 : 0;

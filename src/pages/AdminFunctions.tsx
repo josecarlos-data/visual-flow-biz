@@ -4,27 +4,167 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Eye, Pencil, RotateCcw, Save, ChevronDown, HelpCircle, AlertTriangle, Copy, Check } from "lucide-react";
+import { Eye, Pencil, RotateCcw, Save, ChevronDown, AlertTriangle, Copy, Check } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import AppSettingsCard from "@/components/AppSettingsCard";
-
 
 interface SystemFunction {
   id: string;
   name: string;
   formula: string;
-  excel_equivalent: string | null;
   description: string | null;
   updated_at: string;
 }
 
-const KNOWN_VARIABLES = [
-  "ventasActual", "ventasPrevio", "mesesConDatos", "mesesRestantes",
-  "clientesActivos", "clientesActivosPrev", "totalReal", "sumWeightsReal",
-  "peso_mes", "proyeccion_mes", "totalPrevio", "mes",
+interface Doc {
+  queCalcula: string;
+  pasos: string[];
+  ejemplo: string[];
+  nota?: string;
+}
+
+/** Explicación en lenguaje llano + ejemplo de cada cálculo del CRM. */
+const DOCS: { claves: string[]; titulo: string; doc: Doc }[] = [
+  {
+    claves: ["proyec"],
+    titulo: "Proyección de cierre de año",
+    doc: {
+      queCalcula:
+        "Estima cómo va a cerrar el año a partir de lo vendido hasta la fecha, repartido con el mismo ritmo estacional que tuvo el año anterior. No aplica ningún porcentaje fijo de crecimiento: si vendes más que el año pasado, la proyección sube sola.",
+      pasos: [
+        "El año se divide en 24 quincenas (del 1 al 15 y del 16 a fin de mes), igual que la facturación de la empresa.",
+        "Se toma el corte: la última quincena CERRADA con datos cargados. Si hay datos hasta el 29 de julio, el corte es la quincena 13 (hasta el 15/07), porque la segunda de julio todavía está abierta.",
+        "Se suma lo vendido hasta el corte.",
+        "Se mira qué porcentaje del año anterior representaron esas mismas quincenas (su peso).",
+        "Proyección del ritmo anual = vendido hasta el corte ÷ peso acumulado.",
+        "Cada quincena futura se estima con ese ritmo × su peso; si una quincena abierta ya tiene facturación mayor que lo estimado, se usa lo realmente facturado.",
+      ],
+      nota: "La proyección solo usa quincenas cerradas para no distorsionar el cálculo con una quincena a medias. El importe 'Vendido' que se muestra en pantalla sí incluye la quincena en curso, por eso cuadra siempre con la facturación total.",
+      ejemplo: [
+        "Vendido hasta el 15/07: 667.622 €",
+        "Esas mismas quincenas pesaron el 51,3 % del año 2025",
+        "Ritmo anual: 667.622 / 0,513 = 1.301.400 €",
+        "Proyección de cierre ≈ 1.301.400 € (101,4 % del objetivo de 1.300.250 €)",
+      ],
+    },
+  },
+  {
+    claves: ["crecimiento", "variacion", "variación"],
+    titulo: "Crecimiento / variación vs año anterior",
+    doc: {
+      queCalcula:
+        "Compara lo vendido este año con lo vendido el año pasado en el mismo periodo (YTD, del 1 de enero a la fecha de corte). Positivo = crecimiento, negativo = caída.",
+      pasos: [
+        "Ventas del año actual hasta la fecha de corte.",
+        "Ventas del año anterior hasta esa misma fecha.",
+        "Diferencia = actual − anterior.",
+        "Variación % = (diferencia ÷ anterior) × 100.",
+      ],
+      ejemplo: [
+        "Ventas 2026 hasta 29/07: 891.956 €",
+        "Ventas 2025 hasta 29/07: 844.657 €",
+        "Diferencia: 47.299 €",
+        "Variación: (47.299 / 844.657) × 100 = +5,6 %",
+      ],
+    },
+  },
+  {
+    claves: ["ticket"],
+    titulo: "Ticket medio",
+    doc: {
+      queCalcula: "Importe medio de cada transacción (albarán o factura), no de cada línea de producto.",
+      pasos: [
+        "Se suma el importe facturado del periodo.",
+        "Se cuentan los documentos distintos (transacciones), sin contar los abonos.",
+        "Ticket medio = importe ÷ número de documentos.",
+      ],
+      ejemplo: [
+        "Facturación: 891.956 €",
+        "Transacciones: 6.553",
+        "Ticket medio: 891.956 / 6.553 = 136,11 €",
+      ],
+    },
+  },
 ];
+
+const DOCS_EXTRA: { titulo: string; doc: Doc }[] = [
+  {
+    titulo: "Clientes activos",
+    doc: {
+      queCalcula:
+        "Cliente activo es el que ha comprado dentro de los últimos años configurados (por defecto 3, ajustable arriba en 'Años para considerar cliente activo').",
+      pasos: [
+        "Se toma la última compra de cada cliente.",
+        "Se compara con el 1 de enero del año de referencia menos los años configurados + 1.",
+        "Si la última compra es posterior, el cliente cuenta como activo.",
+      ],
+      ejemplo: [
+        "Año de referencia: 2026 · años configurados: 3",
+        "Fecha límite: 01/01/2024",
+        "Cliente con última compra 12/03/2025 → activo",
+        "Cliente con última compra 08/11/2023 → inactivo",
+      ],
+    },
+  },
+  {
+    titulo: "Tasa de devolución",
+    doc: {
+      queCalcula: "Peso de los abonos (devoluciones) sobre la facturación del año.",
+      pasos: [
+        "Se suma el importe de los documentos de tipo Abono.",
+        "Se divide entre la facturación total del año y se multiplica por 100.",
+      ],
+      ejemplo: [
+        "Abonos: 104.874 €",
+        "Facturación: 1.000.000 €",
+        "Tasa: (104.874 / 1.000.000) × 100 = 10,5 %",
+      ],
+    },
+  },
+  {
+    titulo: "Ritmo necesario por quincena",
+    doc: {
+      queCalcula: "Cuánto hay que facturar en cada quincena que queda para alcanzar el objetivo del año.",
+      pasos: [
+        "Pendiente = objetivo − vendido acumulado.",
+        "Quincenas restantes = 24 − quincena de corte.",
+        "Ritmo = pendiente ÷ quincenas restantes.",
+      ],
+      ejemplo: [
+        "Objetivo: 1.300.250 € · vendido: 707.042 €",
+        "Pendiente: 593.208 €",
+        "Quincenas restantes: 24 − 13 = 11",
+        "Ritmo: 593.208 / 11 = 53.928 € por quincena",
+      ],
+    },
+  },
+  {
+    titulo: "Objetivo de cartera vs rutas especiales",
+    doc: {
+      queCalcula:
+        "Los objetivos de un comercial se separan en dos bolsas independientes: su cartera habitual y las rutas especiales asignadas este año (por ejemplo JAB2026). Las ventas de una ruta especial nunca suman al objetivo de cartera.",
+      pasos: [
+        "Cada cliente tiene comercial asignado y, opcionalmente, una ruta especial.",
+        "Las ventas de clientes con ruta especial con objetivo propio van a ese objetivo de ruta.",
+        "El resto de ventas del comercial van al objetivo de cartera.",
+        "La suma de todos sus objetivos coincide con su facturación total del año.",
+      ],
+      ejemplo: [
+        "Facturación total del comercial: 891.956 €",
+        "Ruta especial JAB2026: 184.914 €",
+        "Cartera: 891.956 − 184.914 = 707.042 €",
+      ],
+    },
+  },
+];
+
+function docFor(name: string): Doc | null {
+  const lower = name.toLowerCase();
+  const hit = DOCS.find((d) => d.claves.some((k) => lower.includes(k)));
+  return hit ? hit.doc : null;
+}
+
 
 function validateFormula(formula: string): { valid: boolean; suggestion?: string; warning?: string } {
   const trimmed = formula.trim();
@@ -37,9 +177,7 @@ function validateFormula(formula: string): { valid: boolean; suggestion?: string
     if (depth < 0) break;
   }
   if (depth !== 0) {
-    if (depth > 0) {
-      return { valid: false, suggestion: trimmed + ")".repeat(depth) };
-    }
+    if (depth > 0) return { valid: false, suggestion: trimmed + ")".repeat(depth) };
     return { valid: false, warning: "Paréntesis desbalanceados. Revisa la fórmula." };
   }
 
@@ -64,16 +202,48 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function FunctionCard({ fn, onSave }: { fn: SystemFunction; onSave: (id: string, formula: string, excelEquiv: string) => Promise<void> }) {
+function Explicacion({ doc }: { doc: Doc }) {
+  return (
+    <div className="space-y-3">
+      <div>
+        <p className="mb-1 text-[11px] font-medium text-muted-foreground">Qué calcula</p>
+        <p className="text-sm text-muted-foreground">{doc.queCalcula}</p>
+      </div>
+
+      <div>
+        <p className="mb-1 text-[11px] font-medium text-muted-foreground">Cómo se calcula</p>
+        <ol className="list-inside list-decimal space-y-1 text-sm text-muted-foreground">
+          {doc.pasos.map((p, i) => <li key={i}>{p}</li>)}
+        </ol>
+      </div>
+
+      {doc.nota && (
+        <div className="rounded-md border bg-accent/40 p-2 text-xs text-muted-foreground">
+          <p className="mb-0.5 text-[11px] font-medium text-foreground">Nota importante</p>
+          <p>{doc.nota}</p>
+        </div>
+      )}
+
+      <div>
+        <p className="mb-1 text-[11px] font-medium text-muted-foreground">Ejemplo</p>
+        <div className="space-y-0.5 rounded-md border bg-muted/40 p-2 text-[11px]">
+          {doc.ejemplo.map((l, i) => <p key={i}>{l}</p>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FunctionCard({ fn, onSave }: { fn: SystemFunction; onSave: (id: string, formula: string) => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draftFormula, setDraftFormula] = useState(fn.formula);
-  const [draftExcel, setDraftExcel] = useState(fn.excel_equivalent || "");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [warningOpen, setWarningOpen] = useState(false);
   const [warningMsg, setWarningMsg] = useState("");
   const [suggestionFormula, setSuggestionFormula] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const doc = docFor(fn.name);
 
   const handleSave = () => {
     const result = validateFormula(draftFormula);
@@ -89,19 +259,13 @@ function FunctionCard({ fn, onSave }: { fn: SystemFunction; onSave: (id: string,
       setWarningOpen(true);
       return;
     }
-    if (result.warning) {
-      setWarningMsg(result.warning + "\n\nSi continúa, la fórmula podría no mostrar datos correctos.");
-      setSuggestionFormula(null);
-      setWarningOpen(true);
-      return;
-    }
     setConfirmOpen(true);
   };
 
   const doSave = async () => {
     setSaving(true);
     try {
-      await onSave(fn.id, draftFormula, draftExcel);
+      await onSave(fn.id, draftFormula);
       setEditing(false);
       setConfirmOpen(false);
       setWarningOpen(false);
@@ -110,104 +274,65 @@ function FunctionCard({ fn, onSave }: { fn: SystemFunction; onSave: (id: string,
     }
   };
 
-  const resetDrafts = () => {
-    setDraftFormula(fn.formula);
-    setDraftExcel(fn.excel_equivalent || "");
-  };
+  const resetDrafts = () => setDraftFormula(fn.formula);
 
   return (
     <>
       <Collapsible open={open} onOpenChange={setOpen}>
         <Card>
           <CollapsibleTrigger asChild>
-            <CardHeader className="cursor-pointer hover:bg-accent/50 transition-colors pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
+            <CardHeader className="cursor-pointer pb-3 transition-colors hover:bg-accent/50">
+              <CardTitle className="flex items-center gap-2 text-sm">
                 <span className="font-mono text-primary">ƒ</span>
-                {fn.name}
-                <span className="text-xs font-normal text-muted-foreground ml-auto mr-2">
-                  {fn.description}
-                </span>
-                <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
+                <span className="truncate">{fn.name}</span>
+                <ChevronDown className={`ml-auto h-4 w-4 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
               </CardTitle>
+              {fn.description && <p className="text-xs text-muted-foreground">{fn.description}</p>}
             </CardHeader>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <CardContent className="pt-0 space-y-3">
+            <CardContent className="space-y-3 pt-0">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">
                   Última actualización: {new Date(fn.updated_at).toLocaleDateString("es-ES")}
                 </span>
-                <div className="flex items-center gap-1">
-                  <HelpPopover functionName={fn.name} />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0"
-                    onClick={() => { setEditing(!editing); resetDrafts(); }}
-                    title={editing ? "Ver" : "Editar"}
-                  >
-                    {editing ? <Eye className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
-                  </Button>
-                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  onClick={() => { setEditing(!editing); resetDrafts(); }}
+                  title={editing ? "Ver" : "Editar"}
+                >
+                  {editing ? <Eye className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
+                </Button>
               </div>
 
-              {/* Main formula block */}
+              {doc && <Explicacion doc={doc} />}
+
               <div>
-                <p className="text-[11px] font-medium text-muted-foreground mb-1">Fórmula del sistema</p>
+                <p className="mb-1 text-[11px] font-medium text-muted-foreground">Fórmula del sistema</p>
                 {editing ? (
                   <Textarea
                     value={draftFormula}
                     onChange={(e) => setDraftFormula(e.target.value)}
-                    className="font-mono text-sm min-h-[80px] bg-muted/50"
+                    className="min-h-[80px] bg-muted/50 font-mono text-sm"
                     placeholder="Escribe la fórmula del sistema..."
                   />
                 ) : (
-                  <div className="bg-muted/50 rounded-md p-3 font-mono text-sm whitespace-pre-wrap break-all border flex items-start gap-2">
+                  <div className="flex items-start gap-2 whitespace-pre-wrap break-all rounded-md border bg-muted/50 p-3 font-mono text-sm">
                     <span className="flex-1">{fn.formula}</span>
                     <CopyButton text={fn.formula} />
                   </div>
                 )}
               </div>
 
-              {/* Excel equivalent block */}
-              {(fn.excel_equivalent || editing) && (
-                <div>
-                  <p className="text-[11px] font-medium text-muted-foreground mb-1 flex items-center gap-1">
-                    📊 Equivalente Excel
-                  </p>
-                  {editing ? (
-                    <Textarea
-                      value={draftExcel}
-                      onChange={(e) => setDraftExcel(e.target.value)}
-                      className="font-mono text-xs min-h-[50px] bg-muted/30 border-dashed"
-                      placeholder="=fórmula en formato Excel..."
-                    />
-                  ) : (
-                    <div className="bg-muted/30 rounded p-2 font-mono text-xs whitespace-pre-wrap break-all border border-dashed flex items-start gap-2">
-                      <span className="flex-1">{fn.excel_equivalent}</span>
-                      <CopyButton text={fn.excel_equivalent || ""} />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Edit actions */}
               {editing && (
-                <div className="flex gap-2 justify-end">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 gap-1 text-xs"
-                    onClick={resetDrafts}
-                  >
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={resetDrafts}>
                     <RotateCcw className="h-3 w-3" />
                     Deshacer
                   </Button>
-                  <Button
-                    size="sm"
-                    className="h-7 gap-1 text-xs"
-                    onClick={handleSave}
-                  >
+                  <Button size="sm" className="h-7 gap-1 text-xs" onClick={handleSave}>
                     <Save className="h-3 w-3" />
                     Guardar
                   </Button>
@@ -218,7 +343,6 @@ function FunctionCard({ fn, onSave }: { fn: SystemFunction; onSave: (id: string,
         </Card>
       </Collapsible>
 
-      {/* Confirmation dialog */}
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -234,22 +358,19 @@ function FunctionCard({ fn, onSave }: { fn: SystemFunction; onSave: (id: string,
         </DialogContent>
       </Dialog>
 
-      {/* Warning dialog */}
       <Dialog open={warningOpen} onOpenChange={setWarningOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-sm flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2 text-sm">
               <AlertTriangle className="h-4 w-4 text-destructive" />
               Advertencia
             </DialogTitle>
-            <DialogDescription className="text-xs whitespace-pre-line">
-              {warningMsg}
-            </DialogDescription>
+            <DialogDescription className="whitespace-pre-line text-xs">{warningMsg}</DialogDescription>
           </DialogHeader>
           {suggestionFormula ? (
             <div className="space-y-2">
               <p className="text-xs text-muted-foreground">Corrección sugerida:</p>
-              <div className="bg-muted/50 rounded p-2 font-mono text-xs break-all">{suggestionFormula}</div>
+              <div className="break-all rounded bg-muted/50 p-2 font-mono text-xs">{suggestionFormula}</div>
               <DialogFooter className="gap-2">
                 <Button variant="outline" size="sm" onClick={() => setWarningOpen(false)}>Cancelar</Button>
                 <Button size="sm" onClick={() => { setDraftFormula(suggestionFormula); setWarningOpen(false); }}>
@@ -271,152 +392,27 @@ function FunctionCard({ fn, onSave }: { fn: SystemFunction; onSave: (id: string,
   );
 }
 
-function getHelpContent(name: string) {
-  const lower = name.toLowerCase();
-
-  if (lower.includes("proyecci")) {
-    return {
-      whatItDoes: "Estima las ventas de los meses que aún no tienen datos reales para predecir el cierre del año. No aplica un porcentaje fijo de crecimiento: el crecimiento viene implícito en la diferencia entre las ventas reales actuales y las del año anterior.",
-      steps: [
-        "Identifica los meses del año actual que ya tienen ventas reales (ej: enero-febrero = 1.500.000 €).",
-        "Consulta el año anterior para calcular qué peso (%) tuvo cada mes sobre el total anual (ej: enero = 7%, febrero = 8%).",
-        "Suma los pesos de los meses con datos reales: 7% + 8% = 15% (0,15).",
-        "Calcula el factor de escala: 1.500.000 / 0,15 = 10.000.000 € (proyección anual implícita).",
-        "Para cada mes sin datos, multiplica el factor por el peso de ese mes: si marzo pesó 9% → 10.000.000 × 0,09 = 900.000 €.",
-        "Si no hay datos del año anterior, usa pesos uniformes (1/12 ≈ 8,33%) con un ligero sesgo de +0,5% mensual acumulativo a partir de julio (segundo semestre).",
-      ],
-      importantNote: "No se aplica un porcentaje fijo de crecimiento (ej: 5%). Si en los mismos meses vendes un 10% más que el año pasado, la proyección reflejará ese +10% proporcionalmente en todos los meses futuros. El sesgo del segundo semestre (+0,5%/mes) solo se activa cuando no hay datos históricos del año anterior.",
-      example: [
-        "Ventas reales ene-feb 2026: 1.500.000 €",
-        "Peso ene+feb en 2025: 15% del total anual",
-        "Factor escala: 1.500.000 / 0,15 = 10.000.000 €",
-        "Marzo (peso 9%): 10.000.000 × 0,09 = 900.000 €",
-        "Abril (peso 8%): 10.000.000 × 0,08 = 800.000 €",
-        "...",
-        "Total proyectado anual: ~10.000.000 €",
-      ],
-      variables: [
-        { name: "totalReal", desc: "Suma de ventas de los meses con datos reales" },
-        { name: "peso_mes", desc: "Proporción de cada mes sobre el total del año anterior" },
-        { name: "totalPrevio", desc: "Total de ventas del año anterior (para calcular pesos)" },
-        { name: "mesesConDatos", desc: "Cantidad de meses con ventas reales en el año actual" },
-        { name: "mesesRestantes", desc: "12 − mesesConDatos" },
-        { name: "sumWeightsReal", desc: "Suma de los pesos de los meses con datos reales" },
-        { name: "proyeccion_mes", desc: "Valor proyectado para un mes sin datos" },
-      ],
-    };
-  }
-
-  if (lower.includes("crecimiento")) {
-    return {
-      whatItDoes: "Calcula la variación porcentual entre las ventas del año actual y las del año anterior. Un valor positivo indica crecimiento, uno negativo indica descenso.",
-      steps: [
-        "Toma el total de ventas del año actual (ventasActual).",
-        "Toma el total de ventas del año anterior (ventasPrevio).",
-        "Resta: ventasActual − ventasPrevio = diferencia.",
-        "Divide la diferencia entre ventasPrevio.",
-        "Multiplica por 100 para obtener el porcentaje.",
-      ],
-      importantNote: null,
-      example: [
-        "Ventas 2026: 8.000.000 €",
-        "Ventas 2025: 7.500.000 €",
-        "Diferencia: 8.000.000 − 7.500.000 = 500.000 €",
-        "Crecimiento: (500.000 / 7.500.000) × 100 = 6,67%",
-      ],
-      variables: [
-        { name: "ventasActual", desc: "Total ventas del año actual (o proyectado)" },
-        { name: "ventasPrevio", desc: "Total ventas del año anterior" },
-      ],
-    };
-  }
-
-  if (lower.includes("ticket")) {
-    return {
-      whatItDoes: "Calcula el gasto medio por cliente activo. Indica cuánto factura de media cada cliente que ha comprado al menos una vez en el período.",
-      steps: [
-        "Toma el total de ventas del período (ventasActual).",
-        "Cuenta los clientes activos: aquellos con al menos una venta > 0 en el año.",
-        "Divide el total entre el número de clientes activos.",
-      ],
-      importantNote: null,
-      example: [
-        "Ventas totales: 8.000.000 €",
-        "Clientes activos: 350",
-        "Ticket medio: 8.000.000 / 350 = 22.857 €/cliente",
-      ],
-      variables: [
-        { name: "ventasActual", desc: "Total de ventas del período" },
-        { name: "clientesActivos", desc: "Número de clientes con ventas > 0" },
-      ],
-    };
-  }
-
-  return {
-    whatItDoes: "Función de cálculo del sistema.",
-    steps: ["Consulta la fórmula mostrada para ver la lógica aplicada."],
-    importantNote: null,
-    example: ["Sin ejemplo específico disponible."],
-    variables: [
-      { name: "ventasActual", desc: "Total ventas año actual" },
-      { name: "ventasPrevio", desc: "Total ventas año anterior" },
-    ],
-  };
-}
-
-function HelpPopover({ functionName }: { functionName: string }) {
-  const content = getHelpContent(functionName);
-
+function DocCard({ titulo, doc }: { titulo: string; doc: Doc }) {
+  const [open, setOpen] = useState(false);
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Ayuda">
-          <HelpCircle className="h-3.5 w-3.5" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[360px] sm:w-[420px] max-h-[480px] overflow-auto text-xs space-y-3" align="end">
-        <h4 className="font-semibold text-sm">ƒ {functionName}</h4>
-
-        <div>
-          <p className="font-medium text-primary mb-1">¿Qué calcula?</p>
-          <p className="text-muted-foreground">{content.whatItDoes}</p>
-        </div>
-
-        <div>
-          <p className="font-medium text-primary mb-1">¿Cómo funciona?</p>
-          <ol className="list-decimal list-inside text-muted-foreground space-y-1">
-            {content.steps.map((step, i) => (
-              <li key={i}>{step}</li>
-            ))}
-          </ol>
-        </div>
-
-        {content.importantNote && (
-          <div className="bg-accent/50 rounded p-2 text-muted-foreground border">
-            <p className="font-medium text-foreground text-[11px] mb-0.5">💡 Nota importante</p>
-            <p>{content.importantNote}</p>
-          </div>
-        )}
-
-        <div>
-          <p className="font-medium text-primary mb-1">Ejemplo numérico</p>
-          <div className="bg-muted/50 rounded p-2 space-y-1 font-mono text-[11px]">
-            {content.example.map((line, i) => (
-              <p key={i}>{line}</p>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <p className="font-medium text-primary mb-1">Variables utilizadas</p>
-          <ul className="text-muted-foreground space-y-0.5">
-            {content.variables.map((v, i) => (
-              <li key={i}><code className="text-foreground bg-muted px-1 rounded">{v.name}</code> — {v.desc}</li>
-            ))}
-          </ul>
-        </div>
-      </PopoverContent>
-    </Popover>
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <Card>
+        <CollapsibleTrigger asChild>
+          <CardHeader className="cursor-pointer pb-3 transition-colors hover:bg-accent/50">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <span className="font-mono text-primary">ƒ</span>
+              <span className="truncate">{titulo}</span>
+              <ChevronDown className={`ml-auto h-4 w-4 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+            </CardTitle>
+          </CardHeader>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent className="pt-0">
+            <Explicacion doc={doc} />
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
   );
 }
 
@@ -432,7 +428,7 @@ export default function AdminFunctions() {
     setLoading(true);
     const { data, error } = await supabase
       .from("system_functions")
-      .select("*")
+      .select("id, name, formula, description, updated_at")
       .order("name");
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -442,10 +438,10 @@ export default function AdminFunctions() {
     setLoading(false);
   };
 
-  const handleSave = async (id: string, formula: string, excelEquiv: string) => {
+  const handleSave = async (id: string, formula: string) => {
     const { error } = await supabase
       .from("system_functions")
-      .update({ formula, excel_equivalent: excelEquiv, updated_at: new Date().toISOString() } as any)
+      .update({ formula, updated_at: new Date().toISOString() } as any)
       .eq("id", id);
     if (error) {
       toast({ title: "Error al guardar", description: error.message, variant: "destructive" });
@@ -458,24 +454,27 @@ export default function AdminFunctions() {
   return (
     <div className="space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Funciones</h1>
-        <p className="text-sm text-muted-foreground">Configuración de fórmulas y parámetros del sistema</p>
+        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Funciones</h1>
+        <p className="text-sm text-muted-foreground">
+          Cómo calcula el CRM cada indicador, con un ejemplo sencillo para poder explicarlo
+        </p>
       </div>
 
       <AppSettingsCard />
 
-
-
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <Card key={i}><CardContent className="py-6"><div className="h-4 bg-muted animate-pulse rounded" /></CardContent></Card>
+            <Card key={i}><CardContent className="py-6"><div className="h-4 animate-pulse rounded bg-muted" /></CardContent></Card>
           ))}
         </div>
       ) : (
         <div className="space-y-3">
           {functions.map((fn) => (
             <FunctionCard key={fn.id} fn={fn} onSave={handleSave} />
+          ))}
+          {DOCS_EXTRA.map((d) => (
+            <DocCard key={d.titulo} titulo={d.titulo} doc={d.doc} />
           ))}
         </div>
       )}
