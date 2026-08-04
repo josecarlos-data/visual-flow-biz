@@ -253,6 +253,7 @@ Doble fuente de verdad entre `visitas.campos` y los bloques mientras dure el leg
 2. `SELECT validacion, count(*) FROM visita_bloques GROUP BY 1;` → solo `CORRECTO` y `pendiente`; **ninguna fila con `correcta`** ni en bloques ni en `visitas`.
 3. Guardar una visita nueva con 2 bloques del mismo motivo.
 4. Marcar un bloque como NO CORRECTO y comprobar que la visita pasa a NO CORRECTO; volverlo a CORRECTO y comprobar que la visita vuelve a CORRECTO.
+5. **Control anti-descarte:** crear una visita nueva con un bloque sin revisar y comprobar que la visita queda en `pendiente`, **nunca** en `CORRECTO`.
 
 **Dependencias:** fase 1.
 
