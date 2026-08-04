@@ -35,6 +35,7 @@ export default function RevisionVisitas() {
   const { data: motivos } = useMotivos();
   const { data: clientes } = useClientes(false, "alfabetico");
   const { revisar } = useRevisionMutations();
+  const { revisarBloque } = useBloqueMutations();
   const { guardar: guardarSituacion } = useSituacionesMutations();
 
   const [estado, setEstado] = useState("pendiente");
