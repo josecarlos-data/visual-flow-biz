@@ -376,9 +376,15 @@ GRANT ALL ON public.campanas, public.campana_lineas TO service_role;
 ALTER TABLE public.campanas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.campana_lineas ENABLE ROW LEVEL SECURITY;
 -- lectura: is_approved(auth.uid()); escritura: is_admin() o has_role(...,'director_comercial')
+
+-- mantenimiento de updated_at, igual que en el resto de tablas del proyecto
+CREATE TRIGGER update_campanas_updated_at BEFORE UPDATE ON public.campanas
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE TRIGGER update_campana_lineas_updated_at BEFORE UPDATE ON public.campana_lineas
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 ```
 
-Fuera de plazo: el bloque de promoción guarda `fuera_de_plazo = true` y `motivo_fuera_plazo` dentro de su jsonb. **Nunca se impide guardar.**
+Fuera de plazo: el bloque de promoción guarda `fuera_de_plazo = true` y `motivo_fuera_plazo` dentro de su jsonb, en los dos campos de sistema declarados en el seed de la fase 3. **Nunca se impide guardar.**
 
 ### Ficheros
 
