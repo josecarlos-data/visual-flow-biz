@@ -287,6 +287,11 @@ Crear campaña con 3 líneas, registrar una promoción eligiendo una línea y co
 
 ```sql
 ALTER TABLE public.visitas ADD COLUMN IF NOT EXISTS observaciones_original text;
+-- marca explícita de proceso: no se deduce de que la copia sea NULL,
+-- porque 3.453 visitas no tienen observaciones y su copia será NULL siempre
+ALTER TABLE public.visitas
+  ADD COLUMN IF NOT EXISTS observaciones_repartidas boolean NOT NULL DEFAULT false;
+
 -- función idempotente repartir_observaciones_gespromo():
 --   1) copia observaciones -> observaciones_original (solo si es NULL)
 --   2) parte SIEMPRE de observaciones_original
@@ -295,7 +300,35 @@ ALTER TABLE public.visitas ADD COLUMN IF NOT EXISTS observaciones_original text;
 --   4) párrafos íntegros en MAYÚSCULAS -> visita_bloques.nota_revision
 --      (NUNCA visitas.nota_revision: toda la revisión vive en el bloque)
 --   5) resto -> observaciones
+--   6) marca observaciones_repartidas = true en TODAS las filas procesadas,
+--      también en las que tenían el origen vacío
 ```
+
+**Estrategia de escritura masiva: trigger desactivado + recálculo agregado (opción elegida).** El UPDATE de la 6a toca 21.484 bloques y el trigger agregado de la fase 2 dispararía una escritura por fila (~43.000 en una sola transacción), con riesgo de agotar el `statement_timeout`. Se descarta el proceso por lotes por ser más lento y dejar estados intermedios visibles. La migración hace:
+
+```sql
+ALTER TABLE public.visita_bloques DISABLE TRIGGER trg_visita_bloques_agregado;
+
+SELECT public.repartir_observaciones_gespromo();
+
+-- recálculo de visitas.validacion en UNA sola pasada agregada
+UPDATE public.visitas v SET validacion = a.estado
+FROM (
+  SELECT b.visita_id,
+         CASE
+           WHEN bool_or(COALESCE(b.validacion,'pendiente') = 'NO CORRECTO') THEN 'NO CORRECTO'
+           WHEN bool_or(COALESCE(b.validacion,'pendiente') = 'pendiente')    THEN 'pendiente'
+           ELSE 'CORRECTO'
+         END AS estado
+  FROM public.visita_bloques b GROUP BY b.visita_id
+) a
+WHERE a.visita_id = v.id AND v.validacion IS DISTINCT FROM a.estado;
+
+ALTER TABLE public.visita_bloques ENABLE TRIGGER trg_visita_bloques_agregado;
+```
+
+El orden de precedencia del recálculo es idéntico al del trigger, de modo que reactivarlo no cambia ningún valor.
+
 
 **Recuperación de los NO CORRECTO (punto crítico).** Verificado: `validacion` solo tiene `pendiente` (11.076) y `correcta` (10.408) — este último ya normalizado a `CORRECTO` en la fase 2 —; **no hay ni un solo NO CORRECTO**, pese a que en el fichero original hay del orden de 256 visitas rechazadas por el director. Hoy están todas cayendo en `pendiente`. La función las recupera desde `observaciones_original`, y el orden de evaluación importa: **primero la negación**, porque `NO CORRECTO` contiene `CORRECTO`.
 
