@@ -357,6 +357,20 @@ Crear campaña con 3 líneas, registrar una promoción eligiendo una línea y co
 
 ### Base de datos
 
+**Claves de motivo — leídas de `motivos_visita`, no inventadas.** Valores reales hoy: `seguimiento`, `promocion`, `revision_seguimiento`, `competencia`, `gsmart`, `informacion_potencial`, `incidencia`. Las vistas usan esas mismas cadenas, y la migración incluye una guarda que aborta si alguna no existe:
+
+```sql
+DO $$
+BEGIN
+  IF (SELECT count(*) FROM public.motivos_visita
+      WHERE key IN ('promocion','competencia','informacion_potencial')) <> 3 THEN
+    RAISE EXCEPTION 'Claves de motivo no encontradas en motivos_visita';
+  END IF;
+END $$;
+```
+
+Las vistas leen `campos->>'clave'` porque, según el contrato fijado en la fase 2, `campos` guarda **valores planos** y la trazabilidad de la IA vive en `campos_meta`.
+
 ```sql
 CREATE OR REPLACE VIEW public.v_visita_oferta AS
 SELECT v.id AS visita_id, v.cod_cliente, v.fecha, v.vendedor,
