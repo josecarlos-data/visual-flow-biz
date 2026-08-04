@@ -198,12 +198,37 @@ export default function RevisionVisitas() {
                   {sel.cod_cliente ? nombrePorCod.get(sel.cod_cliente) ?? `Cliente ${sel.cod_cliente}` : sel.cliente_externo ?? "Sin cliente"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {fechaCorta(sel.fecha)}{sel.hora ? ` · ${sel.hora.slice(0, 5)}` : ""} · {nombreMotivo(sel.motivo_key)}
+                  {fechaCorta(sel.fecha)}{sel.hora ? ` · ${sel.hora.slice(0, 5)}` : ""} · {resumenMotivos(sel)}
                   {sel.comercial_nombre ? ` · ${sel.comercial_nombre}` : ""}
                 </p>
               </div>
 
-              {Object.keys(sel.campos ?? {}).length > 0 && (
+              {/* Un bloque por plantilla: se valida cada uno por separado. */}
+              {bloquesDe(sel).map((b, i) => (
+                <div key={b.id} className="space-y-2 rounded-md border p-3 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-medium">{i + 1}. {nombreMotivo(b.motivo_key)}</p>
+                    {badgeValidacion(b.validacion)}
+                  </div>
+                  {Object.entries(b.campos ?? {}).filter(([, val]) => val != null && val !== "").map(([k, val]) => (
+                    <p key={k} className="flex justify-between gap-3">
+                      <span className="text-muted-foreground">{k}</span>
+                      <span className="text-right font-medium">{String(val)}</span>
+                    </p>
+                  ))}
+                  {b.nota_revision && <p className="text-xs text-muted-foreground">Nota: {b.nota_revision}</p>}
+                  <div className="flex gap-2 pt-1">
+                    <Button size="sm" variant="outline" disabled={revisarBloque.isPending} onClick={() => enviarBloque(b, "NO CORRECTO")}>
+                      No correcto
+                    </Button>
+                    <Button size="sm" disabled={revisarBloque.isPending} onClick={() => enviarBloque(b, "CORRECTO")}>
+                      Validar bloque
+                    </Button>
+                  </div>
+                </div>
+              ))}
+
+              {bloquesDe(sel).length === 0 && Object.keys(sel.campos ?? {}).length > 0 && (
                 <div className="space-y-1 rounded-md border p-3 text-sm">
                   {Object.entries(sel.campos).map(([k, val]) => (
                     <p key={k} className="flex justify-between gap-3">
