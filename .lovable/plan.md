@@ -164,7 +164,8 @@ CREATE TABLE public.visita_bloques (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   visita_id uuid NOT NULL REFERENCES public.visitas(id) ON DELETE CASCADE,
   motivo_key text REFERENCES public.motivos_visita(key),
-  campos jsonb NOT NULL DEFAULT '{}',
+  campos jsonb NOT NULL DEFAULT '{}',      -- SOLO valores planos: { clave: valor }
+  campos_meta jsonb NOT NULL DEFAULT '{}', -- trazabilidad IA: { clave: { cita, confianza } }
   completo boolean NOT NULL DEFAULT true,
   validacion text,
   nota_revision text,
