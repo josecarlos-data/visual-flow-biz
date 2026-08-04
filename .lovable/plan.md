@@ -360,7 +360,7 @@ Se deja **creada pero sin ejecutar** `reprocesar_historico_a_bloques()`, que enc
 ### Verificación
 
 1. `SELECT validacion, count(*) FROM visitas GROUP BY 1;` → **tres** categorías, con `NO CORRECTO` en el entorno de 250. Si sale muy por debajo, la fase no se da por buena: se ajustan los patrones y se reejecuta.
-2. `SELECT count(*) FROM visitas WHERE observaciones_original IS NULL;` → 0.
+2. `SELECT count(*) FROM visitas WHERE observaciones_original IS NULL AND observaciones IS NOT NULL;` → 0. (No se exige `observaciones_original IS NULL` → 0 a secas: 3.453 visitas no tienen observaciones y su copia será NULL siempre.) El control de cobertura real es `SELECT count(*) FROM visitas WHERE NOT observaciones_repartidas;` → 0.
 3. Reejecutar la función dos veces produce exactamente el mismo resultado.
 4. Muestreo manual de 20 filas comparando `observaciones_original` con el reparto en `validacion` / `nota_revision` / `observaciones`.
 
