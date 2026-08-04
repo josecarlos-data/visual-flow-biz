@@ -283,6 +283,11 @@ Doble fuente de verdad entre `visitas.campos` y los bloques mientras dure el leg
   - referencia a catálogo: `{"catalogo":"competidores"}` — los valores se resuelven desde `catalogos_opciones` filtrando por `clave` y ordenando por `orden`.
 
   Si `opciones` es un objeto con la clave `catalogo`, **la referencia manda y la lista literal se ignora**; nunca se mezclan las dos. Un catálogo vacío o inexistente rinde una lista vacía y se avisa en el diseñador, nunca se cae al literal. La resolución se implementa una sola vez en un helper compartido (`resolverOpciones`) y se aplica en los tres consumidores: el renderizador de `NuevaVisita.tsx`, el diseñador de `AdminVisitas.tsx` (que permite elegir entre literal y catálogo) y el JSON schema que se envía a la IA en la fase 4, donde los `enum` van ya resueltos a valores concretos.
+- **Campos de sistema del motivo `promocion`, declarados aquí para que la fase 5 pueda escribirlos.** Se añade un tipo de visibilidad: `motivo_campos.visibilidad` (`normal` por defecto, `sistema` para los que no se pintan en el formulario ni se envían a la IA, pero sí se persisten en el jsonb del bloque). En el seed de esta fase se declaran para `promocion`:
+  - `fuera_de_plazo` — booleano, `visibilidad = 'sistema'`, no obligatorio;
+  - `motivo_fuera_plazo` — texto, `visibilidad = 'sistema'`, no obligatorio.
+
+  Sin esta declaración el guardado los descartaría, porque el formulario solo persiste claves definidas en la plantilla activa. El renderizador filtra por `is_active AND visibilidad = 'normal'`; el guardado conserva además las claves `sistema`.
 
 ### Ficheros
 
