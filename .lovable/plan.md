@@ -142,8 +142,8 @@ No se crea campo `canal`: se documenta `visitas.tipo` con sus cuatro valores ya 
 
 ### Ficheros
 
-- `src/pages/NuevaVisita.tsx`: selector de resultado; geolocalización obligatoria si el resultado es presencial (`efectiva`, `cliente_ausente`, `cerrado`, `sin_acceso` con `tipo <> 'Llamada'`).
-- `src/pages/Visitas.tsx`, `src/pages/RevisionVisitas.tsx`, `src/hooks/useCrm.ts`: mostrar y filtrar por resultado.
+- `src/pages/NuevaVisita.tsx`: selector de resultado; geolocalización obligatoria si el resultado es presencial (`efectiva`, `cliente_ausente`, `cerrado`, `sin_acceso`) y `tipo <> 'llamada'` **en minúscula**, coherente con la normalización del dato hecha en esta misma migración.
+- Revisión de **todas** las comparaciones de `tipo` en el código (`src/pages/NuevaVisita.tsx`, `src/pages/Visitas.tsx`, `src/pages/Agenda.tsx`, `src/pages/RevisionVisitas.tsx`, `src/hooks/useCrm.ts`, `src/lib/datasets/visitasHistorico.ts`): pasan todas a minúscula, y el importador de Gespromo normaliza al insertar.
 
 ### Riesgos
 
