@@ -100,9 +100,9 @@ export default function Visitas() {
                     <Badge variant="secondary">
                       {motivos?.find((m) => m.key === v.motivo_key)?.nombre ?? "Visita"}
                     </Badge>
-                    {v.validacion && (
-                      <Badge variant={v.validacion === "correcto" ? "outline" : "destructive"}>
-                        {v.validacion === "correcto" ? "Correcto" : "No correcto"}
+                    {v.validacion && v.validacion !== "pendiente" && (
+                      <Badge variant={v.validacion === "CORRECTO" ? "outline" : "destructive"}>
+                        {v.validacion === "CORRECTO" ? "Correcto" : "No correcto"}
                       </Badge>
                     )}
                   </div>
