@@ -199,16 +199,27 @@ USING (EXISTS (SELECT 1 FROM public.visitas v WHERE v.id = visita_id AND (
 -- INSERT/UPDATE del propio comercial; UPDATE de campos de revisión solo si puede_revisar_visitas()
 ```
 
-Migración de datos (idempotente):
+**Normalización del vocabulario de validación — obligatoria ANTES del trigger.** El histórico usa `correcta` (10.408 filas) y el trigger agregado razona con `CORRECTO` / `NO CORRECTO` / `pendiente`. Si no se unifica aquí, el trigger no reconocería el valor heredado. Orden exacto dentro de la migración:
 
 ```sql
+-- 1. normalizar el vocabulario en visitas
+UPDATE public.visitas SET validacion = 'CORRECTO' WHERE validacion = 'correcta';
+
+-- 2. crear los bloques a partir del histórico (idempotente)
 INSERT INTO public.visita_bloques (visita_id, motivo_key, campos, validacion, nota_revision, revisado_por, revisado_en)
 SELECT v.id, v.motivo_key, COALESCE(v.campos,'{}'::jsonb), v.validacion, v.nota_revision, v.revisado_por, v.revisado_en
 FROM public.visitas v
 WHERE NOT EXISTS (SELECT 1 FROM public.visita_bloques b WHERE b.visita_id = v.id);
+
+-- 3. red de seguridad sobre los bloques recién insertados
+UPDATE public.visita_bloques SET validacion = 'CORRECTO' WHERE validacion = 'correcta';
+
+-- 4. solo ahora se crea el trigger agregado
 ```
 
-**Contrato de `campos` (obligatorio en todas las fases):** `campos` contiene **valores planos** (`{"precio_ofertado": 128.5}`), nunca objetos anidados. La trazabilidad de la IA (cita literal y confianza) va aparte, en `campos_meta` (`{"precio_ofertado": {"cita": "…", "confianza": "alta"}}`). Así las vistas de la fase 6 pueden leer con `campos->>'clave'` sin ambigüedad, y `campos_meta` se puede vaciar sin perder datos de negocio.
+La **recuperación de los NO CORRECTO** desde el texto no se toca aquí: sigue en la fase 6a. Tras esta fase el reparto será `CORRECTO` (10.408) y `pendiente` (11.076), y los 250 rechazos seguirán dentro de `pendiente` hasta la 6a.
+
+**Contrato de `campos` (obligatorio en todas las fases):** `campos` contiene **valores planos** (`{"precio_ofertado": 128.5}`), nunca objetos anidados. La trazabilidad de la IA (cita literal y confianza) va aparte, en `campos_meta` (`{"precio_ofertado": {"cita": "…", "confianza": "alta"}}`). Así las vistas de la fase 6b pueden leer con `campos->>'clave'` sin ambigüedad, y `campos_meta` se puede vaciar sin perder datos de negocio.
 
 `visitas.motivo_key` y `visitas.campos` se **conservan como legacy**. `visitas.validacion` pasa a estado agregado, mantenido por trigger sobre `visita_bloques`: `NO CORRECTO` si algún bloque lo está; si no, `pendiente` si alguno lo está; si no, `CORRECTO`. Visitas sin bloques (no efectivas) conservan su valor.
 
