@@ -216,7 +216,13 @@ export default function RevisionVisitas() {
                       <span className="text-right font-medium">{String(val)}</span>
                     </p>
                   ))}
-                  {b.nota_revision && <p className="text-xs text-muted-foreground">Nota: {b.nota_revision}</p>}
+                  {b.nota_revision && (
+                    <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-destructive">Nota de revisión</p>
+                      <p className="whitespace-pre-wrap text-sm">{b.nota_revision}</p>
+                    </div>
+                  )}
+
                   <div className="flex gap-2 pt-1">
                     <Button size="sm" variant="outline" disabled={revisarBloque.isPending} onClick={() => enviarBloque(b, "NO CORRECTO")}>
                       No correcto

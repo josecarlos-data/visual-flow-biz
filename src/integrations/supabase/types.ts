@@ -1146,6 +1146,8 @@ export type Database = {
           motivo_key: string | null
           nota_revision: string | null
           observaciones: string | null
+          observaciones_original: string | null
+          observaciones_repartidas: boolean
           origen: string
           resultado_visita: string
           revisado_en: string | null
@@ -1177,6 +1179,8 @@ export type Database = {
           motivo_key?: string | null
           nota_revision?: string | null
           observaciones?: string | null
+          observaciones_original?: string | null
+          observaciones_repartidas?: boolean
           origen?: string
           resultado_visita?: string
           revisado_en?: string | null
@@ -1208,6 +1212,8 @@ export type Database = {
           motivo_key?: string | null
           nota_revision?: string | null
           observaciones?: string | null
+          observaciones_original?: string | null
+          observaciones_repartidas?: boolean
           origen?: string
           resultado_visita?: string
           revisado_en?: string | null
@@ -1556,6 +1562,14 @@ export type Database = {
       registrar_geo_cliente: {
         Args: { _cod: number; _lat: number; _lng: number }
         Returns: boolean
+      }
+      repartir_observaciones_gespromo: {
+        Args: { _forzar?: boolean }
+        Returns: Json
+      }
+      reprocesar_historico_a_bloques: {
+        Args: { _limite?: number }
+        Returns: number
       }
       reset_maestro_isi_data: { Args: never; Returns: undefined }
       ruta_clientes: {
