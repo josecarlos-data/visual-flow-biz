@@ -97,6 +97,13 @@ export interface VisitaHistorica {
   longitud: number | null;
 }
 
+/** La BD solo admite estos cuatro valores en minúscula (visitas_tipo_chk). */
+const TIPOS_VALIDOS = ["cliente", "ruta", "llamada", "agenda"] as const;
+function tipoNormalizado(v: string | null): string {
+  const t = (v ?? "").trim().toLowerCase();
+  return (TIPOS_VALIDOS as readonly string[]).includes(t) ? t : "cliente";
+}
+
 function parseExcel(buffer: ArrayBuffer): VisitaHistorica[] {
   const wb = XLSX.read(buffer, { type: "array", cellDates: true });
   const sheet = wb.Sheets[wb.SheetNames[0]];
@@ -117,7 +124,7 @@ function parseExcel(buffer: ArrayBuffer): VisitaHistorica[] {
       motivo_key: motivoKeyDesde(str(r["Motivo"]), titulo),
       fecha,
       hora: timev(r["Hora"]),
-      tipo: str(r["Tipo"]) ?? str(r["Clase"]),
+      tipo: tipoNormalizado(str(r["Tipo"]) ?? str(r["Clase"])),
       estado: str(r["Estado"]) ?? "realizada",
       validacion: validacionDesde(observaciones, str(r["Estado"])),
       observaciones,

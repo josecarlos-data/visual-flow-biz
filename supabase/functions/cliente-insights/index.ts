@@ -66,11 +66,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    const [clienteRes, ventasRes, productosRes, visitasRes] = await Promise.all([
+    const [clienteRes, ventasRes, productosRes, visitasRes, kpisRes] = await Promise.all([
       userClient.from("clientes").select("*").eq("cod_cliente", cod_cliente).maybeSingle(),
-      userClient.from("ventas_mensuales").select("anio, mes, valor").eq("cod_cliente", cod_cliente),
-      userClient.from("cliente_productos").select("referencia, descripcion, familia, importe, unidades, ultima_compra").eq("cod_cliente", cod_cliente).order("importe", { ascending: false }).limit(30),
+      userClient.from("resumen_cliente_mes").select("anio, mes, importe").eq("cod_cliente", cod_cliente),
+      userClient.rpc("cliente_top_productos", { _cod: cod_cliente, _anio: null }),
       userClient.from("visitas").select("fecha, motivo_key, campos, observaciones").eq("cod_cliente", cod_cliente).order("fecha", { ascending: false }).limit(8),
+      userClient.from("cliente_kpis").select("*").eq("cod_cliente", cod_cliente).maybeSingle(),
     ]);
 
     if (!clienteRes.data) {
@@ -82,8 +83,9 @@ Deno.serve(async (req) => {
 
     const porAnio: Record<number, number> = {};
     for (const v of ventasRes.data ?? []) {
-      porAnio[v.anio] = (porAnio[v.anio] ?? 0) + Number(v.valor ?? 0);
+      porAnio[v.anio] = (porAnio[v.anio] ?? 0) + Number(v.importe ?? 0);
     }
+    const kpis = kpisRes.data;
 
     const cliente = clienteRes.data;
     const contexto = [
@@ -95,8 +97,15 @@ Deno.serve(async (req) => {
       "VENTAS POR AÑO (EUR):",
       Object.entries(porAnio).sort().map(([a, t]) => `  ${a}: ${Math.round(t).toLocaleString("es-ES")}`).join("\n") || "  Sin datos",
       "",
+      kpis
+        ? `INDICADORES: última compra ${kpis.ultima_compra ?? "—"} · ${kpis.dias_sin_comprar ?? "—"} días sin comprar · ` +
+          `ticket medio ${Math.round(Number(kpis.ticket_medio_actual ?? 0)).toLocaleString("es-ES")} EUR · ` +
+          `${kpis.num_documentos_actual ?? 0} documentos este año · ` +
+          `frecuencia de compra cada ${kpis.frecuencia_compra_dias ?? "—"} días · canal principal ${kpis.canal_principal ?? "—"}`
+        : "",
+      "",
       "PRODUCTOS MÁS COMPRADOS:",
-      (productosRes.data ?? []).slice(0, 20).map((p) =>
+      (productosRes.data ?? []).slice(0, 20).map((p: Record<string, unknown>) =>
         `  ${p.referencia}${p.descripcion ? ` (${p.descripcion})` : ""}${p.familia ? ` [${p.familia}]` : ""} — ${Math.round(Number(p.importe)).toLocaleString("es-ES")} EUR${p.ultima_compra ? `, última compra ${p.ultima_compra}` : ""}`
       ).join("\n") || "  Sin datos",
       "",

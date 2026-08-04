@@ -71,20 +71,8 @@ const HANDLERS: Record<string, Handler> = {
         }))
         .filter((r) => r.cod_cliente && r.cliente),
   },
-  ventas: {
-    table: "ventas_mensuales",
-    onConflict: "cod_cliente,anio,mes",
-    wipe: "ventas_mensuales",
-    map: (rows) =>
-      rows
-        .map((r) => ({
-          cod_cliente: num(pick(r, "Cod.", "Cod", "cod_cliente")),
-          anio: num(pick(r, "Año", "Ano", "anio")),
-          mes: num(pick(r, "MesNumero", "Mes", "mes")),
-          valor: num(pick(r, "Valor", "Importe")) ?? 0,
-        }))
-        .filter((r) => r.cod_cliente && r.anio && r.mes),
-  },
+  // "ventas" (ventas_mensuales) retirado: el pipeline vivo es ventas_diarias.
+
   productos: {
     table: "productos",
     onConflict: "referencia",
@@ -99,24 +87,8 @@ const HANDLERS: Record<string, Handler> = {
         }))
         .filter((r) => r.referencia),
   },
-  cliente_productos: {
-    table: "cliente_productos",
-    onConflict: "cod_cliente,referencia,anio",
-    wipe: "cliente_productos",
-    map: (rows) =>
-      rows
-        .map((r) => ({
-          cod_cliente: num(pick(r, "Cod.", "Cod", "cod_cliente")),
-          referencia: str(pick(r, "Referencia", "Ref")),
-          descripcion: str(pick(r, "Descripción", "Descripcion")),
-          familia: str(pick(r, "Familia")),
-          importe: num(pick(r, "Importe", "Valor")) ?? 0,
-          unidades: num(pick(r, "Unidades", "Cantidad")) ?? 0,
-          ultima_compra: toDate(pick(r, "Última compra", "Ultima compra", "Fecha")),
-          anio: num(pick(r, "Año", "Ano")) ?? new Date().getFullYear(),
-        }))
-        .filter((r) => r.cod_cliente && r.referencia),
-  },
+  // "cliente_productos" retirado: se calcula desde ventas_diarias.
+
   visitas: {
     table: "visitas",
     onConflict: "id",
