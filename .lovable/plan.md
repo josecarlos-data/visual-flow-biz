@@ -184,6 +184,10 @@ CREATE TABLE public.visita_bloques (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.visita_bloques TO authenticated;
 GRANT ALL ON public.visita_bloques TO service_role;
 ALTER TABLE public.visita_bloques ENABLE ROW LEVEL SECURITY;
+
+-- mantenimiento de updated_at, igual que en el resto de tablas del proyecto
+CREATE TRIGGER update_visita_bloques_updated_at BEFORE UPDATE ON public.visita_bloques
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 ```
 
 Políticas espejo de las de `visitas`, resolviendo la visita padre (permisivas, nunca restrictivas):
