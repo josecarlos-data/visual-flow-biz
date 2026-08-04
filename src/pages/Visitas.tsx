@@ -27,10 +27,19 @@ export default function Visitas() {
       ? nombreCliente.get(v.cod_cliente) ?? `Cliente #${v.cod_cliente}`
       : v.cliente_externo ?? "Cliente potencial";
 
+  // Bloques de las visitas cargadas: cada visita puede llevar varias plantillas.
+  const { data: bloquesMap } = useVisitaBloques((visitas ?? []).map((v) => v.id));
+
+  const motivosDe = (id: string, legacy: string | null) => {
+    const bs = bloquesMap?.get(id) ?? [];
+    if (bs.length) return bs.map((b) => b.motivo_key).filter(Boolean) as string[];
+    return legacy ? [legacy] : [];
+  };
+
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
     return (visitas ?? []).filter((v) => {
-      if (motivoFiltro !== "todos" && v.motivo_key !== motivoFiltro) return false;
+      if (motivoFiltro !== "todos" && !motivosDe(v.id, v.motivo_key).includes(motivoFiltro)) return false;
       if (!term) return true;
       return (
         titulo(v).toLowerCase().includes(term) ||
@@ -38,7 +47,8 @@ export default function Visitas() {
         (v.ruta ?? "").toLowerCase().includes(term)
       );
     });
-  }, [visitas, q, motivoFiltro, nombreCliente]);
+  }, [visitas, q, motivoFiltro, nombreCliente, bloquesMap]);
+
 
   return (
     <div className="space-y-4">
