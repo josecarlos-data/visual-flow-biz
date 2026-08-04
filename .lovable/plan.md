@@ -186,6 +186,10 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.visita_bloques TO authenticated;
 GRANT ALL ON public.visita_bloques TO service_role;
 ALTER TABLE public.visita_bloques ENABLE ROW LEVEL SECURITY;
 
+-- la clave foránea no crea índice: lo necesitan el trigger agregado, las políticas RLS
+-- con EXISTS, las vistas de la fase 6b y el UPDATE masivo de la fase 6a (21.484 filas)
+CREATE INDEX IF NOT EXISTS idx_visita_bloques_visita_id ON public.visita_bloques(visita_id);
+
 -- mantenimiento de updated_at, igual que en el resto de tablas del proyecto
 CREATE TRIGGER update_visita_bloques_updated_at BEFORE UPDATE ON public.visita_bloques
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
