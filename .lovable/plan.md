@@ -1,162 +1,19 @@
 # Reforma de la sección de Visitas — plan por fases
 
-Plan de arquitectura. Nada se ejecuta hasta que indiques fase por fase.
+**FASES 0 y 1: COMPLETADAS.** Ejecutadas el 04/08/2026 en la migración `20260804104119` y verificadas en producción. No se reejecutan ni se revierten: las tablas eliminadas siguen eliminadas, las columnas añadidas a `visitas` se quedan y `refrescar_resumenes_ventas()` mantiene su definición actual. Se retiran del documento de trabajo.
+
+El resto del plan no se ejecuta hasta que lo indiques fase por fase.
 
 ## Estado actual verificado (consultado en la base de datos)
 
-- `ventas_diarias`: 433.215 filas (pipeline vivo). `ventas_mensuales`, `cliente_productos`, `detalle_ventas`: **0 filas** (pipeline muerto).
-- Consumidores de las tablas muertas en código: `src/pages/Dashboard.tsx`, `src/components/SalesChart.tsx`, `src/components/ClientSparklines.tsx`, `src/components/MonthlyComparisonChart.tsx`, `src/hooks/useHistoricoData.ts`, `src/hooks/useCrm.ts`, `supabase/functions/cliente-insights/index.ts`, `supabase/functions/sync-onedrive/index.ts`.
-- `visitas`: 21.484 filas, **todas** con `origen = 'gespromo'`. `tipo` toma los valores `Ruta` (9.005), `Cliente` (8.056), `Llamada` (4.340), `Agenda` (83) — con mayúscula inicial, no en minúsculas.
+- `ventas_diarias`: 433.215 filas (pipeline vivo). Las tablas muertas `ventas_mensuales`, `cliente_productos` y `detalle_ventas` **ya no existen** (eliminadas en la fase 0); el código consumidor se migró a `resumen_cliente_mes` y `cliente_kpis`.
+- `visitas`: 21.484 filas, **todas** con `origen = 'gespromo'`. `tipo` ya normalizado a minúscula: `ruta` (9.005), `cliente` (8.056), `llamada` (4.340), `agenda` (83).
 - `visitas.validacion` solo tiene `pendiente` (11.076) y `correcta` (10.408): **no existe ningún NO CORRECTO**. Los rechazos del director están enterrados en el texto (477 filas contienen un patrón `NO C…` en `observaciones`; el marcador real de primera línea ronda las 250). Hoy caen todos en `pendiente`.
-- 16.412 visitas tienen `observaciones` que empiezan en mayúsculas; 3.453 no tienen observaciones (de ellas, 21 tienen fecha futura).
-- `visitas.cod_cliente`: 488 filas sin cliente, **todas con `cod_cliente IS NULL`** (clientes potenciales, van por `cliente_externo`). Huérfanos con código real: **0**.
-- `visitas.tipo`: default de tabla `'cliente'` (minúscula) pero el dato histórico es `Ruta`/`Cliente`/`Llamada`/`Agenda`. Incoherencia real a corregir en el dato.
+- 16.412 visitas tienen `observaciones` que empiezan en mayúsculas; **3.453 no tienen observaciones** (de ellas, 21 tienen fecha futura). Esta cifra condiciona la verificación de la fase 6a.
+- `visitas.cod_cliente`: 488 filas sin cliente, todas con `cod_cliente IS NULL` (potenciales, van por `cliente_externo`). Huérfanos con código real: 0; la clave foránea quedó **validada** en la fase 1.
 - `motivos_visita` — claves reales: `seguimiento`, `promocion`, `revision_seguimiento`, `competencia`, `gsmart`, `informacion_potencial`, `incidencia`. `motivo_campos`: 40 campos, **sin columna `is_active`**. `productos`: 67.076 referencias.
-- `visitas` no tiene todavía `resultado_visita`, `visita_origen_id`, `fecha_registro`, `audio_url`, `observaciones_original`.
-
----
-
-## FASE 0 — Higiene de datos y correcciones
-
-**Objetivo:** dejar un único pipeline de ventas vivo y correcto, y arreglar las pantallas que hoy leen tablas vacías.
-
-### Base de datos
-
-```sql
--- 1. Frecuencia de compra realista + días activos
-ALTER TABLE public.cliente_kpis
-  ADD COLUMN IF NOT EXISTS dias_activos_ultimo_ano integer;
-
--- refrescar_resumenes_ventas(): sustituir el cálculo de frecuencia_compra_dias
--- (se recrea la función completa; fragmento relevante)
---   dias_act AS (
---     SELECT cod_cliente, COUNT(DISTINCT fecha) AS dias
---     FROM public.ventas_diarias
---     WHERE fecha > v_max - 365
---     GROUP BY cod_cliente
---   )
---   ... CASE WHEN d.dias > 0 THEN ROUND(365.0 / d.dias, 1) ELSE NULL END  AS frecuencia_compra_dias,
---       d.dias AS dias_activos_ultimo_ano
-
--- 2. Retirada del pipeline muerto (solo si count(*) = 0, se comprueba en la propia migración)
-DROP TABLE IF EXISTS public.cliente_productos;
-DROP TABLE IF EXISTS public.detalle_ventas;
-DROP TABLE IF EXISTS public.ventas_mensuales;
-```
-
-`ventas_mensuales` tiene FK desde/hacia `clientes`; el `DROP` se hace tras confirmar 0 filas dentro de la propia migración con un `DO $$ ... RAISE EXCEPTION ... $$` de guarda. No se tocan `situaciones_cliente`, `rutas`, `zones`, `compras`, `sync_config`, `sync_log`.
-
-### Ficheros de código
-
-- `src/pages/Dashboard.tsx`, `src/components/SalesChart.tsx`, `src/components/ClientSparklines.tsx`, `src/components/MonthlyComparisonChart.tsx`, `src/hooks/useHistoricoData.ts`, `src/hooks/useCrm.ts` → pasan a `resumen_cliente_mes` (y `cliente_kpis` donde toque).
-- `supabase/functions/cliente-insights/index.ts` → reescrito sobre `resumen_cliente_mes`, `cliente_kpis`, `resumen_cliente_familia`, `resumen_cliente_marca` y agregado de `ventas_diarias` para top referencias.
-- `supabase/functions/sync-onedrive/index.ts` → se eliminan las ramas de los datasets muertos.
-- `src/pages/ClienteDetalle.tsx` → etiqueta "días sin comprar (a fecha de corte)" y nueva métrica de frecuencia.
-- `src/integrations/supabase/types.ts` se regenera solo.
-
-### Riesgos
-
-- Las gráficas del dashboard cambian de fuente: si algún componente asumía la forma `{anio, mes, valor}` habrá que remapear a `{anio, mes, importe}`.
-- `refrescar_resumenes_ventas()` es pesada; se recrea con el mismo `statement_timeout` de 300 s.
-- Un `DROP TABLE` es irreversible: la guarda de 0 filas es obligatoria.
-
-### Verificación
-
-1. Contraste manual sobre un cliente concreto: se elige uno con compras recientes y se compara
-   ```sql
-   SELECT count(DISTINCT fecha) FROM ventas_diarias
-   WHERE cod_cliente = :cod AND fecha > (SELECT max(fecha) FROM ventas_diarias) - 365;
-   ```
-   con `dias_activos_ultimo_ano` (deben coincidir exactamente) y `365.0 / ese_valor` con `frecuencia_compra_dias`. Se repite con 3 clientes de perfiles distintos (diario, semanal, esporádico).
-2. Clientes sin compra en 365 días → `frecuencia_compra_dias` y `dias_activos_ultimo_ano` a NULL.
-3. Dashboard, sparklines y comparativa mensual muestran barras (hoy están en blanco).
-4. Análisis IA de un cliente con facturación: ya no dice "no muestra ventas anuales".
-
-**Dependencias:** ninguna. Es la base de todo.
-
----
-
-## FASE 1 — Cabecera de la visita
-
-**Objetivo:** distinguir la visita efectiva de la que no lo fue y trazar el momento real de registro.
-
-```sql
--- 1. Resultado: 'desconocido' para todo el histórico, 'efectiva' solo para lo nuevo
-ALTER TABLE public.visitas
-  ADD COLUMN IF NOT EXISTS resultado_visita text,
-  ADD COLUMN IF NOT EXISTS visita_origen_id uuid REFERENCES public.visitas(id) ON DELETE SET NULL,
-  ADD COLUMN IF NOT EXISTS fecha_registro timestamptz NOT NULL DEFAULT now();
-
-UPDATE public.visitas SET resultado_visita = 'desconocido' WHERE resultado_visita IS NULL;
-
-ALTER TABLE public.visitas
-  ALTER COLUMN resultado_visita SET DEFAULT 'efectiva',
-  ALTER COLUMN resultado_visita SET NOT NULL,
-  ADD CONSTRAINT visitas_resultado_chk
-  CHECK (resultado_visita IN ('efectiva','cliente_ausente','cerrado','sin_acceso','desconocido'));
-
--- 2. Normalización del DATO en tipo (no en la UI)
-UPDATE public.visitas SET tipo = lower(tipo) WHERE tipo <> lower(tipo);
-ALTER TABLE public.visitas
-  ALTER COLUMN tipo SET DEFAULT 'cliente',
-  ADD CONSTRAINT visitas_tipo_chk
-  CHECK (tipo IN ('cliente','ruta','llamada','agenda'));
-
-CREATE INDEX IF NOT EXISTS idx_visitas_origen_id ON public.visitas(visita_origen_id);
-```
-
-**Clave foránea `cod_cliente` — comprobado antes de escribir el plan:**
-
-```sql
-SELECT count(*) FROM visitas v LEFT JOIN clientes c USING (cod_cliente)
-WHERE c.cod_cliente IS NULL;   -- 488
-SELECT count(*) FROM visitas WHERE cod_cliente IS NULL;  -- 488
-```
-
-Las 488 son exactamente las de `cod_cliente IS NULL` (clientes potenciales registrados por `cliente_externo`), y una FK no restringe los NULL. **Huérfanos con código real: 0**, así que el `VALIDATE` es seguro. Aun así la migración lo hace condicional, porque un `VALIDATE` que falla aborta la migración entera:
-
-```sql
-ALTER TABLE public.visitas
-  ADD CONSTRAINT visitas_cod_cliente_fk
-  FOREIGN KEY (cod_cliente) REFERENCES public.clientes(cod_cliente) NOT VALID;
-
-DO $$
-DECLARE n int;
-BEGIN
-  SELECT count(*) INTO n FROM public.visitas v
-  LEFT JOIN public.clientes c USING (cod_cliente)
-  WHERE v.cod_cliente IS NOT NULL AND c.cod_cliente IS NULL;
-  IF n = 0 THEN
-    ALTER TABLE public.visitas VALIDATE CONSTRAINT visitas_cod_cliente_fk;
-  ELSE
-    RAISE NOTICE 'FK dejada NOT VALID: % visitas con cliente inexistente', n;
-  END IF;
-END $$;
-```
-
-Si quedara NOT VALID, te entrego el listado de `cod_cliente` afectados antes de tocar nada más.
-
-**Visitas sin realizar:** 3.453 visitas del histórico no tienen observaciones y son planificaciones que nunca se ejecutaron (21 de ellas con fecha futura). En esta fase **solo se informa**: la migración deja un recuento en el log y te doy la cifra exacta por comercial y año. El traslado a `visitas_planificadas` se decide después, no se hace aquí.
-
-No se crea campo `canal`: se documenta `visitas.tipo` con sus cuatro valores ya normalizados en minúscula.
-
-### Ficheros
-
-- `src/pages/NuevaVisita.tsx`: selector de resultado; geolocalización obligatoria si el resultado es presencial (`efectiva`, `cliente_ausente`, `cerrado`, `sin_acceso`) y `tipo <> 'llamada'` **en minúscula**, coherente con la normalización del dato hecha en esta misma migración.
-- Revisión de **todas** las comparaciones de `tipo` en el código (`src/pages/NuevaVisita.tsx`, `src/pages/Visitas.tsx`, `src/pages/Agenda.tsx`, `src/pages/RevisionVisitas.tsx`, `src/hooks/useCrm.ts`, `src/lib/datasets/visitasHistorico.ts`): pasan todas a minúscula, y el importador de Gespromo normaliza al insertar.
-
-### Riesgos
-
-Bloquear el guardado por falta de GPS en interiores. Mitigación: si el navegador deniega o expira, se avisa y se permite guardar marcando la visita como sin geolocalización.
-
-### Verificación
-
-1. `SELECT resultado_visita, count(*) FROM visitas GROUP BY 1` → 21.484 en `desconocido` y 0 en el resto justo tras migrar.
-2. `SELECT DISTINCT tipo FROM visitas` → solo `cliente`, `ruta`, `llamada`, `agenda`.
-3. Registrar una visita nueva "cliente ausente" sin bloques: queda diferenciada en el listado y con `resultado_visita = 'cliente_ausente'`.
-4. La FK aparece como validada (`convalidated = true` en `pg_constraint`), o con el listado de huérfanos entregado si no.
-
-**Dependencias:** fase 0 (no estricta, pero conviene el orden).
+- `visitas` ya tiene `resultado_visita`, `visita_origen_id` y `fecha_registro` (fase 1). Sigue **sin** `audio_url` ni `observaciones_original`.
+- `cliente_kpis` ya tiene `dias_activos_ultimo_ano` y la frecuencia de compra recalculada sobre 365 días (fase 0).
 
 ---
 
@@ -430,6 +287,11 @@ Crear campaña con 3 líneas, registrar una promoción eligiendo una línea y co
 
 ```sql
 ALTER TABLE public.visitas ADD COLUMN IF NOT EXISTS observaciones_original text;
+-- marca explícita de proceso: no se deduce de que la copia sea NULL,
+-- porque 3.453 visitas no tienen observaciones y su copia será NULL siempre
+ALTER TABLE public.visitas
+  ADD COLUMN IF NOT EXISTS observaciones_repartidas boolean NOT NULL DEFAULT false;
+
 -- función idempotente repartir_observaciones_gespromo():
 --   1) copia observaciones -> observaciones_original (solo si es NULL)
 --   2) parte SIEMPRE de observaciones_original
@@ -438,7 +300,35 @@ ALTER TABLE public.visitas ADD COLUMN IF NOT EXISTS observaciones_original text;
 --   4) párrafos íntegros en MAYÚSCULAS -> visita_bloques.nota_revision
 --      (NUNCA visitas.nota_revision: toda la revisión vive en el bloque)
 --   5) resto -> observaciones
+--   6) marca observaciones_repartidas = true en TODAS las filas procesadas,
+--      también en las que tenían el origen vacío
 ```
+
+**Estrategia de escritura masiva: trigger desactivado + recálculo agregado (opción elegida).** El UPDATE de la 6a toca 21.484 bloques y el trigger agregado de la fase 2 dispararía una escritura por fila (~43.000 en una sola transacción), con riesgo de agotar el `statement_timeout`. Se descarta el proceso por lotes por ser más lento y dejar estados intermedios visibles. La migración hace:
+
+```sql
+ALTER TABLE public.visita_bloques DISABLE TRIGGER trg_visita_bloques_agregado;
+
+SELECT public.repartir_observaciones_gespromo();
+
+-- recálculo de visitas.validacion en UNA sola pasada agregada
+UPDATE public.visitas v SET validacion = a.estado
+FROM (
+  SELECT b.visita_id,
+         CASE
+           WHEN bool_or(COALESCE(b.validacion,'pendiente') = 'NO CORRECTO') THEN 'NO CORRECTO'
+           WHEN bool_or(COALESCE(b.validacion,'pendiente') = 'pendiente')    THEN 'pendiente'
+           ELSE 'CORRECTO'
+         END AS estado
+  FROM public.visita_bloques b GROUP BY b.visita_id
+) a
+WHERE a.visita_id = v.id AND v.validacion IS DISTINCT FROM a.estado;
+
+ALTER TABLE public.visita_bloques ENABLE TRIGGER trg_visita_bloques_agregado;
+```
+
+El orden de precedencia del recálculo es idéntico al del trigger, de modo que reactivarlo no cambia ningún valor.
+
 
 **Recuperación de los NO CORRECTO (punto crítico).** Verificado: `validacion` solo tiene `pendiente` (11.076) y `correcta` (10.408) — este último ya normalizado a `CORRECTO` en la fase 2 —; **no hay ni un solo NO CORRECTO**, pese a que en el fichero original hay del orden de 256 visitas rechazadas por el director. Hoy están todas cayendo en `pendiente`. La función las recupera desde `observaciones_original`, y el orden de evaluación importa: **primero la negación**, porque `NO CORRECTO` contiene `CORRECTO`.
 
@@ -470,7 +360,7 @@ Se deja **creada pero sin ejecutar** `reprocesar_historico_a_bloques()`, que enc
 ### Verificación
 
 1. `SELECT validacion, count(*) FROM visitas GROUP BY 1;` → **tres** categorías, con `NO CORRECTO` en el entorno de 250. Si sale muy por debajo, la fase no se da por buena: se ajustan los patrones y se reejecuta.
-2. `SELECT count(*) FROM visitas WHERE observaciones_original IS NULL;` → 0.
+2. `SELECT count(*) FROM visitas WHERE observaciones_original IS NULL AND observaciones IS NOT NULL;` → 0. (No se exige `observaciones_original IS NULL` → 0 a secas: 3.453 visitas no tienen observaciones y su copia será NULL siempre.) El control de cobertura real es `SELECT count(*) FROM visitas WHERE NOT observaciones_repartidas;` → 0.
 3. Reejecutar la función dos veces produce exactamente el mismo resultado.
 4. Muestreo manual de 20 filas comparando `observaciones_original` con el reparto en `validacion` / `nota_revision` / `observaciones`.
 
@@ -554,14 +444,14 @@ Las tres vistas devuelven filas coherentes con los bloques registrados, `campos-
 
 | Orden | Fase | Contenido | Esfuerzo | Depende de |
 |---|---|---|---|---|
-| 1 | 0 | Higiene de datos, pipeline único, frecuencia de compra | Medio | — |
-| 2 | 1 | Cabecera de visita (resultado, origen, fecha de registro) | Bajo | 0 |
-| 3 | 2 | Bloques múltiples + normalización del vocabulario de validación | Alto | 1 |
-| 4 | 6a | Limpieza del histórico y recuperación de los NO CORRECTO | Medio | 2 |
-| 5 | 3 | Plantillas, tipos nuevos, catálogos y ayudas | Alto | 2 |
-| 6 | 4 | Voz multibloque, repregunta y audio en storage | Alto | 2, 3 |
-| 7 | 5 | Campañas mínimas y enganche con promoción | Medio | 3 |
-| 8 | 6b | Vistas analíticas sobre los bloques | Bajo | 2, 3 |
+| — | 0 | Higiene de datos, pipeline único, frecuencia de compra | — | **COMPLETADA 04/08/2026** |
+| — | 1 | Cabecera de visita (resultado, origen, fecha de registro) | — | **COMPLETADA 04/08/2026** |
+| 1 | 2 | Bloques múltiples + normalización del vocabulario de validación | Alto | 1 |
+| 2 | 6a | Limpieza del histórico y recuperación de los NO CORRECTO | Medio | 2 |
+| 3 | 3 | Plantillas, tipos nuevos, catálogos y ayudas | Alto | 2 |
+| 4 | 4 | Voz multibloque, repregunta y audio en storage | Alto | 2, 3 |
+| 5 | 5 | Campañas mínimas y enganche con promoción | Medio | 3 |
+| 6 | 6b | Vistas analíticas sobre los bloques | Bajo | 2, 3 |
 
 La 6a se adelanta porque solo depende de la 2 y desbloquea la revisión real del director. Las fases 4, 5 y 6b son intercambiables entre sí una vez cerrada la 3.
 
