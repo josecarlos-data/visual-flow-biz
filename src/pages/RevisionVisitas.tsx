@@ -168,7 +168,7 @@ export default function RevisionVisitas() {
                     {v.cod_cliente ? nombrePorCod.get(v.cod_cliente) ?? `Cliente ${v.cod_cliente}` : v.cliente_externo ?? "Sin cliente"}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {fechaCorta(v.fecha)}{v.hora ? ` · ${v.hora.slice(0, 5)}` : ""} · {nombreMotivo(v.motivo_key)}
+                    {fechaCorta(v.fecha)}{v.hora ? ` · ${v.hora.slice(0, 5)}` : ""} · {resumenMotivos(v)}
                     {v.comercial_nombre ? ` · ${v.comercial_nombre}` : ""}
                   </p>
                   {v.observaciones && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{v.observaciones}</p>}
