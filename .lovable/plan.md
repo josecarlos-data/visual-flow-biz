@@ -400,7 +400,8 @@ ALTER TABLE public.visitas ADD COLUMN IF NOT EXISTS observaciones_original text;
 -- función idempotente repartir_observaciones_gespromo():
 --   1) copia observaciones -> observaciones_original (solo si es NULL)
 --   2) parte SIEMPRE de observaciones_original
---   3) primera línea con el marcador del director -> validacion
+--   3) primera línea con el marcador del director -> visita_bloques.validacion
+--      (NUNCA visitas.validacion: la deriva el trigger de la fase 2)
 --   4) párrafos íntegros en MAYÚSCULAS -> nota_revision
 --   5) resto -> observaciones
 ```
