@@ -435,7 +435,8 @@ ALTER TABLE public.visitas ADD COLUMN IF NOT EXISTS observaciones_original text;
 --   2) parte SIEMPRE de observaciones_original
 --   3) primera línea con el marcador del director -> visita_bloques.validacion
 --      (NUNCA visitas.validacion: la deriva el trigger de la fase 2)
---   4) párrafos íntegros en MAYÚSCULAS -> nota_revision
+--   4) párrafos íntegros en MAYÚSCULAS -> visita_bloques.nota_revision
+--      (NUNCA visitas.nota_revision: toda la revisión vive en el bloque)
 --   5) resto -> observaciones
 ```
 
