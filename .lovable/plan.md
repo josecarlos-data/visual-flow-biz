@@ -416,7 +416,7 @@ Campañas con muchas líneas en el selector: búsqueda paginada por campaña.
 
 Crear campaña con 3 líneas, registrar una promoción eligiendo una línea y comprobar el autorrelleno; registrar una con fecha posterior a la prórroga y comprobar que se guarda marcada; exportar y abrir el fichero.
 
-**Dependencias:** fase 3 (campo `campana_id` del bloque de promoción).
+**Dependencias:** fase 3 (campo `campana_id` del bloque de promoción, declarado allí con `is_active = false`). Esta fase lo **activa** con `UPDATE public.motivo_campos SET is_active = true WHERE motivo_key = 'promocion' AND campo_key = 'campana_id';` una vez creada `campanas`.
 
 ---
 
