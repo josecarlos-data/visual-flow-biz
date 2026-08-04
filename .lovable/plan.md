@@ -1,18 +1,19 @@
 # Reforma de la sección de Visitas — plan por fases
 
-Plan de arquitectura. Nada se ejecuta hasta que indiques fase por fase.
+**FASES 0 y 1: COMPLETADAS.** Ejecutadas el 04/08/2026 en la migración `20260804104119` y verificadas en producción. No se reejecutan ni se revierten: las tablas eliminadas siguen eliminadas, las columnas añadidas a `visitas` se quedan y `refrescar_resumenes_ventas()` mantiene su definición actual. Se retiran del documento de trabajo.
+
+El resto del plan no se ejecuta hasta que lo indiques fase por fase.
 
 ## Estado actual verificado (consultado en la base de datos)
 
-- `ventas_diarias`: 433.215 filas (pipeline vivo). `ventas_mensuales`, `cliente_productos`, `detalle_ventas`: **0 filas** (pipeline muerto).
-- Consumidores de las tablas muertas en código: `src/pages/Dashboard.tsx`, `src/components/SalesChart.tsx`, `src/components/ClientSparklines.tsx`, `src/components/MonthlyComparisonChart.tsx`, `src/hooks/useHistoricoData.ts`, `src/hooks/useCrm.ts`, `supabase/functions/cliente-insights/index.ts`, `supabase/functions/sync-onedrive/index.ts`.
-- `visitas`: 21.484 filas, **todas** con `origen = 'gespromo'`. `tipo` toma los valores `Ruta` (9.005), `Cliente` (8.056), `Llamada` (4.340), `Agenda` (83) — con mayúscula inicial, no en minúsculas.
+- `ventas_diarias`: 433.215 filas (pipeline vivo). Las tablas muertas `ventas_mensuales`, `cliente_productos` y `detalle_ventas` **ya no existen** (eliminadas en la fase 0); el código consumidor se migró a `resumen_cliente_mes` y `cliente_kpis`.
+- `visitas`: 21.484 filas, **todas** con `origen = 'gespromo'`. `tipo` ya normalizado a minúscula: `ruta` (9.005), `cliente` (8.056), `llamada` (4.340), `agenda` (83).
 - `visitas.validacion` solo tiene `pendiente` (11.076) y `correcta` (10.408): **no existe ningún NO CORRECTO**. Los rechazos del director están enterrados en el texto (477 filas contienen un patrón `NO C…` en `observaciones`; el marcador real de primera línea ronda las 250). Hoy caen todos en `pendiente`.
-- 16.412 visitas tienen `observaciones` que empiezan en mayúsculas; 3.453 no tienen observaciones (de ellas, 21 tienen fecha futura).
-- `visitas.cod_cliente`: 488 filas sin cliente, **todas con `cod_cliente IS NULL`** (clientes potenciales, van por `cliente_externo`). Huérfanos con código real: **0**.
-- `visitas.tipo`: default de tabla `'cliente'` (minúscula) pero el dato histórico es `Ruta`/`Cliente`/`Llamada`/`Agenda`. Incoherencia real a corregir en el dato.
+- 16.412 visitas tienen `observaciones` que empiezan en mayúsculas; **3.453 no tienen observaciones** (de ellas, 21 tienen fecha futura). Esta cifra condiciona la verificación de la fase 6a.
+- `visitas.cod_cliente`: 488 filas sin cliente, todas con `cod_cliente IS NULL` (potenciales, van por `cliente_externo`). Huérfanos con código real: 0; la clave foránea quedó **validada** en la fase 1.
 - `motivos_visita` — claves reales: `seguimiento`, `promocion`, `revision_seguimiento`, `competencia`, `gsmart`, `informacion_potencial`, `incidencia`. `motivo_campos`: 40 campos, **sin columna `is_active`**. `productos`: 67.076 referencias.
-- `visitas` no tiene todavía `resultado_visita`, `visita_origen_id`, `fecha_registro`, `audio_url`, `observaciones_original`.
+- `visitas` ya tiene `resultado_visita`, `visita_origen_id` y `fecha_registro` (fase 1). Sigue **sin** `audio_url` ni `observaciones_original`.
+- `cliente_kpis` ya tiene `dias_activos_ultimo_ano` y la frecuencia de compra recalculada sobre 365 días (fase 0).
 
 ---
 
