@@ -20,7 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import {
   useCliente, useClienteVentas, useClienteKpis, useClienteProductos, useClienteMix,
-  useClienteVisitas, useMotivos, usePuedeVerMargen, useSituacionesVigentes, useClienteDocumentos,
+  useClienteVisitas, useMotivos, usePuedeVerMargen, useSituacionesVigentes, useClienteDocumentos, useVisitaBloques,
   etiquetaCategoria, eur, num, eurK, fechaCorta,
 } from "@/hooks/useCrm";
 
