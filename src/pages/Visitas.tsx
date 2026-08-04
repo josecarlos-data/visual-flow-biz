@@ -107,9 +107,11 @@ export default function Visitas() {
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
-                    <Badge variant="secondary">
-                      {motivos?.find((m) => m.key === v.motivo_key)?.nombre ?? "Visita"}
-                    </Badge>
+                    {(motivosDe(v.id, v.motivo_key).length ? motivosDe(v.id, v.motivo_key) : [null]).map((k, i) => (
+                      <Badge key={`${k}-${i}`} variant="secondary">
+                        {motivos?.find((m) => m.key === k)?.nombre ?? "Visita"}
+                      </Badge>
+                    ))}
                     {v.validacion && v.validacion !== "pendiente" && (
                       <Badge variant={v.validacion === "CORRECTO" ? "outline" : "destructive"}>
                         {v.validacion === "CORRECTO" ? "Correcto" : "No correcto"}
