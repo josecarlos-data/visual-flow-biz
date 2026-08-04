@@ -309,7 +309,9 @@ Alta de una visita con un bloque de cada motivo nuevo; comprobar en `visita_bloq
 ALTER TABLE public.visitas ADD COLUMN IF NOT EXISTS audio_url text;
 ```
 
-Bucket privado `visitas-audio` (creado con la herramienta de storage, no por SQL) + políticas sobre `storage.objects` equivalentes a las de `visitas`. Retención de 90 días mediante función `purgar_audios_visitas()` y cron diario.
+Bucket privado `visitas-audio` (creado con la herramienta de storage, no por SQL) + políticas sobre `storage.objects` equivalentes a las de `visitas`. Retención de 90 días mediante función `purgar_audios_visitas()`.
+
+**`pg_cron` NO está instalado en el proyecto** (verificado: solo hay `pg_stat_statements`, `pgcrypto`, `plpgsql`, `supabase_vault`, `uuid-ossp`; `pg_cron` y `pg_net` están disponibles pero sin instalar). Alternativa elegida, sin depender de habilitar extensiones: una edge function `purgar-audios` que valida una cabecera con secreto propio, borra del bucket los objetos de más de 90 días y llama a `purgar_audios_visitas()` para limpiar `audio_url`. Se programa desde el planificador de la plataforma con periodicidad diaria. Es idempotente y se puede lanzar a mano. Si más adelante interesa hacerlo dentro de la base de datos, se instalan `pg_cron` + `pg_net` y se agenda la misma edge function; el borrado de ficheros del bucket seguiría necesitándola.
 
 ### Ficheros
 
