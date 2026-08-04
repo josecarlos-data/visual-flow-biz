@@ -418,7 +418,7 @@ ALTER TABLE public.visitas ADD COLUMN IF NOT EXISTS observaciones_original text;
 
 Se usa además `levenshtein` (extensión `fuzzystrmatch`) con distancia ≤ 3 contra `CORRECTO` para cazar variantes no previstas, y la función deja un informe con las primeras líneas que no ha sabido clasificar para revisarlas a mano. Como control previo: 477 filas contienen un patrón `NO C…` en cualquier posición del texto; el marcador válido es solo el de primera línea, de ahí que la cifra esperada sea inferior.
 
-El resultado se propaga a `visita_bloques.validacion` (un bloque por visita histórica) para que el estado agregado de la fase 2 siga siendo coherente.
+**La función escribe el marcador ÚNICAMENTE en `visita_bloques.validacion`** (un bloque por visita histórica) y no toca `visitas.validacion`: el trigger agregado de la fase 2 la deriva a partir de los bloques. Si escribiera en las dos, la propagación pisaría el valor recién calculado. El criterio de aceptación se comprueba igual sobre `visitas.validacion`, ya derivada: tres categorías y del orden de 250 `NO CORRECTO`.
 
 Se deja **creada pero sin ejecutar** `reprocesar_historico_a_bloques()`, que encolará visitas antiguas para el extractor de la fase 4. No se ejecuta en esta fase ni requiere que la fase 4 exista.
 
