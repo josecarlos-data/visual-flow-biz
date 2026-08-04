@@ -548,7 +548,14 @@ export default function ClienteDetalle() {
                               {String(val)}
                             </p>
                           ))}
+                          {b.nota_revision && (
+                            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-destructive">Nota de revisión</p>
+                              <p className="whitespace-pre-wrap text-sm">{b.nota_revision}</p>
+                            </div>
+                          )}
                         </div>
+
                       ))
                     ) : (
                       Object.entries(v.campos ?? {}).filter(([, val]) => val).map(([k, val]) => (

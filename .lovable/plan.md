@@ -277,7 +277,9 @@ Crear campaña con 3 líneas, registrar una promoción eligiendo una línea y co
 
 ---
 
-## FASE 6a — Limpieza del histórico
+## FASE 6a — Limpieza del histórico — COMPLETADA (04/08/2026)
+
+> Ejecutada: 21.484 visitas repartidas. Reparto final de `visitas.validacion`: CORRECTO 10.175, NO CORRECTO 265, pendiente 11.044. `observaciones_original` conservado íntegro y `observaciones_repartidas = true` en todas las filas. `reprocesar_historico_a_bloques()` creada y NO ejecutada.
 
 **Objetivo:** recuperar la información sepultada en el texto de las 21.484 visitas importadas, sin perder una sola letra.
 
