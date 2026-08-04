@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useVisitas, useClientes, useMotivos, fechaCorta } from "@/hooks/useCrm";
+import { useVisitas, useClientes, useMotivos, useVisitaBloques, fechaCorta } from "@/hooks/useCrm";
 
 export default function Visitas() {
   const { data: visitas, isLoading } = useVisitas(300);
@@ -27,10 +27,19 @@ export default function Visitas() {
       ? nombreCliente.get(v.cod_cliente) ?? `Cliente #${v.cod_cliente}`
       : v.cliente_externo ?? "Cliente potencial";
 
+  // Bloques de las visitas cargadas: cada visita puede llevar varias plantillas.
+  const { data: bloquesMap } = useVisitaBloques((visitas ?? []).map((v) => v.id));
+
+  const motivosDe = (id: string, legacy: string | null) => {
+    const bs = bloquesMap?.get(id) ?? [];
+    if (bs.length) return bs.map((b) => b.motivo_key).filter(Boolean) as string[];
+    return legacy ? [legacy] : [];
+  };
+
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
     return (visitas ?? []).filter((v) => {
-      if (motivoFiltro !== "todos" && v.motivo_key !== motivoFiltro) return false;
+      if (motivoFiltro !== "todos" && !motivosDe(v.id, v.motivo_key).includes(motivoFiltro)) return false;
       if (!term) return true;
       return (
         titulo(v).toLowerCase().includes(term) ||
@@ -38,7 +47,8 @@ export default function Visitas() {
         (v.ruta ?? "").toLowerCase().includes(term)
       );
     });
-  }, [visitas, q, motivoFiltro, nombreCliente]);
+  }, [visitas, q, motivoFiltro, nombreCliente, bloquesMap]);
+
 
   return (
     <div className="space-y-4">
@@ -97,9 +107,11 @@ export default function Visitas() {
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
-                    <Badge variant="secondary">
-                      {motivos?.find((m) => m.key === v.motivo_key)?.nombre ?? "Visita"}
-                    </Badge>
+                    {(motivosDe(v.id, v.motivo_key).length ? motivosDe(v.id, v.motivo_key) : [null]).map((k, i) => (
+                      <Badge key={`${k}-${i}`} variant="secondary">
+                        {motivos?.find((m) => m.key === k)?.nombre ?? "Visita"}
+                      </Badge>
+                    ))}
                     {v.validacion && v.validacion !== "pendiente" && (
                       <Badge variant={v.validacion === "CORRECTO" ? "outline" : "destructive"}>
                         {v.validacion === "CORRECTO" ? "Correcto" : "No correcto"}

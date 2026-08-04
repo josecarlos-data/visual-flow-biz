@@ -1066,6 +1066,69 @@ export type Database = {
         }
         Relationships: []
       }
+      visita_bloques: {
+        Row: {
+          campos: Json
+          campos_meta: Json
+          completo: boolean
+          created_at: string
+          id: string
+          motivo_key: string | null
+          nota_revision: string | null
+          orden: number
+          revisado_en: string | null
+          revisado_por: string | null
+          updated_at: string
+          validacion: string
+          visita_id: string
+        }
+        Insert: {
+          campos?: Json
+          campos_meta?: Json
+          completo?: boolean
+          created_at?: string
+          id?: string
+          motivo_key?: string | null
+          nota_revision?: string | null
+          orden?: number
+          revisado_en?: string | null
+          revisado_por?: string | null
+          updated_at?: string
+          validacion?: string
+          visita_id: string
+        }
+        Update: {
+          campos?: Json
+          campos_meta?: Json
+          completo?: boolean
+          created_at?: string
+          id?: string
+          motivo_key?: string | null
+          nota_revision?: string | null
+          orden?: number
+          revisado_en?: string | null
+          revisado_por?: string | null
+          updated_at?: string
+          validacion?: string
+          visita_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visita_bloques_motivo_key_fkey"
+            columns: ["motivo_key"]
+            isOneToOne: false
+            referencedRelation: "motivos_visita"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "visita_bloques_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "visitas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       visitas: {
         Row: {
           campos: Json

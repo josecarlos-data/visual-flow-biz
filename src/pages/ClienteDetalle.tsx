@@ -20,7 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import {
   useCliente, useClienteVentas, useClienteKpis, useClienteProductos, useClienteMix,
-  useClienteVisitas, useMotivos, usePuedeVerMargen, useSituacionesVigentes, useClienteDocumentos,
+  useClienteVisitas, useMotivos, usePuedeVerMargen, useSituacionesVigentes, useClienteDocumentos, useVisitaBloques,
   etiquetaCategoria, eur, num, eurK, fechaCorta,
 } from "@/hooks/useCrm";
 
@@ -53,6 +53,7 @@ export default function ClienteDetalle() {
   const { data: kpis } = useClienteKpis(codNum);
   const { data: mix } = useClienteMix(codNum);
   const { data: visitas } = useClienteVisitas(codNum);
+  const { data: bloquesMap } = useVisitaBloques((visitas ?? []).map((v) => v.id));
   const { data: documentos } = useClienteDocumentos(codNum);
 
   const { data: motivos } = useMotivos();
@@ -524,24 +525,45 @@ export default function ClienteDetalle() {
           {!visitas || visitas.length === 0 ? (
             <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">Sin visitas registradas.</CardContent></Card>
           ) : (
-            visitas.map((v) => (
-              <Card key={v.id}>
-                <CardContent className="space-y-2 p-4">
-                  <div className="flex items-center justify-between gap-2">
-                    <Badge variant="secondary">{motivoNombre(v.motivo_key)}</Badge>
-                    <span className="text-xs text-muted-foreground">{fechaCorta(v.fecha)}</span>
-                  </div>
-                  {Object.entries(v.campos ?? {}).filter(([, val]) => val).map(([k, val]) => (
-                    <p key={k} className="text-sm">
-                      <span className="text-muted-foreground">{k.replace(/_/g, " ")}: </span>
-                      {String(val)}
-                    </p>
-                  ))}
-                  {v.observaciones && <p className="whitespace-pre-wrap text-sm">{v.observaciones}</p>}
-                  {v.origen === "gespromo" && <Badge variant="outline" className="text-xs">Importada de Gespromo</Badge>}
-                </CardContent>
-              </Card>
-            ))
+            visitas.map((v) => {
+              const bloques = bloquesMap?.get(v.id) ?? [];
+              return (
+                <Card key={v.id}>
+                  <CardContent className="space-y-2 p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex flex-wrap gap-1">
+                        {(bloques.length ? bloques.map((b) => b.motivo_key) : [v.motivo_key]).map((k, i) => (
+                          <Badge key={`${k}-${i}`} variant="secondary">{motivoNombre(k)}</Badge>
+                        ))}
+                      </div>
+                      <span className="shrink-0 text-xs text-muted-foreground">{fechaCorta(v.fecha)}</span>
+                    </div>
+                    {bloques.length ? (
+                      bloques.map((b) => (
+                        <div key={b.id} className="space-y-1 rounded-md border p-2">
+                          <p className="text-xs font-medium text-muted-foreground">{motivoNombre(b.motivo_key)}</p>
+                          {Object.entries(b.campos ?? {}).filter(([, val]) => val).map(([k, val]) => (
+                            <p key={k} className="text-sm">
+                              <span className="text-muted-foreground">{k.replace(/_/g, " ")}: </span>
+                              {String(val)}
+                            </p>
+                          ))}
+                        </div>
+                      ))
+                    ) : (
+                      Object.entries(v.campos ?? {}).filter(([, val]) => val).map(([k, val]) => (
+                        <p key={k} className="text-sm">
+                          <span className="text-muted-foreground">{k.replace(/_/g, " ")}: </span>
+                          {String(val)}
+                        </p>
+                      ))
+                    )}
+                    {v.observaciones && <p className="whitespace-pre-wrap text-sm">{v.observaciones}</p>}
+                    {v.origen === "gespromo" && <Badge variant="outline" className="text-xs">Importada de Gespromo</Badge>}
+                  </CardContent>
+                </Card>
+              );
+            })
           )}
         </TabsContent>
 

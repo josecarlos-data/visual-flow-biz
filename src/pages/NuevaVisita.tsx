@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
-import { ArrowLeft, Save, Loader2, Wand2, FileText } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Wand2, FileText, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -15,7 +15,21 @@ import { VoiceRecorder } from "@/components/VoiceRecorder";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { useClientes, useMotivos, hoyISO } from "@/hooks/useCrm";
+import { useClientes, useMotivos, hoyISO, crearBloques, type Motivo } from "@/hooks/useCrm";
+
+interface BloqueForm {
+  uid: string;
+  motivoKey: string;
+  valores: Record<string, string>;
+  transcripcion: string;
+}
+
+const nuevoBloque = (motivoKey: string): BloqueForm => ({
+  uid: crypto.randomUUID(),
+  motivoKey,
+  valores: {},
+  transcripcion: "",
+});
 
 export default function NuevaVisita() {
   const [params] = useSearchParams();
@@ -25,18 +39,18 @@ export default function NuevaVisita() {
   const { data: motivos } = useMotivos();
 
   const [codCliente, setCodCliente] = useState<string>(params.get("cliente") ?? "");
-  const [motivoKey, setMotivoKey] = useState<string>("");
   const [fecha, setFecha] = useState<string>(hoyISO());
   const [resultado, setResultado] = useState<string>("efectiva");
   const [tipo, setTipo] = useState<string>("cliente");
   const [busqueda, setBusqueda] = useState("");
-  const [valores, setValores] = useState<Record<string, string>>({});
-  const [transcripcion, setTranscripcion] = useState("");
+  const [bloques, setBloques] = useState<BloqueForm[]>([]);
   const [observaciones, setObservaciones] = useState("");
-  const [processing, setProcessing] = useState(false);
+  const [procesando, setProcesando] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const motivo = useMemo(() => motivos?.find((m) => m.key === motivoKey), [motivos, motivoKey]);
+  const motivosActivos = useMemo(() => (motivos ?? []).filter((m) => m.is_active), [motivos]);
+  const motivoDe = (key: string): Motivo | undefined => motivos?.find((m) => m.key === key);
+
   const cliente = useMemo(
     () => clientes?.find((c) => String(c.cod_cliente) === codCliente),
     [clientes, codCliente],
@@ -51,17 +65,19 @@ export default function NuevaVisita() {
       .slice(0, 30);
   }, [clientes, busqueda]);
 
+  // Un bloque inicial en cuanto se conocen los motivos.
   useEffect(() => {
-    if (!motivoKey && motivos?.length) setMotivoKey(motivos[0].key);
-  }, [motivos, motivoKey]);
+    if (!bloques.length && motivosActivos.length) setBloques([nuevoBloque(motivosActivos[0].key)]);
+  }, [motivosActivos, bloques.length]);
 
-  useEffect(() => {
-    setValores({});
-  }, [motivoKey]);
+  const actualizarBloque = (uid: string, patch: Partial<BloqueForm>) =>
+    setBloques((bs) => bs.map((b) => (b.uid === uid ? { ...b, ...patch } : b)));
 
-  const procesarAudio = async (blob: Blob) => {
-    if (!motivo) return;
-    setProcessing(true);
+  const procesarAudio = async (uid: string, blob: Blob) => {
+    const bloque = bloques.find((b) => b.uid === uid);
+    const motivo = bloque && motivoDe(bloque.motivoKey);
+    if (!bloque || !motivo) return;
+    setProcesando(uid);
     try {
       const form = new FormData();
       form.append("audio", blob, "nota.wav");
@@ -85,15 +101,14 @@ export default function NuevaVisita() {
       const res = data as { transcripcion?: string; campos?: Record<string, unknown>; error?: string };
       if (res.error) throw new Error(res.error);
 
-      setTranscripcion(res.transcripcion ?? "");
       const next: Record<string, string> = {};
       for (const [k, v] of Object.entries(res.campos ?? {})) if (v != null) next[k] = String(v);
-      setValores(next);
+      actualizarBloque(uid, { transcripcion: res.transcripcion ?? "", valores: next });
       toast({ title: "Informe preliminar listo", description: "Revísalo y corrige lo que haga falta antes de guardar." });
     } catch (e) {
       toast({ title: "Error procesando la nota", description: (e as Error).message, variant: "destructive" });
     } finally {
-      setProcessing(false);
+      setProcesando(null);
     }
   };
 
@@ -115,29 +130,32 @@ export default function NuevaVisita() {
       );
     });
 
-  /** Solo las visitas efectivas llevan motivo y campos; el resto son intentos fallidos. */
+  /** Solo las visitas efectivas llevan bloques; el resto son intentos fallidos. */
   const esEfectiva = resultado === "efectiva";
   /** Los resultados presenciales deberían llevar GPS; una llamada, no. */
   const requiereGeo = tipo !== "llamada";
-
 
   const guardar = async () => {
     if (!codCliente) {
       toast({ title: "Faltan datos", description: "Selecciona un cliente.", variant: "destructive" });
       return;
     }
-    if (esEfectiva && !motivo) {
-      toast({ title: "Faltan datos", description: "Selecciona el motivo de la visita.", variant: "destructive" });
+    if (esEfectiva && !bloques.length) {
+      toast({ title: "Faltan datos", description: "Añade al menos un bloque a la visita.", variant: "destructive" });
       return;
     }
     if (esEfectiva) {
-      const faltan = (motivo?.campos ?? []).filter((c) => c.is_required && !valores[c.campo_key]?.trim());
+      const faltan: string[] = [];
+      for (const b of bloques) {
+        const m = motivoDe(b.motivoKey);
+        if (!m) {
+          toast({ title: "Faltan datos", description: "Selecciona el motivo de cada bloque.", variant: "destructive" });
+          return;
+        }
+        for (const c of m.campos) if (c.is_required && !b.valores[c.campo_key]?.trim()) faltan.push(`${m.nombre}: ${c.label}`);
+      }
       if (faltan.length) {
-        toast({
-          title: "Campos obligatorios sin rellenar",
-          description: faltan.map((c) => c.label).join(", "),
-          variant: "destructive",
-        });
+        toast({ title: "Campos obligatorios sin rellenar", description: faltan.join(", "), variant: "destructive" });
         return;
       }
     }
@@ -150,28 +168,55 @@ export default function NuevaVisita() {
         description: "No se ha podido obtener el GPS. La visita se guarda marcada como sin geolocalización.",
       });
     }
-    const { error } = await supabase.from("visitas").insert({
-      cod_cliente: Number(codCliente),
-      motivo_key: esEfectiva ? motivo?.key ?? null : null,
-      fecha,
-      tipo,
-      resultado_visita: resultado,
-      user_id: user?.id ?? null,
-      vendedor: employeeCode ?? null,
-      transcripcion: esEfectiva ? transcripcion || null : null,
-      observaciones: observaciones || null,
-      campos: esEfectiva ? valores : {},
-      estado: "registrada",
-      origen: "app",
-      latitud: pos?.lat ?? null,
-      longitud: pos?.lng ?? null,
-    });
-    setSaving(false);
 
-    if (error) {
-      toast({ title: "No se ha podido guardar", description: error.message, variant: "destructive" });
+    const transcripcionUnica = bloques
+      .map((b) => b.transcripcion)
+      .filter(Boolean)
+      .join("\n\n");
+
+    const { data: creada, error } = await supabase
+      .from("visitas")
+      .insert({
+        cod_cliente: Number(codCliente),
+        // legacy: se conserva el primer motivo para las vistas antiguas
+        motivo_key: esEfectiva ? bloques[0]?.motivoKey ?? null : null,
+        fecha,
+        tipo,
+        resultado_visita: resultado,
+        user_id: user?.id ?? null,
+        vendedor: employeeCode ?? null,
+        transcripcion: esEfectiva ? transcripcionUnica || null : null,
+        observaciones: observaciones || null,
+        campos: {},
+        estado: "registrada",
+        origen: "app",
+        latitud: pos?.lat ?? null,
+        longitud: pos?.lng ?? null,
+      } as never)
+      .select("id")
+      .single();
+
+    if (error || !creada) {
+      setSaving(false);
+      toast({ title: "No se ha podido guardar", description: error?.message ?? "Error desconocido", variant: "destructive" });
       return;
     }
+
+    try {
+      if (esEfectiva) {
+        await crearBloques(
+          (creada as { id: string }).id,
+          bloques.map((b) => ({ motivo_key: b.motivoKey, campos: b.valores })),
+        );
+      }
+    } catch (e) {
+      setSaving(false);
+      toast({ title: "Visita guardada sin bloques", description: (e as Error).message, variant: "destructive" });
+      return;
+    }
+
+    setSaving(false);
+
     // Geoposicionamiento progresivo: si el cliente aún no tiene ubicación, se la asignamos.
     if (pos) {
       await supabase.rpc("registrar_geo_cliente" as never, {
@@ -183,9 +228,6 @@ export default function NuevaVisita() {
     toast({ title: "Visita guardada" });
     navigate(`/clientes/${codCliente}`);
   };
-
-
-  const hayResultado = Object.keys(valores).length > 0;
 
   return (
     <div className="space-y-4 pb-24">
@@ -266,157 +308,145 @@ export default function NuevaVisita() {
               </Select>
               {!esEfectiva && (
                 <p className="text-xs text-muted-foreground">
-                  La visita se registra sin motivo ni campos; solo con tus observaciones.
+                  La visita se registra sin bloques; solo con tus observaciones.
                 </p>
               )}
             </div>
           </div>
 
-          {esEfectiva && (
-            <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label>Fecha</Label>
+            <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+          </div>
+        </CardContent>
+      </Card>
+
+      {esEfectiva && bloques.map((b, i) => {
+        const motivo = motivoDe(b.motivoKey);
+        const hayResultado = Object.keys(b.valores).length > 0;
+        return (
+          <Card key={b.uid}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="flex items-center gap-2 text-base">
+                Bloque {i + 1}
+                {hayResultado && <Badge variant="secondary" className="gap-1"><Wand2 className="h-3 w-3" />Propuesta IA</Badge>}
+              </CardTitle>
+              {bloques.length > 1 && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Quitar bloque ${i + 1}`}
+                  onClick={() => setBloques((bs) => bs.filter((x) => x.uid !== b.uid))}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Motivo</Label>
-                <Select value={motivoKey} onValueChange={setMotivoKey}>
+                <Select
+                  value={b.motivoKey}
+                  onValueChange={(val) => actualizarBloque(b.uid, { motivoKey: val, valores: {} })}
+                >
                   <SelectTrigger><SelectValue placeholder="Selecciona motivo" /></SelectTrigger>
                   <SelectContent>
-                    {(motivos ?? []).filter((m) => m.is_active).map((m) => (
+                    {motivosActivos.map((m) => (
                       <SelectItem key={m.key} value={m.key}>{m.nombre}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 {motivo?.descripcion && <p className="text-xs text-muted-foreground">{motivo.descripcion}</p>}
               </div>
-              <div className="space-y-2">
-                <Label>Fecha</Label>
-                <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
-              </div>
-            </div>
-          )}
 
-          {!esEfectiva && (
-            <div className="space-y-2">
-              <Label>Fecha</Label>
-              <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              <VoiceRecorder
+                onAudio={(blob) => procesarAudio(b.uid, blob)}
+                disabled={!motivo || !codCliente || procesando !== null}
+                processing={procesando === b.uid}
+                hasResult={hayResultado}
+              />
+              {b.transcripcion && (
+                <Collapsible>
+                  <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+                    <FileText className="h-4 w-4" /> Ver transcripción
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="mt-2 whitespace-pre-wrap rounded-md bg-muted/50 p-3 text-sm">
+                    {b.transcripcion}
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+
+              {(motivo?.campos ?? []).map((c) => {
+                const set = (val: string) =>
+                  actualizarBloque(b.uid, { valores: { ...b.valores, [c.campo_key]: val } });
+                return (
+                  <div key={c.campo_key} className="space-y-1.5">
+                    <Label>
+                      {c.label} {c.is_required && <span className="text-destructive">*</span>}
+                    </Label>
+                    {c.tipo === "numero" ? (
+                      <Input type="number" value={b.valores[c.campo_key] ?? ""} onChange={(e) => set(e.target.value)} />
+                    ) : c.tipo === "fecha" ? (
+                      <Input type="date" value={b.valores[c.campo_key] ?? ""} onChange={(e) => set(e.target.value)} />
+                    ) : c.tipo === "select" ? (
+                      <Select value={b.valores[c.campo_key] ?? ""} onValueChange={set}>
+                        <SelectTrigger><SelectValue placeholder="Selecciona una opción" /></SelectTrigger>
+                        <SelectContent>
+                          {c.opciones.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    ) : c.tipo === "booleano" ? (
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={b.valores[c.campo_key] === "si"}
+                          onCheckedChange={(val) => set(val ? "si" : "no")}
+                        />
+                        <span className="text-sm text-muted-foreground">
+                          {b.valores[c.campo_key] === "si" ? "Sí" : "No"}
+                        </span>
+                      </div>
+                    ) : c.tipo === "texto" ? (
+                      <Input placeholder={c.ayuda ?? ""} value={b.valores[c.campo_key] ?? ""} onChange={(e) => set(e.target.value)} />
+                    ) : (
+                      <Textarea rows={3} placeholder={c.ayuda ?? ""} value={b.valores[c.campo_key] ?? ""} onChange={(e) => set(e.target.value)} />
+                    )}
+                    {c.ayuda && c.tipo !== "texto" && c.tipo !== "texto_largo" && (
+                      <p className="text-xs text-muted-foreground">{c.ayuda}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        );
+      })}
 
       {esEfectiva && (
+        <Button
+          variant="outline"
+          className="w-full"
+          onClick={() => setBloques((bs) => [...bs, nuevoBloque(motivosActivos[0]?.key ?? "")])}
+          disabled={!motivosActivos.length}
+        >
+          <Plus className="mr-2 h-4 w-4" /> Añadir otro bloque
+        </Button>
+      )}
+
       <Card>
-        <CardHeader><CardTitle className="text-base">2. Nota de voz</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Observaciones</CardTitle></CardHeader>
         <CardContent>
-          <VoiceRecorder
-            onAudio={procesarAudio}
-            disabled={!motivo || !codCliente}
-            processing={processing}
-            hasResult={hayResultado}
+          <Textarea
+            rows={3}
+            placeholder={esEfectiva ? "Observaciones adicionales de la visita…" : "¿Qué ha pasado? (cliente ausente, taller cerrado…)"}
+            value={observaciones}
+            onChange={(e) => setObservaciones(e.target.value)}
           />
-          {transcripcion && (
-            <Collapsible className="mt-4">
-              <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-                <FileText className="h-4 w-4" /> Ver transcripción
-              </CollapsibleTrigger>
-              <CollapsibleContent className="mt-2 whitespace-pre-wrap rounded-md bg-muted/50 p-3 text-sm">
-                {transcripcion}
-              </CollapsibleContent>
-            </Collapsible>
-          )}
         </CardContent>
       </Card>
-      )}
-
-      {esEfectiva && motivo && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              3. Informe
-              {hayResultado && <Badge variant="secondary" className="gap-1"><Wand2 className="h-3 w-3" />Propuesta IA</Badge>}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {motivo.campos.map((c) => (
-              <div key={c.campo_key} className="space-y-1.5">
-                <Label>
-                  {c.label} {c.is_required && <span className="text-destructive">*</span>}
-                </Label>
-                {c.tipo === "numero" ? (
-                  <Input
-                    type="number"
-                    value={valores[c.campo_key] ?? ""}
-                    onChange={(e) => setValores((v) => ({ ...v, [c.campo_key]: e.target.value }))}
-                  />
-                ) : c.tipo === "fecha" ? (
-                  <Input
-                    type="date"
-                    value={valores[c.campo_key] ?? ""}
-                    onChange={(e) => setValores((v) => ({ ...v, [c.campo_key]: e.target.value }))}
-                  />
-                ) : c.tipo === "select" ? (
-                  <Select
-                    value={valores[c.campo_key] ?? ""}
-                    onValueChange={(val) => setValores((v) => ({ ...v, [c.campo_key]: val }))}
-                  >
-                    <SelectTrigger><SelectValue placeholder="Selecciona una opción" /></SelectTrigger>
-                    <SelectContent>
-                      {c.opciones.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                ) : c.tipo === "booleano" ? (
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={valores[c.campo_key] === "si"}
-                      onCheckedChange={(val) => setValores((v) => ({ ...v, [c.campo_key]: val ? "si" : "no" }))}
-                    />
-                    <span className="text-sm text-muted-foreground">
-                      {valores[c.campo_key] === "si" ? "Sí" : "No"}
-                    </span>
-                  </div>
-                ) : c.tipo === "texto" ? (
-                  <Input
-                    placeholder={c.ayuda ?? ""}
-                    value={valores[c.campo_key] ?? ""}
-                    onChange={(e) => setValores((v) => ({ ...v, [c.campo_key]: e.target.value }))}
-                  />
-                ) : (
-                  <Textarea
-                    rows={3}
-                    placeholder={c.ayuda ?? ""}
-                    value={valores[c.campo_key] ?? ""}
-                    onChange={(e) => setValores((v) => ({ ...v, [c.campo_key]: e.target.value }))}
-                  />
-                )}
-                {c.ayuda && c.tipo !== "texto" && c.tipo !== "texto_largo" && (
-                  <p className="text-xs text-muted-foreground">{c.ayuda}</p>
-                )}
-              </div>
-            ))}
-
-            <div className="space-y-1.5">
-              <Label>Observaciones adicionales</Label>
-              <Textarea rows={2} value={observaciones} onChange={(e) => setObservaciones(e.target.value)} />
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {!esEfectiva && (
-        <Card>
-          <CardHeader><CardTitle className="text-base">2. Observaciones</CardTitle></CardHeader>
-          <CardContent>
-            <Textarea
-              rows={3}
-              placeholder="¿Qué ha pasado? (cliente ausente, taller cerrado…)"
-              value={observaciones}
-              onChange={(e) => setObservaciones(e.target.value)}
-            />
-          </CardContent>
-        </Card>
-      )}
 
       <div className="fixed inset-x-0 bottom-0 z-20 border-t bg-background/95 p-3 backdrop-blur md:static md:border-0 md:bg-transparent md:p-0">
         <div className="mx-auto flex max-w-3xl gap-2">
-          <Button className="flex-1" onClick={guardar} disabled={saving || !codCliente || (esEfectiva && !motivo)}>
+          <Button className="flex-1" onClick={guardar} disabled={saving || !codCliente || (esEfectiva && !bloques.length)}>
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             Guardar visita
           </Button>

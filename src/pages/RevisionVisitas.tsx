@@ -13,8 +13,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import {
   useVisitasRevision, useRevisionMutations, useMotivos, useClientes,
-  useSituacionesMutations, fechaCorta, hoyISO,
-  type Visita,
+  useSituacionesMutations, useVisitaBloques, useBloqueMutations, fechaCorta, hoyISO,
+  type Visita, type VisitaBloque,
 } from "@/hooks/useCrm";
 
 const ESTADOS = [
@@ -35,6 +35,7 @@ export default function RevisionVisitas() {
   const { data: motivos } = useMotivos();
   const { data: clientes } = useClientes(false, "alfabetico");
   const { revisar } = useRevisionMutations();
+  const { revisarBloque } = useBloqueMutations();
   const { guardar: guardarSituacion } = useSituacionesMutations();
 
   const [estado, setEstado] = useState("pendiente");
@@ -68,7 +69,17 @@ export default function RevisionVisitas() {
     });
   }, [visitas, estado, q, nombrePorCod, motivos]);
 
+  // Bloques de las visitas visibles: una visita puede llevar varias plantillas.
+  const { data: bloquesMap } = useVisitaBloques(filtradas.slice(0, 200).map((v) => v.id));
+  const bloquesDe = (v: Visita) => bloquesMap?.get(v.id) ?? [];
+  const resumenMotivos = (v: Visita) => {
+    const bs = bloquesDe(v);
+    if (!bs.length) return nombreMotivo(v.motivo_key);
+    return bs.map((b) => nombreMotivo(b.motivo_key)).join(" + ");
+  };
+
   const pendientes = (visitas ?? []).filter((v) => (v.validacion ?? "pendiente") === "pendiente").length;
+
 
   const abrir = (v: Visita) => {
     setSel(v);
@@ -78,10 +89,21 @@ export default function RevisionVisitas() {
     setEtiquetaSituacion("Caída justificada");
   };
 
+  /** Valida (o rechaza) todos los bloques de la visita de golpe. */
   const enviar = async (validacion: string) => {
     if (!sel) return;
     try {
-      await revisar.mutateAsync({ id: sel.id, validacion, nota_revision: nota || null, observaciones: observaciones || null });
+      const bs = bloquesDe(sel);
+      for (const b of bs) {
+        await revisarBloque.mutateAsync({ id: b.id, validacion, nota_revision: nota || null });
+      }
+      // La validación de la cabecera la deriva el trigger a partir de los bloques.
+      await revisar.mutateAsync({
+        id: sel.id,
+        validacion: bs.length ? sel.validacion ?? validacion : validacion,
+        nota_revision: nota || null,
+        observaciones: observaciones || null,
+      });
       if (justificar && sel.cod_cliente) {
         await guardarSituacion.mutateAsync({
           cod_cliente: sel.cod_cliente,
@@ -99,6 +121,17 @@ export default function RevisionVisitas() {
       toast({ title: "No se ha podido guardar", description: (e as Error).message, variant: "destructive" });
     }
   };
+
+  /** Validación de un bloque concreto; el resto de bloques no se tocan. */
+  const enviarBloque = async (b: VisitaBloque, validacion: string) => {
+    try {
+      await revisarBloque.mutateAsync({ id: b.id, validacion });
+      toast({ title: validacion === "CORRECTO" ? "Bloque validado" : "Bloque marcado como no correcto" });
+    } catch (e) {
+      toast({ title: "No se ha podido guardar", description: (e as Error).message, variant: "destructive" });
+    }
+  };
+
 
   return (
     <div className="space-y-4">
@@ -135,7 +168,7 @@ export default function RevisionVisitas() {
                     {v.cod_cliente ? nombrePorCod.get(v.cod_cliente) ?? `Cliente ${v.cod_cliente}` : v.cliente_externo ?? "Sin cliente"}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {fechaCorta(v.fecha)}{v.hora ? ` · ${v.hora.slice(0, 5)}` : ""} · {nombreMotivo(v.motivo_key)}
+                    {fechaCorta(v.fecha)}{v.hora ? ` · ${v.hora.slice(0, 5)}` : ""} · {resumenMotivos(v)}
                     {v.comercial_nombre ? ` · ${v.comercial_nombre}` : ""}
                   </p>
                   {v.observaciones && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{v.observaciones}</p>}
@@ -165,12 +198,37 @@ export default function RevisionVisitas() {
                   {sel.cod_cliente ? nombrePorCod.get(sel.cod_cliente) ?? `Cliente ${sel.cod_cliente}` : sel.cliente_externo ?? "Sin cliente"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {fechaCorta(sel.fecha)}{sel.hora ? ` · ${sel.hora.slice(0, 5)}` : ""} · {nombreMotivo(sel.motivo_key)}
+                  {fechaCorta(sel.fecha)}{sel.hora ? ` · ${sel.hora.slice(0, 5)}` : ""} · {resumenMotivos(sel)}
                   {sel.comercial_nombre ? ` · ${sel.comercial_nombre}` : ""}
                 </p>
               </div>
 
-              {Object.keys(sel.campos ?? {}).length > 0 && (
+              {/* Un bloque por plantilla: se valida cada uno por separado. */}
+              {bloquesDe(sel).map((b, i) => (
+                <div key={b.id} className="space-y-2 rounded-md border p-3 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-medium">{i + 1}. {nombreMotivo(b.motivo_key)}</p>
+                    {badgeValidacion(b.validacion)}
+                  </div>
+                  {Object.entries(b.campos ?? {}).filter(([, val]) => val != null && val !== "").map(([k, val]) => (
+                    <p key={k} className="flex justify-between gap-3">
+                      <span className="text-muted-foreground">{k}</span>
+                      <span className="text-right font-medium">{String(val)}</span>
+                    </p>
+                  ))}
+                  {b.nota_revision && <p className="text-xs text-muted-foreground">Nota: {b.nota_revision}</p>}
+                  <div className="flex gap-2 pt-1">
+                    <Button size="sm" variant="outline" disabled={revisarBloque.isPending} onClick={() => enviarBloque(b, "NO CORRECTO")}>
+                      No correcto
+                    </Button>
+                    <Button size="sm" disabled={revisarBloque.isPending} onClick={() => enviarBloque(b, "CORRECTO")}>
+                      Validar bloque
+                    </Button>
+                  </div>
+                </div>
+              ))}
+
+              {bloquesDe(sel).length === 0 && Object.keys(sel.campos ?? {}).length > 0 && (
                 <div className="space-y-1 rounded-md border p-3 text-sm">
                   {Object.entries(sel.campos).map(([k, val]) => (
                     <p key={k} className="flex justify-between gap-3">
