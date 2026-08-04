@@ -146,7 +146,10 @@ Bloquear el guardado por falta de GPS en interiores. Mitigación: si el navegado
 
 ### Verificación
 
-Registrar una visita "cliente ausente" sin bloques y comprobar que aparece en el listado diferenciada; `SELECT resultado_visita, count(*) FROM visitas GROUP BY 1`.
+1. `SELECT resultado_visita, count(*) FROM visitas GROUP BY 1` → 21.484 en `desconocido` y 0 en el resto justo tras migrar.
+2. `SELECT DISTINCT tipo FROM visitas` → solo `cliente`, `ruta`, `llamada`, `agenda`.
+3. Registrar una visita nueva "cliente ausente" sin bloques: queda diferenciada en el listado y con `resultado_visita = 'cliente_ausente'`.
+4. La FK aparece como validada (`convalidated = true` en `pg_constraint`), o con el listado de huérfanos entregado si no.
 
 **Dependencias:** fase 0 (no estricta, pero conviene el orden).
 
