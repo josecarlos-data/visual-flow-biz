@@ -400,9 +400,23 @@ export default function NuevaVisita() {
         </Card>
       )}
 
+      {!esEfectiva && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">2. Observaciones</CardTitle></CardHeader>
+          <CardContent>
+            <Textarea
+              rows={3}
+              placeholder="¿Qué ha pasado? (cliente ausente, taller cerrado…)"
+              value={observaciones}
+              onChange={(e) => setObservaciones(e.target.value)}
+            />
+          </CardContent>
+        </Card>
+      )}
+
       <div className="fixed inset-x-0 bottom-0 z-20 border-t bg-background/95 p-3 backdrop-blur md:static md:border-0 md:bg-transparent md:p-0">
         <div className="mx-auto flex max-w-3xl gap-2">
-          <Button className="flex-1" onClick={guardar} disabled={saving || !codCliente || !motivo}>
+          <Button className="flex-1" onClick={guardar} disabled={saving || !codCliente || (esEfectiva && !motivo)}>
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             Guardar visita
           </Button>
