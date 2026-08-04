@@ -259,7 +259,24 @@ Doble fuente de verdad entre `visitas.campos` y los bloques mientras dure el leg
 - Nuevos motivos: `viaje_incentivo`, `gestion_cobro`, `alta_reapertura`, `visita_partner`. `gsmart` se limpia de contenido de viaje.
 - Nuevos tipos admitidos en `motivo_campos.tipo`: `multiselect`, `referencia`, `adjunto`.
 - Reseed completo de `motivo_campos` por motivo con la definición que has dado (promoción, revisión de seguimiento, competencia, GSMart, viaje/incentivo, información/potencial, incidencia), con `opciones` cargadas y `ayuda` **en todos** los campos.
-- El seed es idempotente (`ON CONFLICT (motivo_key, campo_key) DO UPDATE`); los campos legacy que ya no se usan se marcan `is_active = false`, no se borran.
+- **El reseed se hace en dos pasos, porque `ON CONFLICT DO UPDATE` no puede desactivar lo que no vuelve a insertar.** Primero se apagan todos los campos de los motivos afectados y después el upsert reactiva únicamente los que siguen en la definición nueva:
+  ```sql
+  -- 1. apagar todo lo existente de los motivos que se redefinen
+  UPDATE public.motivo_campos SET is_active = false
+  WHERE motivo_key IN ('promocion','revision_seguimiento','competencia','gsmart',
+                       'informacion_potencial','incidencia','viaje_incentivo');
+
+  -- 2. upsert de la definición nueva, que reactiva solo lo vigente
+  INSERT INTO public.motivo_campos (motivo_key, campo_key, label, ayuda, tipo, opciones,
+                                    is_required, sort_order, is_active)
+  VALUES (...)
+  ON CONFLICT (motivo_key, campo_key) DO UPDATE SET
+    label = EXCLUDED.label, ayuda = EXCLUDED.ayuda, tipo = EXCLUDED.tipo,
+    opciones = EXCLUDED.opciones, is_required = EXCLUDED.is_required,
+    sort_order = EXCLUDED.sort_order, is_active = true;
+  ```
+  Los 40 campos actuales que no aparezcan en la definición nueva quedan con `is_active = false`: **no se borran**, y sus valores en los jsonb históricos se conservan.
+  Requiere índice único `(motivo_key, campo_key)`; se crea si no existe.
 - Catálogos (competidores, marcas de vehículo, marcas de eje, tipos de trabajo, viscosidades) en tabla `catalogos_opciones (clave, valor, orden)` para poder actualizarlos sin migración, con lista inicial razonable hasta que envíes la definitiva.
 
 ### Ficheros
