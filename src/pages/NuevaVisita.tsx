@@ -324,8 +324,9 @@ export default function NuevaVisita() {
           )}
         </CardContent>
       </Card>
+      )}
 
-      {motivo && (
+      {esEfectiva && motivo && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
