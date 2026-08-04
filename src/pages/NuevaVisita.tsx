@@ -27,6 +27,8 @@ export default function NuevaVisita() {
   const [codCliente, setCodCliente] = useState<string>(params.get("cliente") ?? "");
   const [motivoKey, setMotivoKey] = useState<string>("");
   const [fecha, setFecha] = useState<string>(hoyISO());
+  const [resultado, setResultado] = useState<string>("efectiva");
+  const [tipo, setTipo] = useState<string>("cliente");
   const [busqueda, setBusqueda] = useState("");
   const [valores, setValores] = useState<Record<string, string>>({});
   const [transcripcion, setTranscripcion] = useState("");
@@ -113,32 +115,52 @@ export default function NuevaVisita() {
       );
     });
 
+  /** Solo las visitas efectivas llevan motivo y campos; el resto son intentos fallidos. */
+  const esEfectiva = resultado === "efectiva";
+  /** Los resultados presenciales deberían llevar GPS; una llamada, no. */
+  const requiereGeo = tipo !== "llamada";
+
+
   const guardar = async () => {
-    if (!codCliente || !motivo) {
-      toast({ title: "Faltan datos", description: "Selecciona cliente y motivo.", variant: "destructive" });
+    if (!codCliente) {
+      toast({ title: "Faltan datos", description: "Selecciona un cliente.", variant: "destructive" });
       return;
     }
-    const faltan = motivo.campos.filter((c) => c.is_required && !valores[c.campo_key]?.trim());
-    if (faltan.length) {
-      toast({
-        title: "Campos obligatorios sin rellenar",
-        description: faltan.map((c) => c.label).join(", "),
-        variant: "destructive",
-      });
+    if (esEfectiva && !motivo) {
+      toast({ title: "Faltan datos", description: "Selecciona el motivo de la visita.", variant: "destructive" });
       return;
+    }
+    if (esEfectiva) {
+      const faltan = (motivo?.campos ?? []).filter((c) => c.is_required && !valores[c.campo_key]?.trim());
+      if (faltan.length) {
+        toast({
+          title: "Campos obligatorios sin rellenar",
+          description: faltan.map((c) => c.label).join(", "),
+          variant: "destructive",
+        });
+        return;
+      }
     }
 
     setSaving(true);
     const pos = await obtenerPosicion();
+    if (!pos && requiereGeo) {
+      toast({
+        title: "Sin ubicación",
+        description: "No se ha podido obtener el GPS. La visita se guarda marcada como sin geolocalización.",
+      });
+    }
     const { error } = await supabase.from("visitas").insert({
       cod_cliente: Number(codCliente),
-      motivo_key: motivo.key,
+      motivo_key: esEfectiva ? motivo?.key ?? null : null,
       fecha,
+      tipo,
+      resultado_visita: resultado,
       user_id: user?.id ?? null,
       vendedor: employeeCode ?? null,
-      transcripcion: transcripcion || null,
+      transcripcion: esEfectiva ? transcripcion || null : null,
       observaciones: observaciones || null,
-      campos: valores,
+      campos: esEfectiva ? valores : {},
       estado: "registrada",
       origen: "app",
       latitud: pos?.lat ?? null,
@@ -220,25 +242,67 @@ export default function NuevaVisita() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>Motivo</Label>
-              <Select value={motivoKey} onValueChange={setMotivoKey}>
-                <SelectTrigger><SelectValue placeholder="Selecciona motivo" /></SelectTrigger>
+              <Label>Tipo</Label>
+              <Select value={tipo} onValueChange={setTipo}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {(motivos ?? []).filter((m) => m.is_active).map((m) => (
-                    <SelectItem key={m.key} value={m.key}>{m.nombre}</SelectItem>
-                  ))}
+                  <SelectItem value="cliente">Cliente</SelectItem>
+                  <SelectItem value="ruta">Ruta</SelectItem>
+                  <SelectItem value="llamada">Llamada</SelectItem>
+                  <SelectItem value="agenda">Agenda</SelectItem>
                 </SelectContent>
               </Select>
-              {motivo?.descripcion && <p className="text-xs text-muted-foreground">{motivo.descripcion}</p>}
             </div>
+            <div className="space-y-2">
+              <Label>Resultado</Label>
+              <Select value={resultado} onValueChange={setResultado}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="efectiva">Efectiva</SelectItem>
+                  <SelectItem value="cliente_ausente">Cliente ausente</SelectItem>
+                  <SelectItem value="cerrado">Cerrado</SelectItem>
+                  <SelectItem value="sin_acceso">Sin acceso</SelectItem>
+                </SelectContent>
+              </Select>
+              {!esEfectiva && (
+                <p className="text-xs text-muted-foreground">
+                  La visita se registra sin motivo ni campos; solo con tus observaciones.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {esEfectiva && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Motivo</Label>
+                <Select value={motivoKey} onValueChange={setMotivoKey}>
+                  <SelectTrigger><SelectValue placeholder="Selecciona motivo" /></SelectTrigger>
+                  <SelectContent>
+                    {(motivos ?? []).filter((m) => m.is_active).map((m) => (
+                      <SelectItem key={m.key} value={m.key}>{m.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {motivo?.descripcion && <p className="text-xs text-muted-foreground">{motivo.descripcion}</p>}
+              </div>
+              <div className="space-y-2">
+                <Label>Fecha</Label>
+                <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+              </div>
+            </div>
+          )}
+
+          {!esEfectiva && (
             <div className="space-y-2">
               <Label>Fecha</Label>
               <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 
+      {esEfectiva && (
       <Card>
         <CardHeader><CardTitle className="text-base">2. Nota de voz</CardTitle></CardHeader>
         <CardContent>

@@ -79,6 +79,7 @@ export type Database = {
           actualizado_en: string
           canal_principal: string | null
           cod_cliente: number
+          dias_activos_ultimo_ano: number | null
           dias_sin_comprar: number | null
           frecuencia_compra_dias: number | null
           importe_abonos: number
@@ -104,6 +105,7 @@ export type Database = {
           actualizado_en?: string
           canal_principal?: string | null
           cod_cliente: number
+          dias_activos_ultimo_ano?: number | null
           dias_sin_comprar?: number | null
           frecuencia_compra_dias?: number | null
           importe_abonos?: number
@@ -129,6 +131,7 @@ export type Database = {
           actualizado_en?: string
           canal_principal?: string | null
           cod_cliente?: number
+          dias_activos_ultimo_ano?: number | null
           dias_sin_comprar?: number | null
           frecuencia_compra_dias?: number | null
           importe_abonos?: number
@@ -149,48 +152,6 @@ export type Database = {
           ticket_medio_actual?: number
           ticket_medio_anterior?: number
           ultima_compra?: string | null
-        }
-        Relationships: []
-      }
-      cliente_productos: {
-        Row: {
-          anio: number | null
-          cod_cliente: number
-          created_at: string
-          descripcion: string | null
-          familia: string | null
-          id: string
-          importe: number
-          referencia: string
-          ultima_compra: string | null
-          unidades: number
-          updated_at: string
-        }
-        Insert: {
-          anio?: number | null
-          cod_cliente: number
-          created_at?: string
-          descripcion?: string | null
-          familia?: string | null
-          id?: string
-          importe?: number
-          referencia: string
-          ultima_compra?: string | null
-          unidades?: number
-          updated_at?: string
-        }
-        Update: {
-          anio?: number | null
-          cod_cliente?: number
-          created_at?: string
-          descripcion?: string | null
-          familia?: string | null
-          id?: string
-          importe?: number
-          referencia?: string
-          ultima_compra?: string | null
-          unidades?: number
-          updated_at?: string
         }
         Relationships: []
       }
@@ -398,39 +359,6 @@ export type Database = {
           route?: string
           sort_order?: number
           updated_at?: string
-        }
-        Relationships: []
-      }
-      detalle_ventas: {
-        Row: {
-          cod_cliente: number
-          created_at: string
-          documento: string
-          fecha: string
-          id: string
-          importe: number | null
-          referencia: string
-          vendedor: string | null
-        }
-        Insert: {
-          cod_cliente: number
-          created_at?: string
-          documento: string
-          fecha: string
-          id?: string
-          importe?: number | null
-          referencia: string
-          vendedor?: string | null
-        }
-        Update: {
-          cod_cliente?: number
-          created_at?: string
-          documento?: string
-          fecha?: string
-          id?: string
-          importe?: number | null
-          referencia?: string
-          vendedor?: string | null
         }
         Relationships: []
       }
@@ -1138,41 +1066,6 @@ export type Database = {
         }
         Relationships: []
       }
-      ventas_mensuales: {
-        Row: {
-          anio: number
-          cod_cliente: number
-          created_at: string
-          id: string
-          mes: number
-          valor: number
-        }
-        Insert: {
-          anio: number
-          cod_cliente: number
-          created_at?: string
-          id?: string
-          mes: number
-          valor?: number
-        }
-        Update: {
-          anio?: number
-          cod_cliente?: number
-          created_at?: string
-          id?: string
-          mes?: number
-          valor?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ventas_mensuales_cod_cliente_fkey"
-            columns: ["cod_cliente"]
-            isOneToOne: false
-            referencedRelation: "clientes"
-            referencedColumns: ["cod_cliente"]
-          },
-        ]
-      }
       visitas: {
         Row: {
           campos: Json
@@ -1182,6 +1075,7 @@ export type Database = {
           created_at: string
           estado: string
           fecha: string
+          fecha_registro: string
           hora: string | null
           id: string
           latitud: number | null
@@ -1190,6 +1084,7 @@ export type Database = {
           nota_revision: string | null
           observaciones: string | null
           origen: string
+          resultado_visita: string
           revisado_en: string | null
           revisado_por: string | null
           ruta: string | null
@@ -1200,6 +1095,7 @@ export type Database = {
           user_id: string | null
           validacion: string | null
           vendedor: string | null
+          visita_origen_id: string | null
           zona: string | null
         }
         Insert: {
@@ -1210,6 +1106,7 @@ export type Database = {
           created_at?: string
           estado?: string
           fecha?: string
+          fecha_registro?: string
           hora?: string | null
           id?: string
           latitud?: number | null
@@ -1218,6 +1115,7 @@ export type Database = {
           nota_revision?: string | null
           observaciones?: string | null
           origen?: string
+          resultado_visita?: string
           revisado_en?: string | null
           revisado_por?: string | null
           ruta?: string | null
@@ -1228,6 +1126,7 @@ export type Database = {
           user_id?: string | null
           validacion?: string | null
           vendedor?: string | null
+          visita_origen_id?: string | null
           zona?: string | null
         }
         Update: {
@@ -1238,6 +1137,7 @@ export type Database = {
           created_at?: string
           estado?: string
           fecha?: string
+          fecha_registro?: string
           hora?: string | null
           id?: string
           latitud?: number | null
@@ -1246,6 +1146,7 @@ export type Database = {
           nota_revision?: string | null
           observaciones?: string | null
           origen?: string
+          resultado_visita?: string
           revisado_en?: string | null
           revisado_por?: string | null
           ruta?: string | null
@@ -1256,9 +1157,25 @@ export type Database = {
           user_id?: string | null
           validacion?: string | null
           vendedor?: string | null
+          visita_origen_id?: string | null
           zona?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "visitas_cod_cliente_fk"
+            columns: ["cod_cliente"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["cod_cliente"]
+          },
+          {
+            foreignKeyName: "visitas_visita_origen_id_fkey"
+            columns: ["visita_origen_id"]
+            isOneToOne: false
+            referencedRelation: "visitas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       visitas_planificadas: {
         Row: {

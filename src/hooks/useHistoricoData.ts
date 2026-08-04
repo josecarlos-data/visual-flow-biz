@@ -81,8 +81,8 @@ export function useHistoricoData(filters?: UseHistoricoFilters) {
         const batch = codClientes.slice(i, i + BATCH);
         const ventas = await fetchAllPaginated<any>(() =>
           supabase
-            .from("ventas_mensuales")
-            .select("cod_cliente, anio, mes, valor")
+            .from("resumen_cliente_mes")
+            .select("cod_cliente, anio, mes, importe")
             .in("cod_cliente", batch)
         );
         allVentas = allVentas.concat(
@@ -90,7 +90,7 @@ export function useHistoricoData(filters?: UseHistoricoFilters) {
             cod_cliente: v.cod_cliente,
             anio: v.anio,
             mes: v.mes,
-            valor: Number(v.valor) || 0,
+            valor: Number(v.importe) || 0,
           }))
         );
       }
