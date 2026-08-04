@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useVisitas, useClientes, useMotivos, fechaCorta } from "@/hooks/useCrm";
+import { useVisitas, useClientes, useMotivos, useVisitaBloques, fechaCorta } from "@/hooks/useCrm";
 
 export default function Visitas() {
   const { data: visitas, isLoading } = useVisitas(300);
