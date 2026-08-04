@@ -387,9 +387,67 @@ Crear campaña con 3 líneas, registrar una promoción eligiendo una línea y co
 
 ---
 
-## FASE 6 — Vistas analíticas y limpieza del histórico
+## FASE 6a — Limpieza del histórico
 
-**Objetivo:** poder analizar los bloques con SQL y recuperar la información sepultada en el texto del histórico.
+**Objetivo:** recuperar la información sepultada en el texto de las 21.484 visitas importadas, sin perder una sola letra.
+
+**Se puede ejecutar justo después de la fase 2.** No depende de la 3, de la 4 ni de la 5.
+
+### Base de datos
+
+```sql
+ALTER TABLE public.visitas ADD COLUMN IF NOT EXISTS observaciones_original text;
+-- función idempotente repartir_observaciones_gespromo():
+--   1) copia observaciones -> observaciones_original (solo si es NULL)
+--   2) parte SIEMPRE de observaciones_original
+--   3) primera línea con el marcador del director -> validacion
+--   4) párrafos íntegros en MAYÚSCULAS -> nota_revision
+--   5) resto -> observaciones
+```
+
+**Recuperación de los NO CORRECTO (punto crítico).** Verificado: `validacion` solo tiene `pendiente` (11.076) y `correcta` (10.408) — este último ya normalizado a `CORRECTO` en la fase 2 —; **no hay ni un solo NO CORRECTO**, pese a que en el fichero original hay del orden de 256 visitas rechazadas por el director. Hoy están todas cayendo en `pendiente`. La función las recupera desde `observaciones_original`, y el orden de evaluación importa: **primero la negación**, porque `NO CORRECTO` contiene `CORRECTO`.
+
+```sql
+-- primera línea normalizada: sin tildes, sin puntuación, colapsando espacios
+-- 1) negación:  ^N\s*O?\s*C[A-Z]{4,10}   →  'NO CORRECTO'
+--    cubre NO CORRECTO, NOCORRECTO, NO CORRETO, NO CORRCETO, NO CORREFCTO, NO CORRETCO, N O CORRECTO
+-- 2) afirmación: ^C[A-Z]{4,10}           →  'CORRECTO'
+--    cubre CORRECTO, CORRETO, CORRCETO, CORREFCTO, CORRETCO
+-- 3) sin marcador                        →  'pendiente'
+```
+
+Se usa además `levenshtein` (extensión `fuzzystrmatch`) con distancia ≤ 3 contra `CORRECTO` para cazar variantes no previstas, y la función deja un informe con las primeras líneas que no ha sabido clasificar para revisarlas a mano. Como control previo: 477 filas contienen un patrón `NO C…` en cualquier posición del texto; el marcador válido es solo el de primera línea, de ahí que la cifra esperada sea inferior.
+
+El resultado se propaga a `visita_bloques.validacion` (un bloque por visita histórica) para que el estado agregado de la fase 2 siga siendo coherente.
+
+Se deja **creada pero sin ejecutar** `reprocesar_historico_a_bloques()`, que encolará visitas antiguas para el extractor de la fase 4. No se ejecuta en esta fase ni requiere que la fase 4 exista.
+
+### Ficheros
+
+- `src/pages/ClienteDetalle.tsx`: `nota_revision` como aviso destacado, separado del texto del comercial.
+- `src/pages/Visitas.tsx`, `src/pages/RevisionVisitas.tsx`: filtros con el vocabulario `CORRECTO` / `NO CORRECTO` / `pendiente`.
+
+### Riesgos
+
+- El reparto por heurística puede clasificar mal algún párrafo. Mitigación: `observaciones_original` intacto y función reejecutable.
+- Si algún filtro de la UI quedó con `correcta` tras la fase 2, dejaría de encontrar filas: se revisa en esta fase.
+
+### Verificación
+
+1. `SELECT validacion, count(*) FROM visitas GROUP BY 1;` → **tres** categorías, con `NO CORRECTO` en el entorno de 250. Si sale muy por debajo, la fase no se da por buena: se ajustan los patrones y se reejecuta.
+2. `SELECT count(*) FROM visitas WHERE observaciones_original IS NULL;` → 0.
+3. Reejecutar la función dos veces produce exactamente el mismo resultado.
+4. Muestreo manual de 20 filas comparando `observaciones_original` con el reparto en `validacion` / `nota_revision` / `observaciones`.
+
+**Dependencias:** fase 2.
+
+---
+
+## FASE 6b — Vistas analíticas
+
+**Objetivo:** poder analizar los bloques con SQL sin pelearse con el jsonb.
+
+**Depende de la fase 3**, porque las vistas leen las claves de campo que se definen allí.
 
 ### Base de datos
 
@@ -441,61 +499,19 @@ ORDER BY v.cod_cliente, COALESCE((b.campos->>'fecha_verificacion')::date, v.fech
 
 Los casts numéricos se hacen con función auxiliar tolerante para no romper la vista con texto no numérico.
 
-Limpieza del histórico:
-
-```sql
-ALTER TABLE public.visitas ADD COLUMN IF NOT EXISTS observaciones_original text;
--- función idempotente repartir_observaciones_gespromo():
---   1) copia observaciones -> observaciones_original (solo si es NULL)
---   2) parte SIEMPRE de observaciones_original
---   3) primera línea con el marcador del director -> validacion
---   4) párrafos íntegros en MAYÚSCULAS -> nota_revision
---   5) resto -> observaciones
-```
-
-**Recuperación de los NO CORRECTO (punto crítico).** Verificado: `validacion` solo tiene `pendiente` (11.076) y `correcta` (10.408); **no hay ni un solo NO CORRECTO**, pese a que en el fichero original hay del orden de 256 visitas rechazadas por el director. Hoy están todas cayendo en `pendiente`. La función debe recuperarlas desde `observaciones_original`, y el orden de evaluación importa: **primero la negación**, porque `NO CORRECTO` contiene `CORRECTO`.
-
-```sql
--- primera línea normalizada: sin tildes, sin puntuación, colapsando espacios
--- 1) negación:  ^N\s*O?\s*C[A-Z]{4,10}   →  'NO CORRECTO'
---    cubre NO CORRECTO, NOCORRECTO, NO CORRETO, NO CORRCETO, NO CORREFCTO, NO CORRETCO, N O CORRECTO
--- 2) afirmación: ^C[A-Z]{4,10}           →  'CORRECTO'
---    cubre CORRECTO, CORRETO, CORRCETO, CORREFCTO, CORRETCO
--- 3) sin marcador                        →  'pendiente'
-```
-
-Se usa además `levenshtein` (extensión `fuzzystrmatch`) con distancia ≤ 3 contra `CORRECTO` para cazar variantes no previstas, y la función deja un informe con las primeras líneas que no ha sabido clasificar para revisarlas a mano. Como control previo: 477 filas contienen un patrón `NO C…` en cualquier posición del texto; el marcador válido es solo el de primera línea, de ahí que la cifra esperada sea inferior.
-
-**Criterio de aceptación de la fase:** tras ejecutar la función,
-
-```sql
-SELECT validacion, count(*) FROM visitas GROUP BY 1;
-```
-
-debe devolver **tres** categorías: `CORRECTO`, `NO CORRECTO` (en el entorno de 250) y `pendiente`. Si `NO CORRECTO` sale muy por debajo de 250, la fase no se da por buena: se ajustan los patrones y se reejecuta (la función es idempotente porque siempre parte de `observaciones_original`).
-
-
-Se deja **creada pero sin ejecutar** `reprocesar_historico_a_bloques()`, que encolará visitas antiguas para el extractor de la fase 4.
-
 ### Ficheros
 
-- `src/pages/ClienteDetalle.tsx`: `nota_revision` como aviso destacado, separado del texto del comercial.
-- `src/pages/Visitas.tsx`, `src/pages/RevisionVisitas.tsx`: vocabulario de validación unificado.
+Ninguno obligatorio: son vistas de consulta. Opcionalmente se exponen en una pantalla de análisis en fases posteriores.
 
 ### Riesgos
 
-- El reparto por heurística puede clasificar mal algún párrafo. Mitigación: `observaciones_original` intacto y función reejecutable.
-- Cambiar el vocabulario de `validacion` afecta a filtros existentes: se migran en la misma fase.
+Un cambio posterior en las claves de campo de la fase 3 rompe las vistas. Mitigación: las claves quedan documentadas junto al seed.
 
 ### Verificación
 
-1. `SELECT validacion, count(*) FROM visitas GROUP BY 1;` → tres categorías, con `NO CORRECTO` en el entorno de 250.
-2. `SELECT count(*) FROM visitas WHERE observaciones_original IS NULL;` → 0.
-3. Reejecutar la función dos veces produce exactamente el mismo resultado.
-4. Muestreo manual de 20 filas comparando `observaciones_original` con el reparto en `validacion` / `nota_revision` / `observaciones`.
-5. Las tres vistas devuelven filas coherentes y `campos->>'clave'` da valores escalares, no objetos JSON.
+Las tres vistas devuelven filas coherentes con los bloques registrados, `campos->>'clave'` da valores escalares (no objetos JSON) y `gap_pct` cuadra con un cálculo manual sobre un bloque de competencia.
 
-**Dependencias:** fases 2, 3 y 4.
+**Dependencias:** fases 2 y 3.
 
 ---
 
@@ -505,10 +521,12 @@ Se deja **creada pero sin ejecutar** `reprocesar_historico_a_bloques()`, que enc
 |---|---|---|---|---|
 | 1 | 0 | Higiene de datos, pipeline único, frecuencia de compra | Medio | — |
 | 2 | 1 | Cabecera de visita (resultado, origen, fecha de registro) | Bajo | 0 |
-| 3 | 2 | Bloques múltiples por visita + revisión por bloque | Alto | 1 |
-| 4 | 3 | Plantillas, tipos nuevos, catálogos y ayudas | Alto | 2 |
-| 5 | 4 | Voz multibloque, repregunta y audio en storage | Alto | 2, 3 |
-| 6 | 5 | Campañas mínimas y enganche con promoción | Medio | 3 |
-| 7 | 6 | Vistas analíticas y limpieza del histórico | Medio | 2, 3, 4 |
+| 3 | 2 | Bloques múltiples + normalización del vocabulario de validación | Alto | 1 |
+| 4 | 6a | Limpieza del histórico y recuperación de los NO CORRECTO | Medio | 2 |
+| 5 | 3 | Plantillas, tipos nuevos, catálogos y ayudas | Alto | 2 |
+| 6 | 4 | Voz multibloque, repregunta y audio en storage | Alto | 2, 3 |
+| 7 | 5 | Campañas mínimas y enganche con promoción | Medio | 3 |
+| 8 | 6b | Vistas analíticas sobre los bloques | Bajo | 2, 3 |
 
-Las fases 5 y 6 pueden intercambiarse; el resto es secuencial.
+La 6a se adelanta porque solo depende de la 2 y desbloquea la revisión real del director. Las fases 4, 5 y 6b son intercambiables entre sí una vez cerrada la 3.
+
