@@ -453,7 +453,11 @@ Se deja **creada pero sin ejecutar** `reprocesar_historico_a_bloques()`, que enc
 
 ### Verificación
 
-`SELECT count(*) FROM visitas WHERE observaciones_original IS NULL;` → 0 tras ejecutar. Reejecutar la función dos veces produce el mismo resultado. Muestreo de 20 filas comparando original y reparto. Las tres vistas devuelven filas coherentes.
+1. `SELECT validacion, count(*) FROM visitas GROUP BY 1;` → tres categorías, con `NO CORRECTO` en el entorno de 250.
+2. `SELECT count(*) FROM visitas WHERE observaciones_original IS NULL;` → 0.
+3. Reejecutar la función dos veces produce exactamente el mismo resultado.
+4. Muestreo manual de 20 filas comparando `observaciones_original` con el reparto en `validacion` / `nota_revision` / `observaciones`.
+5. Las tres vistas devuelven filas coherentes y `campos->>'clave'` da valores escalares, no objetos JSON.
 
 **Dependencias:** fases 2, 3 y 4.
 
