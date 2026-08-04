@@ -7,9 +7,11 @@ Plan de arquitectura. Nada se ejecuta hasta que indiques fase por fase.
 - `ventas_diarias`: 433.215 filas (pipeline vivo). `ventas_mensuales`, `cliente_productos`, `detalle_ventas`: **0 filas** (pipeline muerto).
 - Consumidores de las tablas muertas en código: `src/pages/Dashboard.tsx`, `src/components/SalesChart.tsx`, `src/components/ClientSparklines.tsx`, `src/components/MonthlyComparisonChart.tsx`, `src/hooks/useHistoricoData.ts`, `src/hooks/useCrm.ts`, `supabase/functions/cliente-insights/index.ts`, `supabase/functions/sync-onedrive/index.ts`.
 - `visitas`: 21.484 filas, **todas** con `origen = 'gespromo'`. `tipo` toma los valores `Ruta` (9.005), `Cliente` (8.056), `Llamada` (4.340), `Agenda` (83) — con mayúscula inicial, no en minúsculas.
-- `visitas.validacion` ya está poblada: `pendiente` (11.076) y `correcta` (10.408). Es decir, el marcador del director ya se extrajo parcialmente en la importación; en la fase 6 hay que revisarlo y normalizarlo a `CORRECTO` / `NO CORRECTO` / `pendiente`, no partir de cero.
-- 16.412 visitas tienen `observaciones` que empiezan en mayúsculas; 3.453 no tienen observaciones.
-- `motivos_visita`: 7 motivos activos. `motivo_campos`: 40 campos. `productos`: 67.076 referencias.
+- `visitas.validacion` solo tiene `pendiente` (11.076) y `correcta` (10.408): **no existe ningún NO CORRECTO**. Los rechazos del director están enterrados en el texto (477 filas contienen un patrón `NO C…` en `observaciones`; el marcador real de primera línea ronda las 250). Hoy caen todos en `pendiente`.
+- 16.412 visitas tienen `observaciones` que empiezan en mayúsculas; 3.453 no tienen observaciones (de ellas, 21 tienen fecha futura).
+- `visitas.cod_cliente`: 488 filas sin cliente, **todas con `cod_cliente IS NULL`** (clientes potenciales, van por `cliente_externo`). Huérfanos con código real: **0**.
+- `visitas.tipo`: default de tabla `'cliente'` (minúscula) pero el dato histórico es `Ruta`/`Cliente`/`Llamada`/`Agenda`. Incoherencia real a corregir en el dato.
+- `motivos_visita` — claves reales: `seguimiento`, `promocion`, `revision_seguimiento`, `competencia`, `gsmart`, `informacion_potencial`, `incidencia`. `motivo_campos`: 40 campos, **sin columna `is_active`**. `productos`: 67.076 referencias.
 - `visitas` no tiene todavía `resultado_visita`, `visita_origen_id`, `fecha_registro`, `audio_url`, `observaciones_original`.
 
 ---
