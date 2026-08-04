@@ -477,6 +477,7 @@ export function useRevisionMutations() {
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["crm_visitas_revision"] });
     qc.invalidateQueries({ queryKey: ["crm_visitas"] });
+    qc.invalidateQueries({ queryKey: ["crm_visita_bloques"] });
   };
 
   const revisar = useMutation({
@@ -493,6 +494,94 @@ export function useRevisionMutations() {
   });
 
   return { revisar };
+}
+
+/* ---------- Bloques de visita (una visita puede llevar varias plantillas) ---------- */
+
+export interface VisitaBloque {
+  id: string;
+  visita_id: string;
+  motivo_key: string | null;
+  /** SOLO valores planos: { clave: valor }. La trazabilidad de la IA va en campos_meta. */
+  campos: Record<string, unknown>;
+  campos_meta: Record<string, unknown>;
+  completo: boolean;
+  validacion: string;
+  nota_revision: string | null;
+  revisado_por: string | null;
+  revisado_en: string | null;
+  orden: number;
+  created_at: string;
+}
+
+/** Bloques de un conjunto de visitas, agrupados por visita_id. */
+export function useVisitaBloques(visitaIds: string[]) {
+  const ids = [...visitaIds].sort();
+  return useQuery({
+    queryKey: ["crm_visita_bloques", ids],
+    enabled: ids.length > 0,
+    queryFn: async () => {
+      const mapa = new Map<string, VisitaBloque[]>();
+      for (let i = 0; i < ids.length; i += 300) {
+        const { data, error } = await supabase
+          .from("visita_bloques")
+          .select("*")
+          .in("visita_id", ids.slice(i, i + 300))
+          .order("orden");
+        if (error) throw error;
+        for (const b of (data ?? []) as unknown as VisitaBloque[]) {
+          const arr = mapa.get(b.visita_id) ?? [];
+          arr.push(b);
+          mapa.set(b.visita_id, arr);
+        }
+      }
+      return mapa;
+    },
+  });
+}
+
+/** Revisión bloque a bloque. visitas.validacion la deriva el trigger de la base de datos. */
+export function useBloqueMutations() {
+  const qc = useQueryClient();
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["crm_visita_bloques"] });
+    qc.invalidateQueries({ queryKey: ["crm_visitas_revision"] });
+    qc.invalidateQueries({ queryKey: ["crm_visitas"] });
+    qc.invalidateQueries({ queryKey: ["crm_cliente_visitas"] });
+  };
+
+  const revisarBloque = useMutation({
+    mutationFn: async (b: { id: string; validacion: string; nota_revision?: string | null; campos?: Record<string, unknown> }) => {
+      const { data: auth } = await supabase.auth.getUser();
+      const { id, ...rest } = b;
+      const { error } = await supabase
+        .from("visita_bloques")
+        .update({ ...rest, revisado_por: auth?.user?.id ?? null, revisado_en: new Date().toISOString() } as never)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+
+  return { revisarBloque };
+}
+
+/** Crea los bloques de una visita recién guardada. */
+export async function crearBloques(
+  visitaId: string,
+  bloques: { motivo_key: string; campos: Record<string, unknown>; campos_meta?: Record<string, unknown> }[],
+) {
+  if (!bloques.length) return;
+  const { error } = await supabase.from("visita_bloques").insert(
+    bloques.map((b, i) => ({
+      visita_id: visitaId,
+      motivo_key: b.motivo_key,
+      campos: b.campos,
+      campos_meta: b.campos_meta ?? {},
+      orden: i,
+    })) as never,
+  );
+  if (error) throw error;
 }
 
 export function useMotivos() {
