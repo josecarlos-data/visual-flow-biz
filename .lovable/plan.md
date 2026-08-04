@@ -172,7 +172,8 @@ CREATE TABLE public.visita_bloques (
   campos jsonb NOT NULL DEFAULT '{}',      -- SOLO valores planos: { clave: valor }
   campos_meta jsonb NOT NULL DEFAULT '{}', -- trazabilidad IA: { clave: { cita, confianza } }
   completo boolean NOT NULL DEFAULT true,
-  validacion text,
+  validacion text NOT NULL DEFAULT 'pendiente'
+    CHECK (validacion IN ('pendiente','CORRECTO','NO CORRECTO')),
   nota_revision text,
   revisado_por uuid,
   revisado_en timestamptz,
@@ -184,6 +185,10 @@ CREATE TABLE public.visita_bloques (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.visita_bloques TO authenticated;
 GRANT ALL ON public.visita_bloques TO service_role;
 ALTER TABLE public.visita_bloques ENABLE ROW LEVEL SECURITY;
+
+-- la clave foránea no crea índice: lo necesitan el trigger agregado, las políticas RLS
+-- con EXISTS, las vistas de la fase 6b y el UPDATE masivo de la fase 6a (21.484 filas)
+CREATE INDEX IF NOT EXISTS idx_visita_bloques_visita_id ON public.visita_bloques(visita_id);
 
 -- mantenimiento de updated_at, igual que en el resto de tablas del proyecto
 CREATE TRIGGER update_visita_bloques_updated_at BEFORE UPDATE ON public.visita_bloques
@@ -211,7 +216,9 @@ UPDATE public.visitas SET validacion = 'CORRECTO' WHERE validacion = 'correcta';
 
 -- 2. crear los bloques a partir del histórico (idempotente)
 INSERT INTO public.visita_bloques (visita_id, motivo_key, campos, validacion, nota_revision, revisado_por, revisado_en)
-SELECT v.id, v.motivo_key, COALESCE(v.campos,'{}'::jsonb), v.validacion, v.nota_revision, v.revisado_por, v.revisado_en
+SELECT v.id, v.motivo_key, COALESCE(v.campos,'{}'::jsonb),
+       CASE WHEN v.validacion IN ('CORRECTO','NO CORRECTO') THEN v.validacion ELSE 'pendiente' END,
+       v.nota_revision, v.revisado_por, v.revisado_en
 FROM public.visitas v
 WHERE NOT EXISTS (SELECT 1 FROM public.visita_bloques b WHERE b.visita_id = v.id);
 
@@ -225,7 +232,9 @@ La **recuperación de los NO CORRECTO** desde el texto no se toca aquí: sigue e
 
 **Contrato de `campos` (obligatorio en todas las fases):** `campos` contiene **valores planos** (`{"precio_ofertado": 128.5}`), nunca objetos anidados. La trazabilidad de la IA (cita literal y confianza) va aparte, en `campos_meta` (`{"precio_ofertado": {"cita": "…", "confianza": "alta"}}`). Así las vistas de la fase 6b pueden leer con `campos->>'clave'` sin ambigüedad, y `campos_meta` se puede vaciar sin perder datos de negocio.
 
-`visitas.motivo_key` y `visitas.campos` se **conservan como legacy**. `visitas.validacion` pasa a estado agregado, mantenido por trigger sobre `visita_bloques`: `NO CORRECTO` si algún bloque lo está; si no, `pendiente` si alguno lo está; si no, `CORRECTO`. Visitas sin bloques (no efectivas) conservan su valor.
+`visitas.motivo_key` y `visitas.campos` se **conservan como legacy**. `visitas.validacion` pasa a estado agregado, mantenido por trigger sobre `visita_bloques`.
+
+**El estado por defecto de un bloque es `pendiente`, nunca NULL.** La columna es `NOT NULL DEFAULT 'pendiente'` con CHECK de los tres valores, y el trigger evalúa además `COALESCE(validacion,'pendiente')` como segunda red. Orden de evaluación: `NO CORRECTO` si algún bloque lo está; si no, `pendiente` si algún bloque lo está; **y solo se llega a `CORRECTO` si TODOS los bloques son explícitamente `CORRECTO`** — nunca por descarte. Visitas sin bloques (no efectivas) conservan su valor.
 
 ### Ficheros
 
@@ -244,6 +253,7 @@ Doble fuente de verdad entre `visitas.campos` y los bloques mientras dure el leg
 2. `SELECT validacion, count(*) FROM visita_bloques GROUP BY 1;` → solo `CORRECTO` y `pendiente`; **ninguna fila con `correcta`** ni en bloques ni en `visitas`.
 3. Guardar una visita nueva con 2 bloques del mismo motivo.
 4. Marcar un bloque como NO CORRECTO y comprobar que la visita pasa a NO CORRECTO; volverlo a CORRECTO y comprobar que la visita vuelve a CORRECTO.
+5. **Control anti-descarte:** crear una visita nueva con un bloque sin revisar y comprobar que la visita queda en `pendiente`, **nunca** en `CORRECTO`.
 
 **Dependencias:** fase 1.
 
@@ -292,6 +302,7 @@ Doble fuente de verdad entre `visitas.campos` y los bloques mientras dure el leg
   - `motivo_fuera_plazo` — texto, `visibilidad = 'sistema'`, no obligatorio.
 
   Sin esta declaración el guardado los descartaría, porque el formulario solo persiste claves definidas en la plantilla activa. El renderizador filtra por `is_active AND visibilidad = 'normal'`; el guardado conserva además las claves `sistema`.
+- **`campana_id` se declara aquí pero nace desactivado.** La tabla `campanas` no existe hasta la fase 5, así que un `select` activo rendiría una lista vacía. Se declara en el seed de `promocion` con `is_active = false` y tipo `referencia_campana`; **la fase 5 lo activa** (`is_active = true`) al crear la tabla, y ese tipo resuelve sus opciones contra `public.campanas` filtrando por `estado = 'activa'` (no contra `catalogos_opciones` ni contra una lista literal).
 
 ### Ficheros
 
@@ -405,7 +416,7 @@ Campañas con muchas líneas en el selector: búsqueda paginada por campaña.
 
 Crear campaña con 3 líneas, registrar una promoción eligiendo una línea y comprobar el autorrelleno; registrar una con fecha posterior a la prórroga y comprobar que se guarda marcada; exportar y abrir el fichero.
 
-**Dependencias:** fase 3 (campo `campana_id` del bloque de promoción).
+**Dependencias:** fase 3 (campo `campana_id` del bloque de promoción, declarado allí con `is_active = false`). Esta fase lo **activa** con `UPDATE public.motivo_campos SET is_active = true WHERE motivo_key = 'promocion' AND campo_key = 'campana_id';` una vez creada `campanas`.
 
 ---
 
@@ -424,7 +435,8 @@ ALTER TABLE public.visitas ADD COLUMN IF NOT EXISTS observaciones_original text;
 --   2) parte SIEMPRE de observaciones_original
 --   3) primera línea con el marcador del director -> visita_bloques.validacion
 --      (NUNCA visitas.validacion: la deriva el trigger de la fase 2)
---   4) párrafos íntegros en MAYÚSCULAS -> nota_revision
+--   4) párrafos íntegros en MAYÚSCULAS -> visita_bloques.nota_revision
+--      (NUNCA visitas.nota_revision: toda la revisión vive en el bloque)
 --   5) resto -> observaciones
 ```
 
