@@ -88,10 +88,21 @@ export default function RevisionVisitas() {
     setEtiquetaSituacion("Caída justificada");
   };
 
+  /** Valida (o rechaza) todos los bloques de la visita de golpe. */
   const enviar = async (validacion: string) => {
     if (!sel) return;
     try {
-      await revisar.mutateAsync({ id: sel.id, validacion, nota_revision: nota || null, observaciones: observaciones || null });
+      const bs = bloquesDe(sel);
+      for (const b of bs) {
+        await revisarBloque.mutateAsync({ id: b.id, validacion, nota_revision: nota || null });
+      }
+      // La validación de la cabecera la deriva el trigger a partir de los bloques.
+      await revisar.mutateAsync({
+        id: sel.id,
+        validacion: bs.length ? sel.validacion ?? validacion : validacion,
+        nota_revision: nota || null,
+        observaciones: observaciones || null,
+      });
       if (justificar && sel.cod_cliente) {
         await guardarSituacion.mutateAsync({
           cod_cliente: sel.cod_cliente,
@@ -109,6 +120,17 @@ export default function RevisionVisitas() {
       toast({ title: "No se ha podido guardar", description: (e as Error).message, variant: "destructive" });
     }
   };
+
+  /** Validación de un bloque concreto; el resto de bloques no se tocan. */
+  const enviarBloque = async (b: VisitaBloque, validacion: string) => {
+    try {
+      await revisarBloque.mutateAsync({ id: b.id, validacion });
+      toast({ title: validacion === "CORRECTO" ? "Bloque validado" : "Bloque marcado como no correcto" });
+    } catch (e) {
+      toast({ title: "No se ha podido guardar", description: (e as Error).message, variant: "destructive" });
+    }
+  };
+
 
   return (
     <div className="space-y-4">
