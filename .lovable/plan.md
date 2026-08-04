@@ -184,6 +184,10 @@ CREATE TABLE public.visita_bloques (
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.visita_bloques TO authenticated;
 GRANT ALL ON public.visita_bloques TO service_role;
 ALTER TABLE public.visita_bloques ENABLE ROW LEVEL SECURITY;
+
+-- mantenimiento de updated_at, igual que en el resto de tablas del proyecto
+CREATE TRIGGER update_visita_bloques_updated_at BEFORE UPDATE ON public.visita_bloques
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 ```
 
 Políticas espejo de las de `visitas`, resolviendo la visita padre (permisivas, nunca restrictivas):
@@ -278,6 +282,16 @@ Doble fuente de verdad entre `visitas.campos` y los bloques mientras dure el leg
   Los 40 campos actuales que no aparezcan en la definición nueva quedan con `is_active = false`: **no se borran**, y sus valores en los jsonb históricos se conservan.
   Requiere índice único `(motivo_key, campo_key)`; se crea si no existe.
 - Catálogos (competidores, marcas de vehículo, marcas de eje, tipos de trabajo, viscosidades) en tabla `catalogos_opciones (clave, valor, orden)` para poder actualizarlos sin migración, con lista inicial razonable hasta que envíes la definitiva.
+- **Precedencia entre `motivo_campos.opciones` y `catalogos_opciones` (fuente única de verdad).** `opciones` admite dos formas y solo dos:
+  - lista literal: `["Sí","No","Pendiente"]` — valores propios de ese campo, no compartidos;
+  - referencia a catálogo: `{"catalogo":"competidores"}` — los valores se resuelven desde `catalogos_opciones` filtrando por `clave` y ordenando por `orden`.
+
+  Si `opciones` es un objeto con la clave `catalogo`, **la referencia manda y la lista literal se ignora**; nunca se mezclan las dos. Un catálogo vacío o inexistente rinde una lista vacía y se avisa en el diseñador, nunca se cae al literal. La resolución se implementa una sola vez en un helper compartido (`resolverOpciones`) y se aplica en los tres consumidores: el renderizador de `NuevaVisita.tsx`, el diseñador de `AdminVisitas.tsx` (que permite elegir entre literal y catálogo) y el JSON schema que se envía a la IA en la fase 4, donde los `enum` van ya resueltos a valores concretos.
+- **Campos de sistema del motivo `promocion`, declarados aquí para que la fase 5 pueda escribirlos.** Se añade un tipo de visibilidad: `motivo_campos.visibilidad` (`normal` por defecto, `sistema` para los que no se pintan en el formulario ni se envían a la IA, pero sí se persisten en el jsonb del bloque). En el seed de esta fase se declaran para `promocion`:
+  - `fuera_de_plazo` — booleano, `visibilidad = 'sistema'`, no obligatorio;
+  - `motivo_fuera_plazo` — texto, `visibilidad = 'sistema'`, no obligatorio.
+
+  Sin esta declaración el guardado los descartaría, porque el formulario solo persiste claves definidas en la plantilla activa. El renderizador filtra por `is_active AND visibilidad = 'normal'`; el guardado conserva además las claves `sistema`.
 
 ### Ficheros
 
@@ -309,7 +323,9 @@ Alta de una visita con un bloque de cada motivo nuevo; comprobar en `visita_bloq
 ALTER TABLE public.visitas ADD COLUMN IF NOT EXISTS audio_url text;
 ```
 
-Bucket privado `visitas-audio` (creado con la herramienta de storage, no por SQL) + políticas sobre `storage.objects` equivalentes a las de `visitas`. Retención de 90 días mediante función `purgar_audios_visitas()` y cron diario.
+Bucket privado `visitas-audio` (creado con la herramienta de storage, no por SQL) + políticas sobre `storage.objects` equivalentes a las de `visitas`. Retención de 90 días mediante función `purgar_audios_visitas()`.
+
+**`pg_cron` NO está instalado en el proyecto** (verificado: solo hay `pg_stat_statements`, `pgcrypto`, `plpgsql`, `supabase_vault`, `uuid-ossp`; `pg_cron` y `pg_net` están disponibles pero sin instalar). Alternativa elegida, sin depender de habilitar extensiones: una edge function `purgar-audios` que valida una cabecera con secreto propio, borra del bucket los objetos de más de 90 días y llama a `purgar_audios_visitas()` para limpiar `audio_url`. Se programa desde el planificador de la plataforma con periodicidad diaria. Es idempotente y se puede lanzar a mano. Si más adelante interesa hacerlo dentro de la base de datos, se instalan `pg_cron` + `pg_net` y se agenda la misma edge function; el borrado de ficheros del bucket seguiría necesitándola.
 
 ### Ficheros
 
@@ -364,9 +380,15 @@ GRANT ALL ON public.campanas, public.campana_lineas TO service_role;
 ALTER TABLE public.campanas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.campana_lineas ENABLE ROW LEVEL SECURITY;
 -- lectura: is_approved(auth.uid()); escritura: is_admin() o has_role(...,'director_comercial')
+
+-- mantenimiento de updated_at, igual que en el resto de tablas del proyecto
+CREATE TRIGGER update_campanas_updated_at BEFORE UPDATE ON public.campanas
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE TRIGGER update_campana_lineas_updated_at BEFORE UPDATE ON public.campana_lineas
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 ```
 
-Fuera de plazo: el bloque de promoción guarda `fuera_de_plazo = true` y `motivo_fuera_plazo` dentro de su jsonb. **Nunca se impide guardar.**
+Fuera de plazo: el bloque de promoción guarda `fuera_de_plazo = true` y `motivo_fuera_plazo` dentro de su jsonb, en los dos campos de sistema declarados en el seed de la fase 3. **Nunca se impide guardar.**
 
 ### Ficheros
 
@@ -400,7 +422,8 @@ ALTER TABLE public.visitas ADD COLUMN IF NOT EXISTS observaciones_original text;
 -- función idempotente repartir_observaciones_gespromo():
 --   1) copia observaciones -> observaciones_original (solo si es NULL)
 --   2) parte SIEMPRE de observaciones_original
---   3) primera línea con el marcador del director -> validacion
+--   3) primera línea con el marcador del director -> visita_bloques.validacion
+--      (NUNCA visitas.validacion: la deriva el trigger de la fase 2)
 --   4) párrafos íntegros en MAYÚSCULAS -> nota_revision
 --   5) resto -> observaciones
 ```
@@ -418,7 +441,7 @@ ALTER TABLE public.visitas ADD COLUMN IF NOT EXISTS observaciones_original text;
 
 Se usa además `levenshtein` (extensión `fuzzystrmatch`) con distancia ≤ 3 contra `CORRECTO` para cazar variantes no previstas, y la función deja un informe con las primeras líneas que no ha sabido clasificar para revisarlas a mano. Como control previo: 477 filas contienen un patrón `NO C…` en cualquier posición del texto; el marcador válido es solo el de primera línea, de ahí que la cifra esperada sea inferior.
 
-El resultado se propaga a `visita_bloques.validacion` (un bloque por visita histórica) para que el estado agregado de la fase 2 siga siendo coherente.
+**La función escribe el marcador ÚNICAMENTE en `visita_bloques.validacion`** (un bloque por visita histórica) y no toca `visitas.validacion`: el trigger agregado de la fase 2 la deriva a partir de los bloques. Si escribiera en las dos, la propagación pisaría el valor recién calculado. El criterio de aceptación se comprueba igual sobre `visitas.validacion`, ya derivada: tres categorías y del orden de 250 `NO CORRECTO`.
 
 Se deja **creada pero sin ejecutar** `reprocesar_historico_a_bloques()`, que encolará visitas antiguas para el extractor de la fase 4. No se ejecuta en esta fase ni requiere que la fase 4 exista.
 
