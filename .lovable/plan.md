@@ -257,7 +257,7 @@ Cada visita histórica tiene exactamente 1 bloque (`21.484`). Guardar una visita
 
 ### Verificación
 
-Alta de una visita con un bloque de cada motivo nuevo; comprobar en `visita_bloques.campos` que los `multiselect` guardan array y `referencia` guarda la referencia con sus datos derivados. `SELECT count(*) FROM motivo_campos WHERE ayuda IS NULL OR ayuda = '';` → 0.
+Alta de una visita con un bloque de cada motivo nuevo; comprobar en `visita_bloques.campos` que los `multiselect` guardan array y `referencia` guarda la referencia con sus datos derivados. `SELECT count(*) FROM motivo_campos WHERE ayuda IS NULL OR ayuda = '';` → 0. Un campo con `is_active = false` desaparece del formulario y del esquema enviado a la IA.
 
 **Dependencias:** fase 2.
 
