@@ -68,7 +68,17 @@ export default function RevisionVisitas() {
     });
   }, [visitas, estado, q, nombrePorCod, motivos]);
 
+  // Bloques de las visitas visibles: una visita puede llevar varias plantillas.
+  const { data: bloquesMap } = useVisitaBloques(filtradas.slice(0, 200).map((v) => v.id));
+  const bloquesDe = (v: Visita) => bloquesMap?.get(v.id) ?? [];
+  const resumenMotivos = (v: Visita) => {
+    const bs = bloquesDe(v);
+    if (!bs.length) return nombreMotivo(v.motivo_key);
+    return bs.map((b) => nombreMotivo(b.motivo_key)).join(" + ");
+  };
+
   const pendientes = (visitas ?? []).filter((v) => (v.validacion ?? "pendiente") === "pendiente").length;
+
 
   const abrir = (v: Visita) => {
     setSel(v);
