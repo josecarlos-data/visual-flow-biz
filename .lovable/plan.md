@@ -444,10 +444,10 @@ Las tres vistas devuelven filas coherentes con los bloques registrados, `campos-
 
 | Orden | Fase | Contenido | Esfuerzo | Depende de |
 |---|---|---|---|---|
-| 1 | 0 | Higiene de datos, pipeline único, frecuencia de compra | Medio | — |
-| 2 | 1 | Cabecera de visita (resultado, origen, fecha de registro) | Bajo | 0 |
-| 3 | 2 | Bloques múltiples + normalización del vocabulario de validación | Alto | 1 |
-| 4 | 6a | Limpieza del histórico y recuperación de los NO CORRECTO | Medio | 2 |
+| — | 0 | Higiene de datos, pipeline único, frecuencia de compra | — | **COMPLETADA 04/08/2026** |
+| — | 1 | Cabecera de visita (resultado, origen, fecha de registro) | — | **COMPLETADA 04/08/2026** |
+| 1 | 2 | Bloques múltiples + normalización del vocabulario de validación | Alto | 1 |
+| 2 | 6a | Limpieza del histórico y recuperación de los NO CORRECTO | Medio | 2 |
 | 5 | 3 | Plantillas, tipos nuevos, catálogos y ayudas | Alto | 2 |
 | 6 | 4 | Voz multibloque, repregunta y audio en storage | Alto | 2, 3 |
 | 7 | 5 | Campañas mínimas y enganche con promoción | Medio | 3 |
