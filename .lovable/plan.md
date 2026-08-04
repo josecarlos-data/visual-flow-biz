@@ -277,7 +277,14 @@ Bucket privado `visitas-audio` (creado con la herramienta de storage, no por SQL
 
 ### Ficheros
 
-- `supabase/functions/visita-voz/index.ts`: reescrita. Entrada: audio + cliente + catálogo completo de motivos y campos. Salida: `{ transcripcion, bloques: [{ motivo_key, completo, campos: { clave: { valor, cita, confianza } } }] }`. Regla dura en el prompt: sin mención explícita → `null`, nunca deducir.
+- `supabase/functions/visita-voz/index.ts`: reescrita. Entrada: audio + cliente + catálogo de motivos y sus campos **activos**. Salida:
+  ```json
+  { "transcripcion": "...",
+    "bloques": [{ "motivo_key": "promocion", "completo": false,
+                  "campos": { "precio_ofertado": 128.5 },
+                  "campos_meta": { "precio_ofertado": { "cita": "se lo dejé a 128 con 50", "confianza": "alta" } } }] }
+  ```
+  Es decir, la función devuelve ya separados los valores planos y la metadatos, en el mismo formato en que se persisten (`campos` / `campos_meta`). Regla dura en el prompt: sin mención explícita → `null`, nunca deducir.
 - `src/pages/NuevaVisita.tsx`: chuleta previa (no obligatoria) con bloques y sus puntos; revisión posterior de bloques detectados resaltando confianza baja; repregunta dirigida solo a los obligatorios vacíos; guardado del bloque como `completo = false` si el comercial no contesta.
 - `src/components/VoiceRecorder.tsx`: subida del audio al bucket.
 
