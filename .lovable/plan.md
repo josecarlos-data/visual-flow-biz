@@ -412,13 +412,32 @@ ALTER TABLE public.visitas ADD COLUMN IF NOT EXISTS observaciones_original text;
 -- función idempotente repartir_observaciones_gespromo():
 --   1) copia observaciones -> observaciones_original (solo si es NULL)
 --   2) parte SIEMPRE de observaciones_original
---   3) primera línea con variantes de CORRECTO/NO CORRECTO (fuzzy: CORRETO, CORRCETO,
---      CORREFCTO, CORRETCO...) -> validacion normalizada
+--   3) primera línea con el marcador del director -> validacion
 --   4) párrafos íntegros en MAYÚSCULAS -> nota_revision
 --   5) resto -> observaciones
 ```
 
-Nota verificada: `validacion` ya contiene `pendiente` (11.076) y `correcta` (10.408), no los valores objetivo. La función normaliza a `CORRECTO` / `NO CORRECTO` / `pendiente` y la UI se adapta al mismo vocabulario.
+**Recuperación de los NO CORRECTO (punto crítico).** Verificado: `validacion` solo tiene `pendiente` (11.076) y `correcta` (10.408); **no hay ni un solo NO CORRECTO**, pese a que en el fichero original hay del orden de 256 visitas rechazadas por el director. Hoy están todas cayendo en `pendiente`. La función debe recuperarlas desde `observaciones_original`, y el orden de evaluación importa: **primero la negación**, porque `NO CORRECTO` contiene `CORRECTO`.
+
+```sql
+-- primera línea normalizada: sin tildes, sin puntuación, colapsando espacios
+-- 1) negación:  ^N\s*O?\s*C[A-Z]{4,10}   →  'NO CORRECTO'
+--    cubre NO CORRECTO, NOCORRECTO, NO CORRETO, NO CORRCETO, NO CORREFCTO, NO CORRETCO, N O CORRECTO
+-- 2) afirmación: ^C[A-Z]{4,10}           →  'CORRECTO'
+--    cubre CORRECTO, CORRETO, CORRCETO, CORREFCTO, CORRETCO
+-- 3) sin marcador                        →  'pendiente'
+```
+
+Se usa además `levenshtein` (extensión `fuzzystrmatch`) con distancia ≤ 3 contra `CORRECTO` para cazar variantes no previstas, y la función deja un informe con las primeras líneas que no ha sabido clasificar para revisarlas a mano. Como control previo: 477 filas contienen un patrón `NO C…` en cualquier posición del texto; el marcador válido es solo el de primera línea, de ahí que la cifra esperada sea inferior.
+
+**Criterio de aceptación de la fase:** tras ejecutar la función,
+
+```sql
+SELECT validacion, count(*) FROM visitas GROUP BY 1;
+```
+
+debe devolver **tres** categorías: `CORRECTO`, `NO CORRECTO` (en el entorno de 250) y `pendiente`. Si `NO CORRECTO` sale muy por debajo de 250, la fase no se da por buena: se ajustan los patrones y se reejecuta (la función es idempotente porque siempre parte de `observaciones_original`).
+
 
 Se deja **creada pero sin ejecutar** `reprocesar_historico_a_bloques()`, que encolará visitas antiguas para el extractor de la fase 4.
 
