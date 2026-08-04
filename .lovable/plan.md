@@ -62,7 +62,12 @@ DROP TABLE IF EXISTS public.ventas_mensuales;
 
 ### Verificación
 
-1. `SELECT count(*) FROM cliente_kpis WHERE frecuencia_compra_dias < 1;` → 0 filas.
+1. Contraste manual sobre un cliente concreto: se elige uno con compras recientes y se compara
+   ```sql
+   SELECT count(DISTINCT fecha) FROM ventas_diarias
+   WHERE cod_cliente = :cod AND fecha > (SELECT max(fecha) FROM ventas_diarias) - 365;
+   ```
+   con `dias_activos_ultimo_ano` (deben coincidir exactamente) y `365.0 / ese_valor` con `frecuencia_compra_dias`. Se repite con 3 clientes de perfiles distintos (diario, semanal, esporádico).
 2. Clientes sin compra en 365 días → `frecuencia_compra_dias` y `dias_activos_ultimo_ano` a NULL.
 3. Dashboard, sparklines y comparativa mensual muestran barras (hoy están en blanco).
 4. Análisis IA de un cliente con facturación: ya no dice "no muestra ventas anuales".
