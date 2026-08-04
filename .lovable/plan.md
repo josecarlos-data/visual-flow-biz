@@ -448,10 +448,10 @@ Las tres vistas devuelven filas coherentes con los bloques registrados, `campos-
 | — | 1 | Cabecera de visita (resultado, origen, fecha de registro) | — | **COMPLETADA 04/08/2026** |
 | 1 | 2 | Bloques múltiples + normalización del vocabulario de validación | Alto | 1 |
 | 2 | 6a | Limpieza del histórico y recuperación de los NO CORRECTO | Medio | 2 |
-| 5 | 3 | Plantillas, tipos nuevos, catálogos y ayudas | Alto | 2 |
-| 6 | 4 | Voz multibloque, repregunta y audio en storage | Alto | 2, 3 |
-| 7 | 5 | Campañas mínimas y enganche con promoción | Medio | 3 |
-| 8 | 6b | Vistas analíticas sobre los bloques | Bajo | 2, 3 |
+| 3 | 3 | Plantillas, tipos nuevos, catálogos y ayudas | Alto | 2 |
+| 4 | 4 | Voz multibloque, repregunta y audio en storage | Alto | 2, 3 |
+| 5 | 5 | Campañas mínimas y enganche con promoción | Medio | 3 |
+| 6 | 6b | Vistas analíticas sobre los bloques | Bajo | 2, 3 |
 
 La 6a se adelanta porque solo depende de la 2 y desbloquea la revisión real del director. Las fases 4, 5 y 6b son intercambiables entre sí una vez cerrada la 3.
 
