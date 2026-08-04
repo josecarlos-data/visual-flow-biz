@@ -13,8 +13,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import {
   useVisitasRevision, useRevisionMutations, useMotivos, useClientes,
-  useSituacionesMutations, fechaCorta, hoyISO,
-  type Visita,
+  useSituacionesMutations, useVisitaBloques, useBloqueMutations, fechaCorta, hoyISO,
+  type Visita, type VisitaBloque,
 } from "@/hooks/useCrm";
 
 const ESTADOS = [
