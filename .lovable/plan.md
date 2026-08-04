@@ -302,6 +302,7 @@ Doble fuente de verdad entre `visitas.campos` y los bloques mientras dure el leg
   - `motivo_fuera_plazo` — texto, `visibilidad = 'sistema'`, no obligatorio.
 
   Sin esta declaración el guardado los descartaría, porque el formulario solo persiste claves definidas en la plantilla activa. El renderizador filtra por `is_active AND visibilidad = 'normal'`; el guardado conserva además las claves `sistema`.
+- **`campana_id` se declara aquí pero nace desactivado.** La tabla `campanas` no existe hasta la fase 5, así que un `select` activo rendiría una lista vacía. Se declara en el seed de `promocion` con `is_active = false` y tipo `referencia_campana`; **la fase 5 lo activa** (`is_active = true`) al crear la tabla, y ese tipo resuelve sus opciones contra `public.campanas` filtrando por `estado = 'activa'` (no contra `catalogos_opciones` ni contra una lista literal).
 
 ### Ficheros
 
