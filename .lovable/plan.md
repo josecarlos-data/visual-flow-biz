@@ -232,13 +232,19 @@ Cada visita histórica tiene exactamente 1 bloque (`21.484`). Guardar una visita
 
 ### Base de datos
 
+- **`motivo_campos` no tiene forma de desactivar campos** (verificado): se añade
+  ```sql
+  ALTER TABLE public.motivo_campos ADD COLUMN IF NOT EXISTS is_active boolean NOT NULL DEFAULT true;
+  ```
+  y se filtra por `is_active` en el renderizador de la visita, en el diseñador de plantillas y en el JSON schema que se envía a la IA (fase 4).
 - Nuevos motivos: `viaje_incentivo`, `gestion_cobro`, `alta_reapertura`, `visita_partner`. `gsmart` se limpia de contenido de viaje.
 - Nuevos tipos admitidos en `motivo_campos.tipo`: `multiselect`, `referencia`, `adjunto`.
 - Reseed completo de `motivo_campos` por motivo con la definición que has dado (promoción, revisión de seguimiento, competencia, GSMart, viaje/incentivo, información/potencial, incidencia), con `opciones` cargadas y `ayuda` **en todos** los campos.
-- El seed es idempotente (`ON CONFLICT (motivo_key, campo_key) DO UPDATE`); los campos legacy que ya no se usan se desactivan, no se borran.
+- El seed es idempotente (`ON CONFLICT (motivo_key, campo_key) DO UPDATE`); los campos legacy que ya no se usan se marcan `is_active = false`, no se borran.
 - Catálogos (competidores, marcas de vehículo, marcas de eje, tipos de trabajo, viscosidades) en tabla `catalogos_opciones (clave, valor, orden)` para poder actualizarlos sin migración, con lista inicial razonable hasta que envíes la definitiva.
 
 ### Ficheros
+
 
 - `src/pages/AdminVisitas.tsx`: diseñador con los tipos nuevos y edición de catálogos.
 - `src/pages/NuevaVisita.tsx`: renderizador de `multiselect`, `referencia` (autocompletado contra `productos`, rellena descripción/familia/marca) y `adjunto`.
