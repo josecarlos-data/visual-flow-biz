@@ -76,27 +76,64 @@ DROP TABLE IF EXISTS public.ventas_mensuales;
 **Objetivo:** distinguir la visita efectiva de la que no lo fue y trazar el momento real de registro.
 
 ```sql
+-- 1. Resultado: 'desconocido' para todo el histórico, 'efectiva' solo para lo nuevo
 ALTER TABLE public.visitas
-  ADD COLUMN IF NOT EXISTS resultado_visita text NOT NULL DEFAULT 'efectiva',
+  ADD COLUMN IF NOT EXISTS resultado_visita text,
   ADD COLUMN IF NOT EXISTS visita_origen_id uuid REFERENCES public.visitas(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS fecha_registro timestamptz NOT NULL DEFAULT now();
 
-ALTER TABLE public.visitas
-  ADD CONSTRAINT visitas_resultado_chk
-  CHECK (resultado_visita IN ('efectiva','cliente_ausente','cerrado','sin_acceso'));
+UPDATE public.visitas SET resultado_visita = 'desconocido' WHERE resultado_visita IS NULL;
 
 ALTER TABLE public.visitas
-  ADD CONSTRAINT visitas_cod_cliente_fk
-  FOREIGN KEY (cod_cliente) REFERENCES public.clientes(cod_cliente) NOT VALID;
--- después, en la misma migración:
-ALTER TABLE public.visitas VALIDATE CONSTRAINT visitas_cod_cliente_fk;
+  ALTER COLUMN resultado_visita SET DEFAULT 'efectiva',
+  ALTER COLUMN resultado_visita SET NOT NULL,
+  ADD CONSTRAINT visitas_resultado_chk
+  CHECK (resultado_visita IN ('efectiva','cliente_ausente','cerrado','sin_acceso','desconocido'));
+
+-- 2. Normalización del DATO en tipo (no en la UI)
+UPDATE public.visitas SET tipo = lower(tipo) WHERE tipo <> lower(tipo);
+ALTER TABLE public.visitas
+  ALTER COLUMN tipo SET DEFAULT 'cliente',
+  ADD CONSTRAINT visitas_tipo_chk
+  CHECK (tipo IN ('cliente','ruta','llamada','agenda'));
 
 CREATE INDEX IF NOT EXISTS idx_visitas_origen_id ON public.visitas(visita_origen_id);
 ```
 
-Si `VALIDATE` falla por visitas de clientes potenciales, la restricción se queda `NOT VALID` (sigue aplicándose a filas nuevas) y se registra el listado de huérfanos.
+**Clave foránea `cod_cliente` — comprobado antes de escribir el plan:**
 
-No se crea campo `canal`: se documenta `visitas.tipo` con sus valores reales `Cliente` / `Ruta` / `Llamada` / `Agenda`, y se normaliza su presentación en la UI.
+```sql
+SELECT count(*) FROM visitas v LEFT JOIN clientes c USING (cod_cliente)
+WHERE c.cod_cliente IS NULL;   -- 488
+SELECT count(*) FROM visitas WHERE cod_cliente IS NULL;  -- 488
+```
+
+Las 488 son exactamente las de `cod_cliente IS NULL` (clientes potenciales registrados por `cliente_externo`), y una FK no restringe los NULL. **Huérfanos con código real: 0**, así que el `VALIDATE` es seguro. Aun así la migración lo hace condicional, porque un `VALIDATE` que falla aborta la migración entera:
+
+```sql
+ALTER TABLE public.visitas
+  ADD CONSTRAINT visitas_cod_cliente_fk
+  FOREIGN KEY (cod_cliente) REFERENCES public.clientes(cod_cliente) NOT VALID;
+
+DO $$
+DECLARE n int;
+BEGIN
+  SELECT count(*) INTO n FROM public.visitas v
+  LEFT JOIN public.clientes c USING (cod_cliente)
+  WHERE v.cod_cliente IS NOT NULL AND c.cod_cliente IS NULL;
+  IF n = 0 THEN
+    ALTER TABLE public.visitas VALIDATE CONSTRAINT visitas_cod_cliente_fk;
+  ELSE
+    RAISE NOTICE 'FK dejada NOT VALID: % visitas con cliente inexistente', n;
+  END IF;
+END $$;
+```
+
+Si quedara NOT VALID, te entrego el listado de `cod_cliente` afectados antes de tocar nada más.
+
+**Visitas sin realizar:** 3.453 visitas del histórico no tienen observaciones y son planificaciones que nunca se ejecutaron (21 de ellas con fecha futura). En esta fase **solo se informa**: la migración deja un recuento en el log y te doy la cifra exacta por comercial y año. El traslado a `visitas_planificadas` se decide después, no se hace aquí.
+
+No se crea campo `canal`: se documenta `visitas.tipo` con sus cuatro valores ya normalizados en minúscula.
 
 ### Ficheros
 
