@@ -172,7 +172,8 @@ CREATE TABLE public.visita_bloques (
   campos jsonb NOT NULL DEFAULT '{}',      -- SOLO valores planos: { clave: valor }
   campos_meta jsonb NOT NULL DEFAULT '{}', -- trazabilidad IA: { clave: { cita, confianza } }
   completo boolean NOT NULL DEFAULT true,
-  validacion text,
+  validacion text NOT NULL DEFAULT 'pendiente'
+    CHECK (validacion IN ('pendiente','CORRECTO','NO CORRECTO')),
   nota_revision text,
   revisado_por uuid,
   revisado_en timestamptz,
