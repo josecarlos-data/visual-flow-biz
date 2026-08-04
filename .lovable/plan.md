@@ -278,6 +278,11 @@ Doble fuente de verdad entre `visitas.campos` y los bloques mientras dure el leg
   Los 40 campos actuales que no aparezcan en la definición nueva quedan con `is_active = false`: **no se borran**, y sus valores en los jsonb históricos se conservan.
   Requiere índice único `(motivo_key, campo_key)`; se crea si no existe.
 - Catálogos (competidores, marcas de vehículo, marcas de eje, tipos de trabajo, viscosidades) en tabla `catalogos_opciones (clave, valor, orden)` para poder actualizarlos sin migración, con lista inicial razonable hasta que envíes la definitiva.
+- **Precedencia entre `motivo_campos.opciones` y `catalogos_opciones` (fuente única de verdad).** `opciones` admite dos formas y solo dos:
+  - lista literal: `["Sí","No","Pendiente"]` — valores propios de ese campo, no compartidos;
+  - referencia a catálogo: `{"catalogo":"competidores"}` — los valores se resuelven desde `catalogos_opciones` filtrando por `clave` y ordenando por `orden`.
+
+  Si `opciones` es un objeto con la clave `catalogo`, **la referencia manda y la lista literal se ignora**; nunca se mezclan las dos. Un catálogo vacío o inexistente rinde una lista vacía y se avisa en el diseñador, nunca se cae al literal. La resolución se implementa una sola vez en un helper compartido (`resolverOpciones`) y se aplica en los tres consumidores: el renderizador de `NuevaVisita.tsx`, el diseñador de `AdminVisitas.tsx` (que permite elegir entre literal y catálogo) y el JSON schema que se envía a la IA en la fase 4, donde los `enum` van ya resueltos a valores concretos.
 
 ### Ficheros
 
