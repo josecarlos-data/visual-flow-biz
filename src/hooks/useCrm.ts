@@ -599,10 +599,7 @@ export function useMotivos() {
       ]);
       if (mRes.error) throw mRes.error;
       if (cRes.error) throw cRes.error;
-      const campos = ((cRes.data ?? []) as unknown as MotivoCampo[]).map((c) => ({
-        ...c,
-        opciones: Array.isArray(c.opciones) ? c.opciones.map(String) : [],
-      }));
+      const campos = (cRes.data ?? []) as unknown as MotivoCampo[];
       return ((mRes.data ?? []) as unknown as Omit<Motivo, "campos">[]).map((m) => ({
         ...m,
         campos: campos.filter((c) => c.motivo_key === m.key),
@@ -611,6 +608,28 @@ export function useMotivos() {
     staleTime: 5 * 60 * 1000,
   });
 }
+
+/** Catálogos cerrados de opciones (competidores, canales de envío…). */
+export function useCatalogos() {
+  return useQuery({
+    queryKey: ["crm_catalogos"],
+    queryFn: async (): Promise<CatalogoMap> => {
+      const { data, error } = await supabase
+        .from("catalogos_opciones")
+        .select("clave, valor, orden, is_active")
+        .eq("is_active", true)
+        .order("orden");
+      if (error) throw error;
+      const map: CatalogoMap = {};
+      for (const row of (data ?? []) as { clave: string; valor: string }[]) {
+        (map[row.clave] ??= []).push(row.valor);
+      }
+      return map;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 
 /** Alta, edición y borrado de plantillas de visita (solo administración). */
 export function useMotivosAdmin() {
