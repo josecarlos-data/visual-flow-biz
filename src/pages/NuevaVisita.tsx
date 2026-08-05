@@ -159,7 +159,9 @@ export default function NuevaVisita() {
           toast({ title: "Faltan datos", description: "Selecciona el motivo de cada bloque.", variant: "destructive" });
           return;
         }
-        for (const c of m.campos) if (c.is_required && !b.valores[c.campo_key]?.trim()) faltan.push(`${m.nombre}: ${c.label}`);
+        for (const c of camposVisibles(m.campos))
+          if (c.is_required && !b.valores[c.campo_key]?.trim()) faltan.push(`${m.nombre}: ${c.label}`);
+
       }
       if (faltan.length) {
         toast({ title: "Campos obligatorios sin rellenar", description: faltan.join(", "), variant: "destructive" });
