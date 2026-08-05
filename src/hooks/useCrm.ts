@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { CatalogoMap, OpcionesDef } from "@/lib/motivoCampos";
+
 
 export interface Cliente {
   cod_cliente: number;
