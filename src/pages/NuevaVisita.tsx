@@ -12,10 +12,13 @@ import { Switch } from "@/components/ui/switch";
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { VoiceRecorder } from "@/components/VoiceRecorder";
+import { CampoVisita } from "@/components/CampoVisita";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { useClientes, useMotivos, hoyISO, crearBloques, type Motivo } from "@/hooks/useCrm";
+import { useClientes, useMotivos, useCatalogos, hoyISO, crearBloques, type Motivo } from "@/hooks/useCrm";
+import { camposVisibles, resolverOpciones } from "@/lib/motivoCampos";
+
 
 interface BloqueForm {
   uid: string;
