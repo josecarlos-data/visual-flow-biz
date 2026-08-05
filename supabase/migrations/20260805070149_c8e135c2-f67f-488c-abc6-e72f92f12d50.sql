@@ -1,0 +1,1 @@
+GRANT EXECUTE ON FUNCTION public.has_dashboard_access(uuid, text) TO authenticated;
