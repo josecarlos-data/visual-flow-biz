@@ -376,46 +376,25 @@ export default function NuevaVisita() {
                 </Collapsible>
               )}
 
-              {(motivo?.campos ?? []).map((c) => {
-                const set = (val: string) =>
-                  actualizarBloque(b.uid, { valores: { ...b.valores, [c.campo_key]: val } });
-                return (
-                  <div key={c.campo_key} className="space-y-1.5">
-                    <Label>
-                      {c.label} {c.is_required && <span className="text-destructive">*</span>}
-                    </Label>
-                    {c.tipo === "numero" ? (
-                      <Input type="number" value={b.valores[c.campo_key] ?? ""} onChange={(e) => set(e.target.value)} />
-                    ) : c.tipo === "fecha" ? (
-                      <Input type="date" value={b.valores[c.campo_key] ?? ""} onChange={(e) => set(e.target.value)} />
-                    ) : c.tipo === "select" ? (
-                      <Select value={b.valores[c.campo_key] ?? ""} onValueChange={set}>
-                        <SelectTrigger><SelectValue placeholder="Selecciona una opción" /></SelectTrigger>
-                        <SelectContent>
-                          {c.opciones.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    ) : c.tipo === "booleano" ? (
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={b.valores[c.campo_key] === "si"}
-                          onCheckedChange={(val) => set(val ? "si" : "no")}
-                        />
-                        <span className="text-sm text-muted-foreground">
-                          {b.valores[c.campo_key] === "si" ? "Sí" : "No"}
-                        </span>
-                      </div>
-                    ) : c.tipo === "texto" ? (
-                      <Input placeholder={c.ayuda ?? ""} value={b.valores[c.campo_key] ?? ""} onChange={(e) => set(e.target.value)} />
-                    ) : (
-                      <Textarea rows={3} placeholder={c.ayuda ?? ""} value={b.valores[c.campo_key] ?? ""} onChange={(e) => set(e.target.value)} />
-                    )}
-                    {c.ayuda && c.tipo !== "texto" && c.tipo !== "texto_largo" && (
-                      <p className="text-xs text-muted-foreground">{c.ayuda}</p>
-                    )}
-                  </div>
-                );
-              })}
+              {camposVisibles(motivo?.campos ?? []).map((c) => (
+                <CampoVisita
+                  key={c.campo_key}
+                  campo={c}
+                  valores={b.valores}
+                  catalogos={catalogos}
+                  onChange={(patch) => actualizarBloque(b.uid, { valores: { ...b.valores, ...patch } })}
+                />
+              ))}
+
+              {faltanValidacion(motivo).length > 0 && (
+                <p className="text-xs text-amber-600 dark:text-amber-500">
+                  Para que la visita se dé por válida faltan: {faltanValidacion(motivo)
+                    .filter((c) => !b.valores[c.campo_key]?.trim())
+                    .map((c) => c.label)
+                    .join(", ") || "nada"}
+                </p>
+              )}
+
             </CardContent>
           </Card>
         );
