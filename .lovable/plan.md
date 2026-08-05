@@ -1,62 +1,62 @@
-# Corrección FASE 6a — reparto de `nota_revision`
+# FASE 3 — Plantillas definitivas de visita
 
-## Diagnóstico
+Solo esta fase. Base de evidencia: los 1.311 comentarios reales del director ya repartidos en
+`visita_bloques.nota_revision` (547 revisión de seguimiento, 412 promoción, 177 GSMart,
+163 competencia, 6 potencial, 6 seguimiento). De su lectura salen los criterios de "visita
+válida" que se van a codificar en las plantillas.
 
-La función `repartir_observaciones_gespromo()` sólo intenta detectar el marcador cuando
-la **primera línea entera** está en mayúsculas (`raw1 = upper(raw1)`). En los casos reales
-que aportas, la observación del comercial va pegada en la misma línea:
+## Qué exige el director, según sus propios comentarios
 
-```text
-NO CORRECTO REFERENCIA INEXISTENTE NO SE PUEDE CONTRASTAR Aforador ref: ...
-```
+- **Estudio de competencia**: "SIN MARCA NO VALE", "FALTA REFERENCIA DEL COMPETIDOR",
+  "NO SE PONE NUESTRO PRECIO", "FALTA PRECIO FALTA PONER VENTA FALLIDA". Marca, referencia
+  y los dos precios son obligatorios para validar.
+- **Revisión de seguimiento**: "SI NO TE ATIENDE NO ES REVISION DE SEGUIMIENTO", "NO VALE
+  POR TELÉFONO", "QUE ESTAS REVISANDO ??", "TIENES QUE TRATAR EL TEMA CONCRETO CON EL
+  CLIENTE". Hace falta decir qué oferta/tema se revisa, con quién se habló y que fue presencial.
+- **Promoción / oferta**: "PON LA REFERENCIA", "CUAL ?? POR REFERENCIAS POR FAVOR",
+  "MOTIVO NO VALIDO SI NO ESTAN EN SISTEMA LAS OFERTAS", "COMO SE LA ENVIAS ?? POR WASAP ??",
+  "PON CANTIDAD Y A QUE PRECIO". Referencia, precio, cantidad y canal de envío de la oferta.
+- **GSMart / crucero**: "HAY UN GUION, HAY QUE CEÑIRSE A ESE GUIÓN", "SABES CUANTOS ACCESOS
+  TIENEN ??", "SABE DE PROMOCIONES ??", "AYUDALE A HACER UNA COMPRA". El guion se convierte
+  en campos concretos.
+- **Información importante / potencial**: "SACA NÚMERO VEHÍCULOS / MARCA / NÚMERO MECÁNICOS /
+  CUÁL ES EL MATERIAL (REFERENCIAS)".
+- **Seguimiento**: "TIENES QUE COMENTAR QUE HABLAS CON EL CLIENTE", "HACER SEGUIMIENTO",
+  "QUÉ HAY QUE HACER DESPUÉS".
 
-Esa línea contiene minúsculas, así que la condición falla, no se extrae ni marcador ni
-comentario, y `nota_revision` queda NULL. En el caso multilínea (`NO CORRETO\nNO HAY MARCA...`)
-sí se detecta el marcador, pero el resto de la línea del marcador está vacío y el bucle de
-líneas siguientes exige mayúsculas exactas (`l1 = upper(l1)`), regla demasiado estricta con
-acentos y signos.
+## Cambios que se van a hacer
 
-## Qué se va a cambiar
-
-Reescribir `public.repartir_observaciones_gespromo(boolean)` con un reparto por **palabras**,
-no por líneas completas:
-
-1. Detección del marcador (`CORRECTO` / `NO CORRECTO`, con tolerancia de erratas tipo
-   `NO CORRETO`) sobre los primeros tokens de la primera línea, **sin exigir** que la línea
-   completa sea mayúscula.
-2. Tras retirar el marcador, se recorren los tokens restantes de esa misma línea mientras
-   sean mayúsculas (o puntuación/números/`??`); en cuanto aparece un token con minúsculas,
-   ahí empieza la observación del comercial. Ese tramo mayúsculo se suma a la nota del director.
-3. Se anexan las líneas siguientes que sean íntegramente del director, hasta la primera
-   que no lo sea.
-4. Criterio de "línea/tramo del director": al menos el **90 % de sus letras en mayúscula**
-   y **8 letras o más**. Se conservan literalmente los signos `??`.
-5. El resultado concatenado va a `visita_bloques.nota_revision`; todo lo demás (resto de la
-   línea del marcador + líneas posteriores) se guarda en `visitas.observaciones`, sin pérdida
-   de texto.
-6. El mismo tratamiento se aplica tanto a `NO CORRECTO` como a `CORRECTO`.
-
-La función sigue siendo idempotente: siempre parte de `observaciones_original` y reescribe
-`observaciones`, `validacion` y `nota_revision`.
-
-## Ejecución
-
-- Desactivar sólo `trg_visita_bloques_agregado` durante el reparto (los otros dos triggers
-  se mantienen), ejecutar `repartir_observaciones_gespromo(true)`, recalcular el agregado de
-  `visitas.validacion` y volver a activar el trigger.
-- Después, contar y reportar:
-  - filas de `visita_bloques` con `nota_revision` no nula (esperado del orden de ~1.650),
-  - reparto CORRECTO / NO CORRECTO / pendiente,
-  - varios ejemplos reales de original → nota + observación para validar visualmente.
+1. **Reescribir el catálogo de campos** de los 7 motivos existentes (migración de datos sobre
+   `motivos_visita` y `motivo_campos`), conservando los `campo_key` actuales para no romper
+   los 21.484 bloques históricos y añadiendo los que faltan:
+   - competencia: `marca_competencia`, `referencia_competencia`, `precio_rimosa`,
+     `precio_competencia`, `resultado_venta` (ganada / fallida / pendiente).
+   - revision_seguimiento: `tema_revisado`, `interlocutor`, `canal` (presencial / teléfono /
+     WhatsApp), `resultado`, `proxima_accion`.
+   - promocion: `referencia`, `cantidad`, `precio_ofertado`, `canal_envio`, `respuesta_cliente`.
+   - gsmart: `accesos`, `conoce_promociones`, `sabe_comprar`, `compra_realizada`, `interes_crucero`.
+   - informacion_potencial: vehículos, marcas, mecánicos, referencias de consumo, potencial.
+   - seguimiento e incidencia: ajustes menores de obligatoriedad y orden.
+2. **Textos de `ayuda`** para todos los campos, redactados a partir de esos comentarios, en
+   lenguaje directo de comercial ("Marca del competidor: sin marca la visita no se valida").
+3. **`requerido_validacion`**: marcar los campos que el director exige para dar por buena la
+   visita, distinto de `is_required` (obligatorio para guardar). Se usan las reglas de arriba.
+4. **`placeholder`** con ejemplos reales sacados del histórico (referencias, formatos de precio).
+5. **Descripción de cada motivo** (`motivos_visita.descripcion`) con el criterio de validez en
+   una frase, para que se lea antes de elegir plantilla.
+6. **AdminVisitas.tsx**: añadir al editor los dos campos que hoy no se pueden editar
+   (`placeholder` y `requerido_validacion`) y mostrar la descripción del motivo como textarea.
+7. **NuevaVisita.tsx**: mostrar el texto de `ayuda` bajo cada campo y avisar (sin bloquear el
+   guardado) cuando falte un campo con `requerido_validacion`, indicando que el director puede
+   marcar la visita como NO CORRECTO.
 
 ## Detalle técnico
 
-- Migración única `CREATE OR REPLACE FUNCTION public.repartir_observaciones_gespromo(boolean)`
-  (SECURITY DEFINER, `search_path = public, extensions`, `REVOKE` a anon/authenticated como ahora).
-- Función auxiliar interna (expresión inline) para el test de "mayúsculas del director":
-  contar letras vía `regexp_replace(x, '[^[:alpha:]]', '', 'g')` y comparar con su versión
-  `upper()`, exigiendo ratio ≥ 0,9 y longitud ≥ 8.
-- Sin cambios de frontend: `ClienteDetalle.tsx` y `RevisionVisitas.tsx` ya muestran
-  `nota_revision` destacada.
+- Migración de datos vía la herramienta de inserción: `UPDATE`/`INSERT ... ON CONFLICT` sobre
+  `motivo_campos` por `(motivo_key, campo_key)`; sin cambios de esquema (las columnas
+  `opciones`, `placeholder`, `requerido_validacion` ya existen).
+- Ningún `campo_key` existente se borra: los que dejen de usarse se marcan con
+  `sort_order` alto y `is_required=false` para no perder datos históricos.
+- Sin cambios en `visita_bloques`, triggers ni funciones de validación.
 
 No se avanza a ninguna otra fase.
