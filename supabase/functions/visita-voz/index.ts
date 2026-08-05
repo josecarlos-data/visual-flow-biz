@@ -55,7 +55,9 @@ Deno.serve(async (req) => {
     const clienteNombre = String(form.get("cliente_nombre") ?? "");
     const transcripcionPrevia = String(form.get("transcripcion") ?? "");
 
-    const campos: CampoDef[] = camposRaw ? JSON.parse(String(camposRaw)) : [];
+    const campos: CampoDef[] = (camposRaw ? JSON.parse(String(camposRaw)) : []).filter(
+      (c: CampoDef) => c.tipo !== "adjunto" && c.tipo !== "referencia_campana",
+    );
     if (campos.length === 0) {
       return new Response(JSON.stringify({ error: "No hay campos definidos para este motivo" }), {
         status: 400,
