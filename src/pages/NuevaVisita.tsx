@@ -40,6 +40,8 @@ export default function NuevaVisita() {
   const { user, employeeCode } = useAuth();
   const { data: clientes } = useClientes();
   const { data: motivos } = useMotivos();
+  const { data: catalogos } = useCatalogos();
+
 
   const [codCliente, setCodCliente] = useState<string>(params.get("cliente") ?? "");
   const [fecha, setFecha] = useState<string>(hoyISO());
@@ -89,15 +91,17 @@ export default function NuevaVisita() {
       form.append(
         "campos",
         JSON.stringify(
-          motivo.campos.map((c) => ({
+          camposVisibles(motivo.campos).map((c) => ({
             campo_key: c.campo_key,
             label: c.label,
             ayuda: c.ayuda,
             tipo: c.tipo,
             is_required: c.is_required,
+            opciones: resolverOpciones(c.opciones, catalogos),
           })),
         ),
       );
+
 
       const { data, error } = await supabase.functions.invoke("visita-voz", { body: form });
       if (error) throw new Error((await (error as { context?: Response }).context?.text?.()) || error.message);
