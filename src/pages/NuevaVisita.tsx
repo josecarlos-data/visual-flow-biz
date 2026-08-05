@@ -386,14 +386,18 @@ export default function NuevaVisita() {
                 />
               ))}
 
-              {faltanValidacion(motivo).length > 0 && (
-                <p className="text-xs text-amber-600 dark:text-amber-500">
-                  Para que la visita se dé por válida faltan: {faltanValidacion(motivo)
-                    .filter((c) => !b.valores[c.campo_key]?.trim())
-                    .map((c) => c.label)
-                    .join(", ") || "nada"}
-                </p>
-              )}
+              {(() => {
+                const faltan = camposVisibles(motivo?.campos ?? [])
+                  .filter((c) => c.requerido_validacion && !b.valores[c.campo_key]?.trim())
+                  .map((c) => c.label);
+                if (!faltan.length) return null;
+                return (
+                  <p className="text-xs text-amber-600 dark:text-amber-500">
+                    Se puede guardar, pero para que el director la dé por válida faltan: {faltan.join(", ")}.
+                  </p>
+                );
+              })()}
+
 
             </CardContent>
           </Card>
