@@ -1,4 +1,4 @@
-# FASE 3 — Plantillas definitivas de visita
+# FASE 3 — Plantillas definitivas de visita — COMPLETADA (05/08/2026)
 
 Solo esta fase. Base de evidencia: los 1.311 comentarios reales del director ya repartidos en
 `visita_bloques.nota_revision` (547 revisión de seguimiento, 412 promoción, 177 GSMart,

@@ -8,14 +8,21 @@ interface CampoDef {
   ayuda?: string | null;
   tipo: string;
   is_required: boolean;
+  opciones?: string[];
 }
 
 function buildSchema(campos: CampoDef[]) {
   const properties: Record<string, unknown> = {};
   for (const c of campos) {
+    const opciones = Array.isArray(c.opciones) ? c.opciones.filter(Boolean) : [];
+    const listado = opciones.length ? ` Elige solo entre estas opciones: ${opciones.join(" / ")}.` : "";
     properties[c.campo_key] = {
       type: c.tipo === "numero" ? ["number", "null"] : ["string", "null"],
-      description: `${c.label}${c.ayuda ? ` — ${c.ayuda}` : ""}. Devuelve null si la nota de voz no aporta información sobre este punto.`,
+      description:
+        `${c.label}${c.ayuda ? ` — ${c.ayuda}` : ""}.${listado}` +
+        (c.tipo === "multiselect" ? " Si son varias, sepáralas con ' | '." : "") +
+        (c.tipo === "booleano" ? " Responde 'si' o 'no'." : "") +
+        " Devuelve null si la nota de voz no aporta información sobre este punto.",
     };
   }
   return {
@@ -25,6 +32,7 @@ function buildSchema(campos: CampoDef[]) {
     additionalProperties: false,
   };
 }
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -47,7 +55,9 @@ Deno.serve(async (req) => {
     const clienteNombre = String(form.get("cliente_nombre") ?? "");
     const transcripcionPrevia = String(form.get("transcripcion") ?? "");
 
-    const campos: CampoDef[] = camposRaw ? JSON.parse(String(camposRaw)) : [];
+    const campos: CampoDef[] = (camposRaw ? JSON.parse(String(camposRaw)) : []).filter(
+      (c: CampoDef) => c.tipo !== "adjunto" && c.tipo !== "referencia_campana",
+    );
     if (campos.length === 0) {
       return new Response(JSON.stringify({ error: "No hay campos definidos para este motivo" }), {
         status: 400,

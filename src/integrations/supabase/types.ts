@@ -38,6 +38,36 @@ export type Database = {
         }
         Relationships: []
       }
+      catalogos_opciones: {
+        Row: {
+          clave: string
+          created_at: string
+          id: string
+          is_active: boolean
+          orden: number
+          updated_at: string
+          valor: string
+        }
+        Insert: {
+          clave: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          orden?: number
+          updated_at?: string
+          valor: string
+        }
+        Update: {
+          clave?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          orden?: number
+          updated_at?: string
+          valor?: string
+        }
+        Relationships: []
+      }
       cliente_insights: {
         Row: {
           alertas: Json
@@ -368,6 +398,7 @@ export type Database = {
           campo_key: string
           created_at: string
           id: string
+          is_active: boolean
           is_required: boolean
           label: string
           motivo_key: string
@@ -377,12 +408,14 @@ export type Database = {
           sort_order: number
           tipo: string
           updated_at: string
+          visibilidad: string
         }
         Insert: {
           ayuda?: string | null
           campo_key: string
           created_at?: string
           id?: string
+          is_active?: boolean
           is_required?: boolean
           label: string
           motivo_key: string
@@ -392,12 +425,14 @@ export type Database = {
           sort_order?: number
           tipo?: string
           updated_at?: string
+          visibilidad?: string
         }
         Update: {
           ayuda?: string | null
           campo_key?: string
           created_at?: string
           id?: string
+          is_active?: boolean
           is_required?: boolean
           label?: string
           motivo_key?: string
@@ -407,6 +442,7 @@ export type Database = {
           sort_order?: number
           tipo?: string
           updated_at?: string
+          visibilidad?: string
         }
         Relationships: [
           {
@@ -1319,6 +1355,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      buscar_productos: {
+        Args: { _limite?: number; _q: string }
+        Returns: {
+          descripcion: string
+          familia: string
+          marca: string
+          referencia: string
+        }[]
+      }
       can_view_cliente: {
         Args: { _cod: number; _user_id: string }
         Returns: boolean

@@ -12,10 +12,13 @@ import { Switch } from "@/components/ui/switch";
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { VoiceRecorder } from "@/components/VoiceRecorder";
+import { CampoVisita } from "@/components/CampoVisita";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { useClientes, useMotivos, hoyISO, crearBloques, type Motivo } from "@/hooks/useCrm";
+import { useClientes, useMotivos, useCatalogos, hoyISO, crearBloques, type Motivo } from "@/hooks/useCrm";
+import { camposVisibles, resolverOpciones } from "@/lib/motivoCampos";
+
 
 interface BloqueForm {
   uid: string;
@@ -37,6 +40,8 @@ export default function NuevaVisita() {
   const { user, employeeCode } = useAuth();
   const { data: clientes } = useClientes();
   const { data: motivos } = useMotivos();
+  const { data: catalogos } = useCatalogos();
+
 
   const [codCliente, setCodCliente] = useState<string>(params.get("cliente") ?? "");
   const [fecha, setFecha] = useState<string>(hoyISO());
@@ -86,15 +91,17 @@ export default function NuevaVisita() {
       form.append(
         "campos",
         JSON.stringify(
-          motivo.campos.map((c) => ({
+          camposVisibles(motivo.campos).map((c) => ({
             campo_key: c.campo_key,
             label: c.label,
             ayuda: c.ayuda,
             tipo: c.tipo,
             is_required: c.is_required,
+            opciones: resolverOpciones(c.opciones, catalogos),
           })),
         ),
       );
+
 
       const { data, error } = await supabase.functions.invoke("visita-voz", { body: form });
       if (error) throw new Error((await (error as { context?: Response }).context?.text?.()) || error.message);
@@ -152,7 +159,9 @@ export default function NuevaVisita() {
           toast({ title: "Faltan datos", description: "Selecciona el motivo de cada bloque.", variant: "destructive" });
           return;
         }
-        for (const c of m.campos) if (c.is_required && !b.valores[c.campo_key]?.trim()) faltan.push(`${m.nombre}: ${c.label}`);
+        for (const c of camposVisibles(m.campos))
+          if (c.is_required && !b.valores[c.campo_key]?.trim()) faltan.push(`${m.nombre}: ${c.label}`);
+
       }
       if (faltan.length) {
         toast({ title: "Campos obligatorios sin rellenar", description: faltan.join(", "), variant: "destructive" });
@@ -376,46 +385,29 @@ export default function NuevaVisita() {
                 </Collapsible>
               )}
 
-              {(motivo?.campos ?? []).map((c) => {
-                const set = (val: string) =>
-                  actualizarBloque(b.uid, { valores: { ...b.valores, [c.campo_key]: val } });
+              {camposVisibles(motivo?.campos ?? []).map((c) => (
+                <CampoVisita
+                  key={c.campo_key}
+                  campo={c}
+                  valores={b.valores}
+                  catalogos={catalogos}
+                  onChange={(patch) => actualizarBloque(b.uid, { valores: { ...b.valores, ...patch } })}
+                />
+              ))}
+
+              {(() => {
+                const faltan = camposVisibles(motivo?.campos ?? [])
+                  .filter((c) => c.requerido_validacion && !b.valores[c.campo_key]?.trim())
+                  .map((c) => c.label);
+                if (!faltan.length) return null;
                 return (
-                  <div key={c.campo_key} className="space-y-1.5">
-                    <Label>
-                      {c.label} {c.is_required && <span className="text-destructive">*</span>}
-                    </Label>
-                    {c.tipo === "numero" ? (
-                      <Input type="number" value={b.valores[c.campo_key] ?? ""} onChange={(e) => set(e.target.value)} />
-                    ) : c.tipo === "fecha" ? (
-                      <Input type="date" value={b.valores[c.campo_key] ?? ""} onChange={(e) => set(e.target.value)} />
-                    ) : c.tipo === "select" ? (
-                      <Select value={b.valores[c.campo_key] ?? ""} onValueChange={set}>
-                        <SelectTrigger><SelectValue placeholder="Selecciona una opción" /></SelectTrigger>
-                        <SelectContent>
-                          {c.opciones.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    ) : c.tipo === "booleano" ? (
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={b.valores[c.campo_key] === "si"}
-                          onCheckedChange={(val) => set(val ? "si" : "no")}
-                        />
-                        <span className="text-sm text-muted-foreground">
-                          {b.valores[c.campo_key] === "si" ? "Sí" : "No"}
-                        </span>
-                      </div>
-                    ) : c.tipo === "texto" ? (
-                      <Input placeholder={c.ayuda ?? ""} value={b.valores[c.campo_key] ?? ""} onChange={(e) => set(e.target.value)} />
-                    ) : (
-                      <Textarea rows={3} placeholder={c.ayuda ?? ""} value={b.valores[c.campo_key] ?? ""} onChange={(e) => set(e.target.value)} />
-                    )}
-                    {c.ayuda && c.tipo !== "texto" && c.tipo !== "texto_largo" && (
-                      <p className="text-xs text-muted-foreground">{c.ayuda}</p>
-                    )}
-                  </div>
+                  <p className="text-xs text-amber-600 dark:text-amber-500">
+                    Se puede guardar, pero para que el director la dé por válida faltan: {faltan.join(", ")}.
+                  </p>
                 );
-              })}
+              })()}
+
+
             </CardContent>
           </Card>
         );
