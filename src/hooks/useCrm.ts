@@ -44,10 +44,13 @@ export interface MotivoCampo {
   tipo: string;
   is_required: boolean;
   sort_order: number;
-  opciones: string[];
+  opciones: OpcionesDef;
   placeholder: string | null;
   requerido_validacion?: boolean | null;
+  is_active?: boolean;
+  visibilidad?: string;
 }
+
 
 export interface Motivo {
   key: string;
