@@ -52,6 +52,18 @@ Un único `json_schema` estricto:
   - `campos`: objeto con **todos** los campos candidatos (clave `motivo.campo`),
     todos nullable; el modelo rellena solo los del motivo del bloque y deja el resto
     a null. La aplicación descarta lo que no pertenezca a ese motivo.
+  - `campos_meta`: por cada campo que el modelo rellena, `{ "cita": "...",
+    "confianza": "alta|media|baja" }`. La cita es literal de la transcripción y es
+    lo que justifica el valor; la confianza la declara el modelo. Si un campo va a
+    null, no lleva meta.
+
+`campos` guarda solo valores planos; la trazabilidad vive entera en `campos_meta`
+(columna creada en la FASE 2 y hoy vacía). Al guardar, cada bloque persiste su
+`campos_meta` filtrado a los campos del motivo. En la pantalla de revisión los
+campos de confianza **baja** se resaltan y, al pasar por encima (o tocar, en
+móvil), se muestra la frase de la transcripción que los justifica; así el
+comercial valida sin releerse toda la narración.
+
 
 `description` de cada campo = su texto de `motivo_campos.ayuda` (los 80 de la FASE 3),
 más el enum literal cuando el campo es `select`/`multiselect`. Los selects se envían
