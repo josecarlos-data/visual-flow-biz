@@ -87,19 +87,6 @@ con el RPC `buscar_productos`:
 
 El modelo nunca inventa ni aproxima una referencia.
 
-## 5. Coste y latencia
-
-- Transcripción: `openai/gpt-4o-transcribe` (la que ya usa la función).
-- Extracción: `openai/gpt-5.6-sol` vía la Responses API del gateway, en streaming
-  consumido dentro de la función (una nota larga con razonamiento supera el tiempo
-  máximo de una petición sin streaming).
-- **Catálogo completo en una sola llamada**, no filtrado: el modelo necesita ver los
-  11 motivos para elegir. Los 74 campos con sus ayudas ocupan del orden de 6–8k tokens
-  de entrada; la salida ronda 300–800 tokens.
-- Estimación por visita: ~1 min de audio + una extracción. Del orden de **1–3 céntimos
-  de crédito por visita**, 15–40 s de espera. Si en pruebas la latencia molesta, la
-  alternativa (dos llamadas: primero elegir motivos, luego extraer solo esos campos)
-  queda documentada pero no se implementa ahora.
 
 ## 5. Chuleta previa (antes de grabar)
 
