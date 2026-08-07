@@ -16,7 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useClientes, useMotivos, useCatalogos, hoyISO, crearBloques, type Motivo, type MotivoCampo } from "@/hooks/useCrm";
-import { camposVisibles, resolverOpciones } from "@/lib/motivoCampos";
+import { camposVisibles } from "@/lib/motivoCampos";
 
 type Meta = Record<string, { cita?: string; confianza?: string }>;
 
