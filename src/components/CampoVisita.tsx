@@ -17,6 +17,8 @@ interface Props {
   campo: MotivoCampo;
   valores: Record<string, string>;
   catalogos?: CatalogoMap;
+  /** Trazabilidad de la propuesta de la IA para este campo. */
+  meta?: { cita?: string; confianza?: string };
   onChange: (patch: Record<string, string>) => void;
 }
 
