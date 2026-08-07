@@ -574,7 +574,12 @@ export function useBloqueMutations() {
 /** Crea los bloques de una visita recién guardada. */
 export async function crearBloques(
   visitaId: string,
-  bloques: { motivo_key: string; campos: Record<string, unknown>; campos_meta?: Record<string, unknown> }[],
+  bloques: {
+    motivo_key: string;
+    campos: Record<string, unknown>;
+    campos_meta?: Record<string, unknown>;
+    completo?: boolean;
+  }[],
 ) {
   if (!bloques.length) return;
   const { error } = await supabase.from("visita_bloques").insert(
@@ -583,6 +588,7 @@ export async function crearBloques(
       motivo_key: b.motivo_key,
       campos: b.campos,
       campos_meta: b.campos_meta ?? {},
+      ...(b.completo === undefined ? {} : { completo: b.completo }),
       orden: i,
     })) as never,
   );
