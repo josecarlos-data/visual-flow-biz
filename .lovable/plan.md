@@ -1,179 +1,119 @@
-# FASE 4 — Nota de voz multibloque
+# FASE 4 — Ajustes tras la prueba con narraciones reales
 
-Hoy la nota de voz es por bloque: el comercial elige el motivo, graba y la IA rellena
-solo ese bloque. En la FASE 4 se graba **una sola narración de la visita** y el modelo
-decide qué motivos hay, crea un bloque por cada uno y reparte los datos.
+Solo se toca la FASE 4: función `visita-voz`, plantillas de campos, pantalla de visita
+y dos columnas de trazabilidad. Nada de FASE 5 ni 6b.
 
-No se toca ninguna otra fase.
+## 1. Modelo de extracción: `luna` con prueba previa
 
-## 1. Flujo
+- La extracción pasa de `openai/gpt-5.6-sol` a `openai/gpt-5.6-luna`, por la pasarela
+  de Lovable. La llamada directa al proveedor queda documentada en el propio archivo
+  como comentario, sin implementar.
+- **Antes de fijarlo**: se ejecutan las MISMAS tres narraciones del histórico
+  (Icer/Dometic, GSMart+viaje, potencial+competencia) contra `sol` y contra `luna`,
+  con el prompt ya corregido (regla de competencia incluida), y se entrega la tabla:
+  motivos acertados / campos correctos / selects fuera de enum / latencia.
+  Si `luna` clasifica peor los motivos, se queda `sol` y se dice.
+- Se mantiene `reasoning_effort: "none"`. Se añade `temperature: 0`; si el modelo lo
+  rechaza con 400, se quita (el esquema estricto ya acota la salida).
+- `response_format` sigue siendo `json_schema` con `strict: true` — ya lo está; se
+  verifica que todo el esquema cumple el contrato estricto tras los cambios.
 
-```text
-Comercial graba una vez (o escribe la narración)
-        v
-Transcripción -> se guarda SIEMPRE en visitas.transcripcion
-        v
-Extracción estructurada (1 llamada) -> resultado_visita + N bloques
-        v
-Pantalla de revisión: bloques propuestos, campos rellenos, avisos
-        v
-El comercial edita/borra/añade y guarda
-```
+## 2. Transcripción
 
-Nada se persiste hasta que el comercial guarda. Los bloques propuestos son un
-borrador editable, igual que hoy.
+Sigue `gpt-4o-transcribe` con `language: "es"`. Único cambio: se añade el parámetro
+`prompt` con el vocabulario del sector, para que deje de oír "Ize"/"Ether" por Icer y
+"Alpoliva" por "el polígono":
 
-## 2. Criterio de selección de motivo
+albarán, referencia, rappel, GSMart, Top Truck, delegación, electromecánico, ejes SAF,
+ejes BPW, pastillas, discos, Icer, Febi, Dometic, Sachs, TitanX, Knorr, Volvo, Scania,
+DAF, Ford, Eurorrecambios — más, cargados en caliente, los valores del catálogo
+`competidores` y los nombres de comerciales (`get_distinct_vendedores`). Ese trozo
+dinámico se cachea en memoria de la función.
 
-El prompt del sistema incluye los 11 motivos con su `nombre` y su `descripcion`
-(la escrita en la FASE 3, que ya contiene el criterio de validez del director),
-más estas reglas explícitas de desempate:
+## 3. Prompt caching
 
-- `revision_seguimiento` solo si se revisa algo concreto de una visita anterior
-  (una oferta ya pasada, un compromiso previo). Si es una oferta nueva, es `promocion`.
-- `seguimiento` es el cajón de último recurso: solo si no encaja en ningún otro motivo.
-- `competencia` exige que se mencione un competidor o un precio ajeno.
-- Un motivo solo se instancia si hay **al menos un dato real** en la narración.
-  Prohibido crear bloques vacíos "por si acaso".
-- Si un mismo motivo aparece dos veces con contenido distinto (dos ofertas, dos
-  comparativas de precio), se devuelven **dos bloques** de ese motivo, nunca uno
-  con los datos mezclados. `visita_bloques` no tiene restricción única, así que se
-  insertan tal cual con `orden` correlativo.
+El system prompt (11 motivos, descripciones y reglas de desempate) se construye una
+vez por arranque y se reutiliza **idéntico carácter por carácter**: va siempre primero
+y no lleva nada variable. Cliente y transcripción van en el mensaje de usuario.
 
-## 3. Esquema enviado al modelo
+## 4. Citas más cortas
 
-Un único `json_schema` estricto:
+Se mantienen las citas en todos los campos rellenos, pero acortadas: la descripción del
+campo `cita` pasa a pedir **un fragmento literal de 5 a 10 palabras**, no la frase
+entera; el servidor recorta a 12 palabras por si el modelo se pasa.
 
-- `resultado_visita`: enum `efectiva` / `cliente_ausente` / `cerrado` / `sin_acceso`,
-  propuesto a partir de la narración y editable por el comercial. Si no es `efectiva`,
-  no se proponen bloques.
-- `bloques`: lista de objetos con
-  - `motivo_key`: enum con los 11 motivos activos,
-  - `campos`: objeto con **todos** los campos candidatos (clave `motivo.campo`),
-    todos nullable; el modelo rellena solo los del motivo del bloque y deja el resto
-    a null. La aplicación descarta lo que no pertenezca a ese motivo.
-  - `campos_meta`: por cada campo que el modelo rellena, `{ "cita": "...",
-    "confianza": "alta|media|baja" }`. La cita es literal de la transcripción y es
-    lo que justifica el valor; la confianza la declara el modelo. Si un campo va a
-    null, no lleva meta.
+## 5. Obligatoriedad de campos (datos falsos)
 
-`campos` guarda solo valores planos; la trazabilidad vive entera en `campos_meta`
-(columna creada en la FASE 2 y hoy vacía). Al guardar, cada bloque persiste su
-`campos_meta` filtrado a los campos del motivo. En la pantalla de revisión los
-campos de confianza **baja** se resaltan y, al pasar por encima (o tocar, en
-móvil), se muestra la frase de la transcripción que los justifica; así el
-comercial valida sin releerse toda la narración.
+Hoy hay 37 campos con `is_required = true`, entre ellos referencias que el comercial no
+siempre dice. Se rebaja a `requerido_validacion` (aviso ámbar, no bloquea el guardado)
+todo lo que no sea imprescindible para que el bloque tenga sentido:
 
+- `promocion.referencia`, `competencia.referencia_competencia`,
+  `informacion_potencial.referencias_consumo` — todas las referencias de producto.
+- Los importes y datos que dependen de que el cliente los suelte:
+  `competencia.precio_competencia`, `precio_rimosa`, `marca_competencia`,
+  `promocion.cantidad`, `precio_ofertado`, `canal_envio`,
+  `informacion_potencial.num_mecanicos`, `num_vehiculos`, `persona_contacto`,
+  `marcas_vehiculo`, `gestion_cobro.importe_pendiente`,
+  `alta_reapertura.persona_contacto`, `razon_social`, `visita_partner.partner_nombre`,
+  `incidencia.solucion`, `seguimiento.proxima_accion`,
+  `revision_seguimiento.interlocutor`, `canal`, `seguimiento.interlocutor`.
 
-`description` de cada campo = su texto de `motivo_campos.ayuda` (los 80 de la FASE 3),
-más el enum literal cuando el campo es `select`/`multiselect`. Los selects se envían
-como enum real, de modo que el modelo **no puede** devolver texto libre; los
-multiselect se serializan con `" | "`.
+Se quedan como `is_required` solo los que definen el bloque: el `select` que le da
+sentido (`respuesta_cliente`, `resultado`, `resultado_venta`, `competidor`,
+`tipo_incidencia`, `tema`, `compromiso_pago`, `origen_alta`, `partner`, `interesado`)
+y el texto que describe el asunto (`temas_tratados`, `tema_revisado`, `descripcion`,
+`conclusion`, `motivo_conjunto`). Todos siguen siendo `requerido_validacion` donde ya
+lo eran.
 
-**Campos excluidos del esquema**: `is_active = false`, `visibilidad = 'sistema'`,
-tipo `adjunto` y tipo `referencia_campana`. Con el catálogo actual quedan **74 campos**
-sobre 11 motivos.
+## 6. El bloque de competencia nunca se creaba
 
-## 4. Referencias de producto
+En las tres narraciones había comparación explícita de precio con Euro Recambios y las
+tres acabaron en `revision_seguimiento` con "Venta perdida" y los precios enterrados en
+`motivo_perdida`. Se corrige en el prompt con una regla imperativa y un ejemplo:
 
-Los campos de tipo `referencia` se piden como texto tal cual lo dijo el comercial
-("ref 04154 de Febi"), sin normalizar. La aplicación lo resuelve contra `productos`
-con el RPC `buscar_productos`:
+> Si en la narración aparece un competidor nombrado o un precio de otro proveedor,
+> creas SIEMPRE un bloque `competencia` con `competidor`, `precio_rimosa`,
+> `precio_competencia` y `resultado_venta`, **además** del bloque de seguimiento o
+> revisión que corresponda. No son excluyentes: la misma situación genera los dos.
 
-- coincidencia exacta -> se rellena el campo,
-- sin coincidencia exacta -> el campo se deja **vacío**, se muestra un aviso
-  ("no he encontrado esa referencia: 04154") y el buscador ya existente queda
-  abierto para que el comercial la elija.
+Se refuerza también en la `descripcion` del motivo `competencia` y con un
+recordatorio de que los precios no deben quedarse solo en un campo de texto libre.
 
-El modelo nunca inventa ni aproxima una referencia.
+## 7. Menores de la prueba
 
+- "Remolques" se colaba como marca de vehículo: se añade a la ayuda de
+  `marcas_vehiculo` que solo van marcas reales de fabricante, y "Remolques" u otros
+  tipos de vehículo van a `observaciones`.
+- Los electromecánicos iban a `observaciones` en vez de a `num_electromecanicos`: se
+  aclara en la ayuda de ese campo qué frases lo alimentan.
+- `referencias_consumo` guardó "Ha": el servidor descarta valores de campos
+  `referencia` de menos de 3 caracteres o sin ningún dígito, y la ayuda lo explicita.
 
-## 5. Chuleta previa (antes de grabar)
+## 8. Trazabilidad y reanálisis
 
-Pantalla ligera y **no bloqueante** antes de la grabación: tarjetas plegables con
-los 11 motivos, su `descripcion` y sus puntos clave (los campos con
-`requerido_validacion`, que es justo lo que el director exige). Sirve de recordatorio
-para que el comercial no se deje nada; no obliga a elegir motivo ni cambia el flujo.
-Se puede saltar con un botón y queda accesible durante la grabación.
+- Migración: `visitas.analisis_modelo` (text) y `visitas.analisis_prompt_version`
+  (text). La versión del prompt es una constante en la función (`fase4.2`), que se
+  sube a mano cuando cambian las reglas.
+- La extracción devuelve ambos valores y la pantalla los guarda con la visita.
+- **Reanalizar**: botón en la visita ya guardada (detalle de visita / revisión) que
+  vuelve a llamar a `visita-voz` con la `transcripcion` almacenada, sin transcribir
+  otra vez, y propone bloques nuevos que el comercial confirma antes de sustituir a
+  los actuales. Los bloques existentes no se borran hasta que confirma.
 
-## 6. Repregunta de campos que faltan
+## 9. Cliente
 
-Tras la extracción, la aplicación calcula por bloque los campos con
-`requerido_validacion` vacíos. Si hay alguno:
-
-- se muestra **una sola tanda** con esos campos concretos ("¿Qué precio te dio de
-  Febi?", "¿Qué día se comprometió a pagar?"), agrupados por bloque;
-- el comercial responde por **voz** (una segunda grabación corta que se manda a la
-  misma función, con el esquema reducido solo a esos campos) o **por texto** en el
-  propio formulario;
-- si no contesta o la salta, el bloque se guarda igual con `completo = false` y el
-  aviso ámbar de siempre. Nunca se bloquea el guardado.
-
-La repregunta se hace una vez; si tras responder siguen faltando campos, se guarda
-con `completo = false` sin volver a insistir.
-
-## 7. Modelo, coste y latencia
-
-- Transcripción: `openai/gpt-4o-transcribe` (la que ya usa la función).
-- Extracción: **antes de comprometerse** se prueban dos configuraciones sobre las
-  **mismas 3 narraciones reales** (una simple de un motivo, una de dos ofertas, una
-  larga con tres motivos y referencias):
-  - **A — rápida, sin razonamiento**: `openai/gpt-5.6-sol` en chat completions con
-    `reasoning_effort: "none"` y `json_schema` estricto. Es una tarea de rellenar
-    campos con instrucciones explícitas, no de razonar; es la candidata por defecto.
-  - **B — con razonamiento**: `openai/gpt-5.6-sol` por la Responses API en streaming.
-- Se mide en cada una: motivos acertados, campos correctos, selects fuera de enum,
-  **latencia** (p50 y peor caso) y coste por visita, y se te entrega la tabla antes
-  de fijar la configuración.
-- **Objetivo: menos de 10 s** de extracción. Si A cumple, se queda A y no se usa
-  streaming ni razonamiento. B solo se adopta si A falla en calidad de forma clara.
-- Si A cumple calidad pero no los 10 s, la palanca es el tamaño del prompt: se pasa
-  a dos llamadas (primero elegir motivos con solo las 11 descripciones, luego extraer
-  con los campos de esos motivos), que recorta el prompt de ~74 campos a ~10–20.
-- **De partida se envía el catálogo completo** en una sola llamada: el modelo necesita
-  ver los 11 motivos para elegir. Son del orden de 6–8k tokens de entrada y 300–800
-  de salida; coste estimado de **1–3 céntimos de crédito por visita**.
-
-## 8. Fallback: nunca perder la narración
-
-- La transcripción se devuelve al cliente y se guarda en `visitas.transcripcion`
-  **antes** de intentar la extracción.
-- Si la extracción falla (error del gateway, 429, 402, JSON inválido, motivo
-  desconocido), se devuelve `{ transcripcion, bloques: [], error }`: la pantalla
-  muestra la transcripción íntegra, un aviso claro y el formulario manual de siempre.
-- Bloques con `motivo_key` no reconocido o sin ningún campo relleno se descartan en
-  el servidor antes de responder.
-
-## 9. Cambios técnicos
-
-- `supabase/functions/visita-voz/index.ts`: nuevo modo multibloque (esquema con
-  `resultado_visita`, `bloques`, `campos` y `campos_meta`), más un modo reducido para
-  la repregunta. Se mantiene el modo actual por bloque mientras se prueba.
-- `src/pages/NuevaVisita.tsx`: chuleta previa, grabadora a nivel de visita, bloques
-  propuestos editables, resaltado de confianza baja con la cita, tanda de repregunta
-  y `resultado_visita` precargado.
-- `src/hooks/useCrm.ts`: catálogo completo de motivos y campos en una sola llamada;
-  `crearBloques` pasa a persistir también `campos_meta` y `completo`.
-- `src/lib/motivoCampos.ts`: helper para decidir qué campos entran en el esquema
-  (activo, no sistema, no adjunto, no campaña) y cuáles disparan repregunta.
-- `src/pages/RevisionVisitas.tsx` y `ClienteDetalle.tsx`: mostrar la cita de
-  `campos_meta` al revisar.
-
-Sin cambios de esquema de base de datos en esta fase.
+Confirmado por código: el cliente se elige siempre en el desplegable de la pantalla
+antes de grabar (`cod_cliente`), y al modelo solo se le pasa el **nombre** como
+contexto de lectura. El modelo no devuelve cliente en el esquema y la aplicación nunca
+lo lee de la transcripción. Se documenta explícitamente en el prompt: "no deduzcas el
+cliente, ya viene dado".
 
 ## 10. Verificación
 
-- Una narración con dos ofertas distintas produce dos bloques `promocion`.
-- Una narración de charla genérica no produce bloques de `competencia` ni
-  `revision_seguimiento`.
-- Un select nunca queda con un valor fuera de su lista.
-- Una referencia inexistente deja el campo vacío y muestra aviso.
-- Forzando un fallo de la extracción, la transcripción sigue visible y guardable.
-- **`campos_meta` se guarda con cita y confianza** para todos los campos rellenos:
-  `SELECT count(*) FROM visita_bloques WHERE campos <> '{}' AND campos_meta = '{}'` → 0
-  en las visitas creadas con voz.
-- **Un bloque al que le falte un campo `requerido_validacion` dispara la repregunta**;
-  si se salta, se guarda con `completo = false`.
-- Tabla comparativa A vs B sobre las 3 narraciones, con la extracción elegida por
-  debajo de 10 s.
-
+- Tabla `sol` vs `luna` sobre las tres narraciones, antes de fijar el modelo.
+- Las tres narraciones producen ahora un bloque `competencia` con los cuatro campos.
+- Una narración sin referencias se guarda sin bloquear.
+- `SELECT count(*) FROM visitas WHERE transcripcion IS NOT NULL AND analisis_modelo IS NULL`
+  → 0 en las visitas creadas tras el cambio.
+- Reanalizar una visita antigua no vuelve a llamar a transcripción (comprobado en logs).
