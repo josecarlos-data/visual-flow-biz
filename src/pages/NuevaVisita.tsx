@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
-import { ArrowLeft, Save, Loader2, Wand2, FileText, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Save, Loader2, Wand2, FileText, Plus, Trash2, Lightbulb, AlertTriangle, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { VoiceRecorder } from "@/components/VoiceRecorder";
@@ -16,23 +15,26 @@ import { CampoVisita } from "@/components/CampoVisita";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { useClientes, useMotivos, useCatalogos, hoyISO, crearBloques, type Motivo } from "@/hooks/useCrm";
+import { useClientes, useMotivos, useCatalogos, hoyISO, crearBloques, type Motivo, type MotivoCampo } from "@/hooks/useCrm";
 import { camposVisibles, resolverOpciones } from "@/lib/motivoCampos";
 
+type Meta = Record<string, { cita?: string; confianza?: string }>;
 
 interface BloqueForm {
   uid: string;
   motivoKey: string;
   valores: Record<string, string>;
-  transcripcion: string;
+  meta: Meta;
 }
 
 const nuevoBloque = (motivoKey: string): BloqueForm => ({
   uid: crypto.randomUUID(),
   motivoKey,
   valores: {},
-  transcripcion: "",
+  meta: {},
 });
+
+const RESULTADOS = ["efectiva", "cliente_ausente", "cerrado", "sin_acceso"];
 
 export default function NuevaVisita() {
   const [params] = useSearchParams();
@@ -42,7 +44,6 @@ export default function NuevaVisita() {
   const { data: motivos } = useMotivos();
   const { data: catalogos } = useCatalogos();
 
-
   const [codCliente, setCodCliente] = useState<string>(params.get("cliente") ?? "");
   const [fecha, setFecha] = useState<string>(hoyISO());
   const [resultado, setResultado] = useState<string>("efectiva");
@@ -50,7 +51,13 @@ export default function NuevaVisita() {
   const [busqueda, setBusqueda] = useState("");
   const [bloques, setBloques] = useState<BloqueForm[]>([]);
   const [observaciones, setObservaciones] = useState("");
-  const [procesando, setProcesando] = useState<string | null>(null);
+  const [transcripcion, setTranscripcion] = useState("");
+  const [transcribiendo, setTranscribiendo] = useState(false);
+  const [extrayendo, setExtrayendo] = useState(false);
+  const [errorExtraccion, setErrorExtraccion] = useState<string | null>(null);
+  const [avisosRef, setAvisosRef] = useState<string[]>([]);
+  const [repreguntaHecha, setRepreguntaHecha] = useState(false);
+  const [respondiendo, setRespondiendo] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const motivosActivos = useMemo(() => (motivos ?? []).filter((m) => m.is_active), [motivos]);
@@ -70,56 +77,169 @@ export default function NuevaVisita() {
       .slice(0, 30);
   }, [clientes, busqueda]);
 
-  // Un bloque inicial en cuanto se conocen los motivos.
-  useEffect(() => {
-    if (!bloques.length && motivosActivos.length) setBloques([nuevoBloque(motivosActivos[0].key)]);
-  }, [motivosActivos, bloques.length]);
-
   const actualizarBloque = (uid: string, patch: Partial<BloqueForm>) =>
     setBloques((bs) => bs.map((b) => (b.uid === uid ? { ...b, ...patch } : b)));
 
-  const procesarAudio = async (uid: string, blob: Blob) => {
-    const bloque = bloques.find((b) => b.uid === uid);
-    const motivo = bloque && motivoDe(bloque.motivoKey);
-    if (!bloque || !motivo) return;
-    setProcesando(uid);
+  /** Solo las visitas efectivas llevan bloques; el resto son intentos fallidos. */
+  const esEfectiva = resultado === "efectiva";
+  const requiereGeo = tipo !== "llamada";
+
+  // ---------------------------------------------------------------- referencias
+
+  /**
+   * Las referencias que propone la IA se contrastan contra el maestro de productos.
+   * Sin coincidencia exacta el campo se deja vacío: nunca se aproxima una referencia.
+   */
+  const resolverReferencias = async (lista: BloqueForm[]) => {
+    const avisos: string[] = [];
+    for (const b of lista) {
+      const motivo = motivoDe(b.motivoKey);
+      if (!motivo) continue;
+      for (const c of camposVisibles(motivo.campos).filter((x) => x.tipo === "referencia")) {
+        const bruto = b.valores[c.campo_key]?.trim();
+        if (!bruto) continue;
+        const { data } = await supabase.rpc("buscar_productos" as never, { _q: bruto, _limite: 10 } as never);
+        const filas = (data ?? []) as unknown as { referencia: string; descripcion: string | null; marca: string | null }[];
+        const exacta = filas.find((p) => p.referencia.toLowerCase() === bruto.toLowerCase());
+        if (exacta) {
+          b.valores[c.campo_key] = exacta.referencia;
+          b.valores[`${c.campo_key}_descripcion`] = exacta.descripcion ?? "";
+          b.valores[`${c.campo_key}_marca`] = exacta.marca ?? "";
+        } else {
+          delete b.valores[c.campo_key];
+          delete b.meta[c.campo_key];
+          avisos.push(`${motivo.nombre} · ${c.label}: no existe la referencia «${bruto}», búscala a mano.`);
+        }
+      }
+    }
+    return avisos;
+  };
+
+  // ---------------------------------------------------------------- voz
+
+  const transcribirAudio = async (blob: Blob): Promise<string | null> => {
+    const form = new FormData();
+    form.append("audio", blob, "nota.wav");
+    const { data, error } = await supabase.functions.invoke("visita-voz", { body: form });
+    if (error) throw new Error((await (error as { context?: Response }).context?.text?.()) || error.message);
+    const res = data as { transcripcion?: string; error?: string };
+    if (res.error) throw new Error(res.error);
+    return res.transcripcion ?? null;
+  };
+
+  /** Graba una vez toda la visita: se pinta la transcripción y la extracción va por detrás. */
+  const procesarVisita = async (blob: Blob) => {
+    setTranscribiendo(true);
+    setErrorExtraccion(null);
+    setAvisosRef([]);
+    let texto: string | null = null;
     try {
-      const form = new FormData();
-      form.append("audio", blob, "nota.wav");
-      form.append("motivo_nombre", motivo.nombre);
-      form.append("cliente_nombre", cliente?.cliente ?? "");
-      form.append(
-        "campos",
-        JSON.stringify(
-          camposVisibles(motivo.campos).map((c) => ({
-            campo_key: c.campo_key,
-            label: c.label,
-            ayuda: c.ayuda,
-            tipo: c.tipo,
-            is_required: c.is_required,
-            opciones: resolverOpciones(c.opciones, catalogos),
-          })),
-        ),
-      );
+      texto = await transcribirAudio(blob);
+    } catch (e) {
+      setTranscribiendo(false);
+      toast({ title: "No se ha podido transcribir", description: (e as Error).message, variant: "destructive" });
+      return;
+    }
+    setTranscribiendo(false);
+    if (!texto) return;
 
-
-      const { data, error } = await supabase.functions.invoke("visita-voz", { body: form });
+    // La narración ya está en pantalla; la extracción corre en paralelo.
+    setTranscripcion(texto);
+    setExtrayendo(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("visita-voz", {
+        body: { transcripcion: texto, cliente_nombre: cliente?.cliente ?? "" },
+      });
       if (error) throw new Error((await (error as { context?: Response }).context?.text?.()) || error.message);
-      const res = data as { transcripcion?: string; campos?: Record<string, unknown>; error?: string };
+      const res = data as {
+        resultado_visita?: string;
+        bloques?: { motivo_key: string; campos: Record<string, string>; campos_meta: Meta }[];
+        error?: string;
+      };
       if (res.error) throw new Error(res.error);
 
-      const next: Record<string, string> = {};
-      for (const [k, v] of Object.entries(res.campos ?? {})) if (v != null) next[k] = String(v);
-      actualizarBloque(uid, { transcripcion: res.transcripcion ?? "", valores: next });
-      toast({ title: "Informe preliminar listo", description: "Revísalo y corrige lo que haga falta antes de guardar." });
+      if (res.resultado_visita && RESULTADOS.includes(res.resultado_visita)) setResultado(res.resultado_visita);
+
+      const propuestos: BloqueForm[] = (res.bloques ?? [])
+        .filter((b) => motivoDe(b.motivo_key))
+        .map((b) => ({
+          uid: crypto.randomUUID(),
+          motivoKey: b.motivo_key,
+          valores: { ...b.campos },
+          meta: { ...(b.campos_meta ?? {}) },
+        }));
+
+      const avisos = await resolverReferencias(propuestos);
+      setAvisosRef(avisos);
+      setRepreguntaHecha(false);
+      setBloques(propuestos.length ? propuestos : [nuevoBloque(motivosActivos[0]?.key ?? "")]);
+      toast({
+        title: propuestos.length ? `${propuestos.length} bloque(s) propuestos` : "Sin datos suficientes",
+        description: propuestos.length
+          ? "Revísalos y corrige lo que haga falta antes de guardar."
+          : "No he identificado datos concretos: rellénalo a mano.",
+      });
     } catch (e) {
-      toast({ title: "Error procesando la nota", description: (e as Error).message, variant: "destructive" });
+      setErrorExtraccion((e as Error).message);
+      if (!bloques.length) setBloques([nuevoBloque(motivosActivos[0]?.key ?? "")]);
+      toast({
+        title: "No se ha podido analizar la nota",
+        description: "Tienes la transcripción completa; puedes rellenar la visita a mano.",
+        variant: "destructive",
+      });
     } finally {
-      setProcesando(null);
+      setExtrayendo(false);
     }
   };
 
-  /** Ubicación del comercial al registrar la visita (opcional, nunca bloquea el guardado). */
+  /** Segunda tanda: el comercial contesta por voz a los campos que faltan de un bloque. */
+  const responderRepregunta = async (uid: string, blob: Blob) => {
+    const bloque = bloques.find((b) => b.uid === uid);
+    const motivo = bloque && motivoDe(bloque.motivoKey);
+    if (!bloque || !motivo) return;
+    setRespondiendo(uid);
+    try {
+      const texto = await transcribirAudio(blob);
+      if (!texto) return;
+      const faltan = pendientesDe(bloque).map((c) => c.campo_key);
+      const { data, error } = await supabase.functions.invoke("visita-voz", {
+        body: { accion: "repreguntar", transcripcion: texto, motivo_key: bloque.motivoKey, campos: faltan },
+      });
+      if (error) throw new Error((await (error as { context?: Response }).context?.text?.()) || error.message);
+      const res = data as { campos?: Record<string, string>; campos_meta?: Meta; error?: string };
+      if (res.error) throw new Error(res.error);
+
+      const siguiente: BloqueForm = {
+        ...bloque,
+        valores: { ...bloque.valores, ...(res.campos ?? {}) },
+        meta: { ...bloque.meta, ...(res.campos_meta ?? {}) },
+      };
+      const avisos = await resolverReferencias([siguiente]);
+      setAvisosRef((a) => [...a, ...avisos]);
+      actualizarBloque(uid, { valores: siguiente.valores, meta: siguiente.meta });
+      setTranscripcion((t) => `${t}\n\n[Respuesta a los datos que faltaban]\n${texto}`);
+    } catch (e) {
+      toast({ title: "No se ha podido usar la respuesta", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setRespondiendo(null);
+      setRepreguntaHecha(true);
+    }
+  };
+
+  // ---------------------------------------------------------------- validación
+
+  /** Campos que el director exige para dar el bloque por válido y siguen vacíos. */
+  const pendientesDe = (b: BloqueForm): MotivoCampo[] => {
+    const motivo = motivoDe(b.motivoKey);
+    if (!motivo) return [];
+    return camposVisibles(motivo.campos).filter((c) => c.requerido_validacion && !b.valores[c.campo_key]?.trim());
+  };
+
+  const hayPendientes = esEfectiva && bloques.some((b) => pendientesDe(b).length > 0);
+  const mostrarRepregunta = hayPendientes && !repreguntaHecha && (transcripcion !== "" || bloques.some((b) => Object.keys(b.valores).length));
+
+  // ---------------------------------------------------------------- guardado
+
   const obtenerPosicion = () =>
     new Promise<{ lat: number; lng: number } | null>((resolve) => {
       if (!("geolocation" in navigator)) return resolve(null);
@@ -136,11 +256,6 @@ export default function NuevaVisita() {
         { enableHighAccuracy: true, timeout: 6000 },
       );
     });
-
-  /** Solo las visitas efectivas llevan bloques; el resto son intentos fallidos. */
-  const esEfectiva = resultado === "efectiva";
-  /** Los resultados presenciales deberían llevar GPS; una llamada, no. */
-  const requiereGeo = tipo !== "llamada";
 
   const guardar = async () => {
     if (!codCliente) {
@@ -161,7 +276,6 @@ export default function NuevaVisita() {
         }
         for (const c of camposVisibles(m.campos))
           if (c.is_required && !b.valores[c.campo_key]?.trim()) faltan.push(`${m.nombre}: ${c.label}`);
-
       }
       if (faltan.length) {
         toast({ title: "Campos obligatorios sin rellenar", description: faltan.join(", "), variant: "destructive" });
@@ -178,11 +292,6 @@ export default function NuevaVisita() {
       });
     }
 
-    const transcripcionUnica = bloques
-      .map((b) => b.transcripcion)
-      .filter(Boolean)
-      .join("\n\n");
-
     const { data: creada, error } = await supabase
       .from("visitas")
       .insert({
@@ -194,7 +303,7 @@ export default function NuevaVisita() {
         resultado_visita: resultado,
         user_id: user?.id ?? null,
         vendedor: employeeCode ?? null,
-        transcripcion: esEfectiva ? transcripcionUnica || null : null,
+        transcripcion: transcripcion || null,
         observaciones: observaciones || null,
         campos: {},
         estado: "registrada",
@@ -215,7 +324,12 @@ export default function NuevaVisita() {
       if (esEfectiva) {
         await crearBloques(
           (creada as { id: string }).id,
-          bloques.map((b) => ({ motivo_key: b.motivoKey, campos: b.valores })),
+          bloques.map((b) => ({
+            motivo_key: b.motivoKey,
+            campos: b.valores,
+            campos_meta: b.meta,
+            completo: pendientesDe(b).length === 0,
+          })),
         );
       }
     } catch (e) {
@@ -226,7 +340,6 @@ export default function NuevaVisita() {
 
     setSaving(false);
 
-    // Geoposicionamiento progresivo: si el cliente aún no tiene ubicación, se la asignamos.
     if (pos) {
       await supabase.rpc("registrar_geo_cliente" as never, {
         _cod: Number(codCliente),
@@ -246,7 +359,7 @@ export default function NuevaVisita() {
 
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Registrar visita</h1>
-        <p className="text-sm text-muted-foreground">Dicta la visita y la IA prepara el informe por ti</p>
+        <p className="text-sm text-muted-foreground">Cuenta la visita entera de una vez y la IA la reparte en bloques</p>
       </div>
 
       <Card>
@@ -330,9 +443,125 @@ export default function NuevaVisita() {
         </CardContent>
       </Card>
 
+      {/* Chuleta previa: recordatorio, no obliga a elegir motivo */}
+      {esEfectiva && (
+        <Card>
+          <Collapsible defaultOpen={!transcripcion}>
+            <CollapsibleTrigger className="flex w-full items-center gap-2 p-4 text-left">
+              <Lightbulb className="h-4 w-4 text-primary" />
+              <span className="text-base font-semibold">Antes de grabar: qué no dejarte</span>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-3 px-4 pb-4">
+              <p className="text-xs text-muted-foreground">
+                No hace falta elegir motivo: cuenta la visita y la IA lo reparte. Esto es solo un recordatorio de lo que
+                el director exige en cada tipo de asunto.
+              </p>
+              {motivosActivos.map((m) => {
+                const clave = camposVisibles(m.campos).filter((c) => c.requerido_validacion).map((c) => c.label);
+                return (
+                  <div key={m.key} className="rounded-md border p-3">
+                    <p className="text-sm font-medium">{m.nombre}</p>
+                    {m.descripcion && <p className="text-xs text-muted-foreground">{m.descripcion}</p>}
+                    {clave.length > 0 && (
+                      <p className="mt-1 text-xs">
+                        <span className="text-muted-foreground">Imprescindible: </span>
+                        {clave.join(" · ")}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </CollapsibleContent>
+          </Collapsible>
+        </Card>
+      )}
+
+      {esEfectiva && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">2. Cuenta la visita</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            <VoiceRecorder
+              onAudio={(blob) => procesarVisita(blob)}
+              disabled={!codCliente || transcribiendo || extrayendo}
+              processing={transcribiendo}
+              hasResult={transcripcion !== ""}
+            />
+
+            {transcripcion && (
+              <div className="space-y-2 rounded-md border bg-muted/40 p-3">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <FileText className="h-4 w-4" /> Lo que he entendido
+                  {extrayendo && (
+                    <Badge variant="secondary" className="gap-1">
+                      <Loader2 className="h-3 w-3 animate-spin" /> rellenando campos…
+                    </Badge>
+                  )}
+                </div>
+                <Textarea
+                  rows={6}
+                  value={transcripcion}
+                  onChange={(e) => setTranscripcion(e.target.value)}
+                  className="bg-background text-sm"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Léela mientras se preparan los bloques. Puedes corregirla: se guarda con la visita.
+                </p>
+              </div>
+            )}
+
+            {errorExtraccion && (
+              <div className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/5 p-3 text-sm">
+                <AlertTriangle className="mt-0.5 h-4 w-4 text-destructive" />
+                <div className="space-y-2">
+                  <p>No se han podido preparar los bloques ({errorExtraccion}). La transcripción está guardada; rellena la visita a mano.</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={extrayendo}
+                    onClick={async () => {
+                      setExtrayendo(true);
+                      setErrorExtraccion(null);
+                      try {
+                        const { data, error } = await supabase.functions.invoke("visita-voz", {
+                          body: { transcripcion, cliente_nombre: cliente?.cliente ?? "" },
+                        });
+                        if (error) throw new Error(error.message);
+                        const res = data as { bloques?: { motivo_key: string; campos: Record<string, string>; campos_meta: Meta }[]; error?: string };
+                        if (res.error) throw new Error(res.error);
+                        const propuestos: BloqueForm[] = (res.bloques ?? [])
+                          .filter((b) => motivoDe(b.motivo_key))
+                          .map((b) => ({ uid: crypto.randomUUID(), motivoKey: b.motivo_key, valores: { ...b.campos }, meta: { ...(b.campos_meta ?? {}) } }));
+                        setAvisosRef(await resolverReferencias(propuestos));
+                        if (propuestos.length) setBloques(propuestos);
+                      } catch (e) {
+                        setErrorExtraccion((e as Error).message);
+                      } finally {
+                        setExtrayendo(false);
+                      }
+                    }}
+                  >
+                    Reintentar el análisis
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {avisosRef.length > 0 && (
+              <div className="rounded-md border border-amber-400/70 bg-amber-50/60 p-3 text-sm dark:bg-amber-500/10">
+                <p className="mb-1 font-medium">Referencias sin confirmar</p>
+                <ul className="list-disc pl-5 text-xs">
+                  {avisosRef.map((a, i) => <li key={i}>{a}</li>)}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {esEfectiva && bloques.map((b, i) => {
         const motivo = motivoDe(b.motivoKey);
         const hayResultado = Object.keys(b.valores).length > 0;
+        const faltan = pendientesDe(b);
         return (
           <Card key={b.uid}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -356,7 +585,7 @@ export default function NuevaVisita() {
                 <Label>Motivo</Label>
                 <Select
                   value={b.motivoKey}
-                  onValueChange={(val) => actualizarBloque(b.uid, { motivoKey: val, valores: {} })}
+                  onValueChange={(val) => actualizarBloque(b.uid, { motivoKey: val, valores: {}, meta: {} })}
                 >
                   <SelectTrigger><SelectValue placeholder="Selecciona motivo" /></SelectTrigger>
                   <SelectContent>
@@ -368,50 +597,69 @@ export default function NuevaVisita() {
                 {motivo?.descripcion && <p className="text-xs text-muted-foreground">{motivo.descripcion}</p>}
               </div>
 
-              <VoiceRecorder
-                onAudio={(blob) => procesarAudio(b.uid, blob)}
-                disabled={!motivo || !codCliente || procesando !== null}
-                processing={procesando === b.uid}
-                hasResult={hayResultado}
-              />
-              {b.transcripcion && (
-                <Collapsible>
-                  <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-                    <FileText className="h-4 w-4" /> Ver transcripción
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="mt-2 whitespace-pre-wrap rounded-md bg-muted/50 p-3 text-sm">
-                    {b.transcripcion}
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
-
               {camposVisibles(motivo?.campos ?? []).map((c) => (
                 <CampoVisita
                   key={c.campo_key}
                   campo={c}
                   valores={b.valores}
+                  meta={b.meta[c.campo_key]}
                   catalogos={catalogos}
                   onChange={(patch) => actualizarBloque(b.uid, { valores: { ...b.valores, ...patch } })}
                 />
               ))}
 
-              {(() => {
-                const faltan = camposVisibles(motivo?.campos ?? [])
-                  .filter((c) => c.requerido_validacion && !b.valores[c.campo_key]?.trim())
-                  .map((c) => c.label);
-                if (!faltan.length) return null;
-                return (
-                  <p className="text-xs text-amber-600 dark:text-amber-500">
-                    Se puede guardar, pero para que el director la dé por válida faltan: {faltan.join(", ")}.
-                  </p>
-                );
-              })()}
-
-
+              {faltan.length > 0 && (
+                <p className="text-xs text-amber-600 dark:text-amber-500">
+                  Se puede guardar, pero para que el director la dé por válida faltan: {faltan.map((c) => c.label).join(", ")}.
+                </p>
+              )}
             </CardContent>
           </Card>
         );
       })}
+
+      {/* Repregunta: una sola tanda por los campos que el director exige */}
+      {mostrarRepregunta && (
+        <Card className="border-amber-400/70">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <AlertTriangle className="h-4 w-4 text-amber-600" /> Falta un par de datos
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Contéstalos ahora — por voz o escribiéndolos arriba — y el director no tendrá que reclamártelos.
+              Si lo dejas, la visita se guarda igual marcada como incompleta.
+            </p>
+            {bloques.map((b, i) => {
+              const faltan = pendientesDe(b);
+              if (!faltan.length) return null;
+              const motivo = motivoDe(b.motivoKey);
+              return (
+                <div key={b.uid} className="space-y-2 rounded-md border p-3">
+                  <p className="text-sm font-medium">Bloque {i + 1} · {motivo?.nombre}</p>
+                  <ul className="list-disc pl-5 text-xs text-muted-foreground">
+                    {faltan.map((c) => <li key={c.campo_key}>{c.label}{c.ayuda ? ` — ${c.ayuda}` : ""}</li>)}
+                  </ul>
+                  {respondiendo === b.uid ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Procesando tu respuesta…
+                    </div>
+                  ) : (
+                    <VoiceRecorder
+                      onAudio={(blob) => responderRepregunta(b.uid, blob)}
+                      disabled={respondiendo !== null}
+                    />
+                  )}
+                </div>
+              );
+            })}
+            <Button variant="outline" className="w-full" onClick={() => setRepreguntaHecha(true)}>
+              <Mic className="mr-2 h-4 w-4" /> Ahora no, guardar así
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {esEfectiva && (
         <Button
