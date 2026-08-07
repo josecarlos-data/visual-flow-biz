@@ -234,16 +234,39 @@ export function CampoVisita(props: Props) {
     }
   })();
 
+  const meta = props.meta;
+  const dudoso = meta?.confianza === "baja";
+
   return (
-    <div className="space-y-1.5">
+    <div
+      className={
+        dudoso
+          ? "space-y-1.5 rounded-md border border-amber-400/70 bg-amber-50/50 p-2 dark:bg-amber-500/10"
+          : "space-y-1.5"
+      }
+    >
       <Label>
         {campo.label}
         {campo.is_required && <span className="ml-1 text-destructive">*</span>}
         {!campo.is_required && campo.requerido_validacion && (
           <Badge variant="outline" className="ml-2 text-[10px]">Necesario para validar</Badge>
         )}
+        {meta?.confianza && (
+          <Badge
+            variant={dudoso ? "destructive" : "secondary"}
+            className="ml-2 cursor-help text-[10px]"
+            title={meta.cita ? `«${meta.cita}»` : "Propuesto por la IA"}
+          >
+            IA · {meta.confianza}
+          </Badge>
+        )}
       </Label>
       {control}
+      {meta?.cita && (
+        <p className={`text-xs italic ${dudoso ? "text-amber-700 dark:text-amber-500" : "text-muted-foreground"}`}>
+          «{meta.cita}»
+        </p>
+      )}
       {campo.ayuda && <p className="text-xs text-muted-foreground">{campo.ayuda}</p>}
     </div>
   );
