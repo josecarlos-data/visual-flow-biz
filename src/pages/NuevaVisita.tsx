@@ -52,6 +52,7 @@ export default function NuevaVisita() {
   const [bloques, setBloques] = useState<BloqueForm[]>([]);
   const [observaciones, setObservaciones] = useState("");
   const [transcripcion, setTranscripcion] = useState("");
+  const [analisis, setAnalisis] = useState<{ modelo: string | null; version: string | null }>({ modelo: null, version: null });
   const [transcribiendo, setTranscribiendo] = useState(false);
   const [extrayendo, setExtrayendo] = useState(false);
   const [errorExtraccion, setErrorExtraccion] = useState<string | null>(null);
@@ -154,9 +155,12 @@ export default function NuevaVisita() {
       const res = data as {
         resultado_visita?: string;
         bloques?: { motivo_key: string; campos: Record<string, string>; campos_meta: Meta }[];
+        analisis_modelo?: string;
+        analisis_prompt_version?: string;
         error?: string;
       };
       if (res.error) throw new Error(res.error);
+      setAnalisis({ modelo: res.analisis_modelo ?? null, version: res.analisis_prompt_version ?? null });
 
       if (res.resultado_visita && RESULTADOS.includes(res.resultado_visita)) setResultado(res.resultado_visita);
 
@@ -310,6 +314,8 @@ export default function NuevaVisita() {
         origen: "app",
         latitud: pos?.lat ?? null,
         longitud: pos?.lng ?? null,
+        analisis_modelo: analisis.modelo,
+        analisis_prompt_version: analisis.version,
       } as never)
       .select("id")
       .single();
