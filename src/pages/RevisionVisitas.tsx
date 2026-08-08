@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, Clock, XCircle, Search, ExternalLink } from "lucide-react";
+import { CheckCircle2, Clock, XCircle, Search, ExternalLink, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +13,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import {
   useVisitasRevision, useRevisionMutations, useMotivos, useClientes,
-  useSituacionesMutations, useVisitaBloques, useBloqueMutations, fechaCorta, hoyISO,
+  useSituacionesMutations, useVisitaBloques, useBloqueMutations, useReanalizarVisita, fechaCorta, hoyISO,
   type Visita, type VisitaBloque,
 } from "@/hooks/useCrm";
 
@@ -37,6 +37,7 @@ export default function RevisionVisitas() {
   const { revisar } = useRevisionMutations();
   const { revisarBloque } = useBloqueMutations();
   const { guardar: guardarSituacion } = useSituacionesMutations();
+  const reanalizar = useReanalizarVisita();
 
   const [estado, setEstado] = useState("pendiente");
   const [q, setQ] = useState("");
@@ -247,8 +248,37 @@ export default function RevisionVisitas() {
 
               {sel.transcripcion && (
                 <div className="space-y-1.5">
-                  <Label>Transcripción original</Label>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label>Transcripción original</Label>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={reanalizar.isPending}
+                      onClick={() => {
+                        if (!confirm("Se sustituyen los bloques actuales por los que proponga el análisis. ¿Continuar?")) return;
+                        reanalizar.mutate(
+                          {
+                            id: sel.id,
+                            transcripcion: sel.transcripcion!,
+                            cliente_nombre: sel.cod_cliente ? nombrePorCod.get(sel.cod_cliente) ?? "" : "",
+                          },
+                          {
+                            onSuccess: (n) => toast({ title: `Reanalizada: ${n} bloque(s)` }),
+                            onError: (e) => toast({ title: "No se ha podido reanalizar", description: (e as Error).message, variant: "destructive" }),
+                          },
+                        );
+                      }}
+                    >
+                      {reanalizar.isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1 h-3.5 w-3.5" />}
+                      Reanalizar
+                    </Button>
+                  </div>
                   <p className="rounded-md border bg-muted/40 p-2 text-xs text-muted-foreground">{sel.transcripcion}</p>
+                  {(sel.analisis_modelo || sel.analisis_prompt_version) && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Analizada con {sel.analisis_modelo ?? "—"} · {sel.analisis_prompt_version ?? "—"}
+                    </p>
+                  )}
                 </div>
               )}
 

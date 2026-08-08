@@ -1167,6 +1167,8 @@ export type Database = {
       }
       visitas: {
         Row: {
+          analisis_modelo: string | null
+          analisis_prompt_version: string | null
           campos: Json
           cliente_externo: string | null
           cod_cliente: number | null
@@ -1200,6 +1202,8 @@ export type Database = {
           zona: string | null
         }
         Insert: {
+          analisis_modelo?: string | null
+          analisis_prompt_version?: string | null
           campos?: Json
           cliente_externo?: string | null
           cod_cliente?: number | null
@@ -1233,6 +1237,8 @@ export type Database = {
           zona?: string | null
         }
         Update: {
+          analisis_modelo?: string | null
+          analisis_prompt_version?: string | null
           campos?: Json
           cliente_externo?: string | null
           cod_cliente?: number | null
