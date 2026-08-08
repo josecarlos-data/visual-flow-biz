@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, Clock, XCircle, Search, ExternalLink } from "lucide-react";
+import { CheckCircle2, Clock, XCircle, Search, ExternalLink, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +13,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import {
   useVisitasRevision, useRevisionMutations, useMotivos, useClientes,
-  useSituacionesMutations, useVisitaBloques, useBloqueMutations, fechaCorta, hoyISO,
+  useSituacionesMutations, useVisitaBloques, useBloqueMutations, useReanalizarVisita, fechaCorta, hoyISO,
   type Visita, type VisitaBloque,
 } from "@/hooks/useCrm";
 
@@ -37,6 +37,7 @@ export default function RevisionVisitas() {
   const { revisar } = useRevisionMutations();
   const { revisarBloque } = useBloqueMutations();
   const { guardar: guardarSituacion } = useSituacionesMutations();
+  const reanalizar = useReanalizarVisita();
 
   const [estado, setEstado] = useState("pendiente");
   const [q, setQ] = useState("");

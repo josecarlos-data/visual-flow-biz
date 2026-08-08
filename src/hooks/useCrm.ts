@@ -89,6 +89,8 @@ export interface Visita {
   campos: Record<string, unknown>;
   estado: string;
   origen: string;
+  analisis_modelo: string | null;
+  analisis_prompt_version: string | null;
   created_at: string;
 }
 
