@@ -595,6 +595,52 @@ export async function crearBloques(
   if (error) throw error;
 }
 
+/**
+ * Relanza el análisis sobre la transcripción YA guardada: no vuelve a transcribir.
+ * Sustituye los bloques de la visita por los nuevos y anota modelo y versión de prompt.
+ */
+export function useReanalizarVisita() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (v: { id: string; transcripcion: string; cliente_nombre?: string }) => {
+      const { data, error } = await supabase.functions.invoke("visita-voz", {
+        body: { transcripcion: v.transcripcion, cliente_nombre: v.cliente_nombre ?? "" },
+      });
+      if (error) throw new Error(error.message);
+      const res = data as {
+        bloques?: { motivo_key: string; campos: Record<string, unknown>; campos_meta?: Record<string, unknown> }[];
+        resultado_visita?: string;
+        analisis_modelo?: string;
+        analisis_prompt_version?: string;
+        error?: string;
+      };
+      if (res.error) throw new Error(res.error);
+      const bloques = res.bloques ?? [];
+      if (!bloques.length) throw new Error("El análisis no ha propuesto ningún bloque; se dejan los actuales.");
+
+      const { error: delErr } = await supabase.from("visita_bloques").delete().eq("visita_id", v.id);
+      if (delErr) throw delErr;
+      await crearBloques(v.id, bloques.map((b) => ({ motivo_key: b.motivo_key, campos: b.campos, campos_meta: b.campos_meta })));
+
+      const { error: upErr } = await supabase
+        .from("visitas")
+        .update({
+          analisis_modelo: res.analisis_modelo ?? null,
+          analisis_prompt_version: res.analisis_prompt_version ?? null,
+        } as never)
+        .eq("id", v.id);
+      if (upErr) throw upErr;
+      return bloques.length;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["crm_visita_bloques"] });
+      qc.invalidateQueries({ queryKey: ["crm_visitas_revision"] });
+      qc.invalidateQueries({ queryKey: ["crm_visitas"] });
+      qc.invalidateQueries({ queryKey: ["crm_cliente_visitas"] });
+    },
+  });
+}
+
 export function useMotivos() {
   return useQuery({
     queryKey: ["crm_motivos"],
