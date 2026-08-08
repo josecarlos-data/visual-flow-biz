@@ -247,8 +247,37 @@ export default function RevisionVisitas() {
 
               {sel.transcripcion && (
                 <div className="space-y-1.5">
-                  <Label>Transcripción original</Label>
+                  <div className="flex items-center justify-between gap-2">
+                    <Label>Transcripción original</Label>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={reanalizar.isPending}
+                      onClick={() => {
+                        if (!confirm("Se sustituyen los bloques actuales por los que proponga el análisis. ¿Continuar?")) return;
+                        reanalizar.mutate(
+                          {
+                            id: sel.id,
+                            transcripcion: sel.transcripcion!,
+                            cliente_nombre: sel.cod_cliente ? nombrePorCod.get(sel.cod_cliente) ?? "" : "",
+                          },
+                          {
+                            onSuccess: (n) => toast({ title: `Reanalizada: ${n} bloque(s)` }),
+                            onError: (e) => toast({ title: "No se ha podido reanalizar", description: (e as Error).message, variant: "destructive" }),
+                          },
+                        );
+                      }}
+                    >
+                      {reanalizar.isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1 h-3.5 w-3.5" />}
+                      Reanalizar
+                    </Button>
+                  </div>
                   <p className="rounded-md border bg-muted/40 p-2 text-xs text-muted-foreground">{sel.transcripcion}</p>
+                  {(sel.analisis_modelo || sel.analisis_prompt_version) && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Analizada con {sel.analisis_modelo ?? "—"} · {sel.analisis_prompt_version ?? "—"}
+                    </p>
+                  )}
                 </div>
               )}
 
