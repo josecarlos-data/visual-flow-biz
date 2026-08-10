@@ -1,53 +1,92 @@
-# FASE 4.3 — Dos ajustes al prompt (mismo modelo: luna)
+# FASE 6b — Vistas analíticas sobre los bloques de visita
 
-Solo se toca `supabase/functions/visita-voz/index.ts` (prompt + versión) y se repite
-la comparativa. Sin cambios de modelo, de esquema ni de base de datos.
+Solo la 6b. Dos entregables: las vistas SQL y el registro en el repo de la comparativa
+`sol` vs `luna`.
 
-## 1. Un bloque por comparativa de precio
+## Estado verificado antes de planificar
 
-En `sistemaExtraccion`, dentro de la regla imperativa de competencia, se añade:
+- En `public` no existe **ninguna** vista hoy (`information_schema.views` vacío).
+- Claves reales en `motivo_campos` (reseed FASE 3), distintas de las del plan original:
+  - `competencia`: `competidor`, `marca_competencia`, `referencia_competencia`,
+    `precio_rimosa`, **`precio_competencia`** (no `precio_competidor`), `resultado_venta`,
+    `conclusion`, `foto_albaran`. El viejo `referencia` está `is_active=false`.
+  - `promocion`: `referencia`, `producto`, `cantidad`, `precio_ofertado`, `canal_envio`,
+    `respuesta_cliente`, `importe_estimado`, `proxima_accion`, `fuera_de_plazo`,
+    `motivo_fuera_plazo` (`campana_id` inactivo, es de la FASE 5).
+  - `informacion_potencial`: `persona_contacto`, `num_vehiculos`, `marcas_vehiculo`,
+    `tipo_ejes`, `num_mecanicos`, `tipo_trabajo`, `referencias_consumo`,
+    `potencial_estimado`, `observaciones`. **No existe `fecha_verificacion`**, que es lo
+    que el plan original usaba para ordenar la ficha de flota.
+- `nota_revision` ya se muestra en la ficha del cliente y en revisión: ese punto del plan
+  original ya está cubierto por la 6a y no se rehace.
+- `reprocesar_historico_a_bloques()` ya existe creada y sin ejecutar: se deja igual.
 
-> Cada referencia comparada es una comparativa independiente: si el comercial compara
-> dos o más referencias con precios distintos, devuelves un bloque `competencia` por
-> cada una, nunca uno resumido. `resultado_venta` se rellena en cada bloque.
+## Vistas a crear
 
-Ejemplo nuevo con dos referencias, del estilo de la narración real de baterías:
+Todas con `security_invoker = true` (respetan la RLS de `visitas`/`visita_bloques`, sin
+puerta trasera) y `GRANT SELECT ... TO authenticated` únicamente, en línea con el
+endurecimiento ya aplicado (nada para `anon`).
 
-> «la batería de 110 se la dan a 78 y nosotros a 92, y la de 140 a 105 frente a
-> nuestros 121» => dos bloques `competencia`, uno con precio_competencia=78 /
-> precio_rimosa=92 y otro con 105 / 121, cada uno con su referencia y su
-> `resultado_venta`.
+1. `v_visita_bloques_campos` (base, formato largo)
+   Un registro por bloque y campo: `visita_id, bloque_id, cod_cliente, fecha, vendedor,
+   ruta, delegación, motivo_key, campo_key, valor_texto, valor_num, confianza, cita,
+   validacion`. Es la capa sobre la que se apoyan las demás y evita repetir el
+   desanidado del jsonb en cada vista.
 
-Se refuerza también en la `description` del array `bloques_competencia`
-(en `esquemaExtraccion`): "una comparativa por referencia y precio; no las agrupes".
+2. `v_visita_oferta` (bloques `promocion`)
+   Cabecera de visita + `referencia`, `producto`, `cantidad`, `precio_ofertado`,
+   `canal_envio`, `respuesta_cliente`, `importe_estimado`, `proxima_accion`,
+   `fuera_de_plazo`, `motivo_fuera_plazo`, con los numéricos ya casteados.
 
-## 2. `seguimiento` sobrante
+3. `v_visita_competencia` (bloques `competencia`)
+   Cabecera + `competidor`, `marca_competencia`, `referencia_competencia`,
+   `precio_rimosa`, `precio_competencia`, `resultado_venta`, `conclusion`, y calculados:
+   - `gap_eur = precio_rimosa - precio_competencia`
+   - `gap_pct = (precio_rimosa - precio_competencia) / NULLIF(precio_competencia,0) * 100`
+   Ambos nulos si falta alguno de los dos precios.
 
-La regla actual («cajón de último recurso») se endurece:
+4. `v_ficha_flota_actual` (bloques `informacion_potencial`)
+   Un registro por cliente con el **último valor no nulo de cada campo**, no la última
+   fila entera: al no existir `fecha_verificacion` se ordena por `visitas.fecha` y, a
+   igualdad, por `created_at` del bloque. Se hace campo a campo para que una visita
+   reciente que solo aporta el nº de mecánicos no borre las marcas de vehículo
+   registradas antes. Incluye `fecha_ultima_actualizacion` y `visita_id_origen`.
 
-> `seguimiento` solo se instancia si NO has creado ningún otro bloque. Si ya existe al
-> menos un bloque de otro motivo, no añadas `seguimiento` salvo que quede contenido
-> concreto que no encaje en ninguno de ellos; en ese caso el bloque recoge únicamente
-> ese contenido sobrante, nunca un resumen de lo ya repartido.
+## Mejoras que propongo incorporar (nuevas respecto al plan original)
 
-## 3. Versión e historial
+- **Casteo numérico tolerante**: los valores llegan como texto del formulario y de la IA
+  (comas decimales, "€", espacios). Una función `to_num_visita(text)` inmutable
+  normaliza antes de castear, para que `gap_eur` no se caiga con "194,70 €".
+- **Columna `validacion` en todas las vistas** en lugar de filtrar: quien analice decide
+  si excluye lo marcado `NO CORRECTO`. Sin ella se perdería el 100 % del histórico no
+  revisado.
+- **`v_visita_accion_pendiente`**: `proxima_accion` existe en 7 de los 11 motivos y hoy
+  no hay forma de listarlo. Vista transversal con cliente, motivo, texto de la acción y
+  `fecha_proxima_accion` cuando el motivo la tiene. Es el uso más inmediato para el
+  comercial y sale casi gratis desde la vista base.
+- Índice GIN sobre `visita_bloques.campos` y btree en `(motivo_key)` si el plan de
+  ejecución lo pide; se mide antes de crearlo.
 
-`VERSION_PROMPT` pasa a `"fase4.3"` y se añade al bloque HISTORIAL del archivo la
-entrada correspondiente con los dos cambios y la fecha (09/08/2026).
+Si prefieres dejar fuera `v_visita_accion_pendiente` o la vista base y quedarte solo con
+las tres del plan original, dilo y lo recorto.
 
-## 4. Comparativa fase4.2 vs fase4.3 (solo luna)
+## Verificación
 
-Se reutiliza el banco de pruebas de la comparativa anterior con las mismas tres
-narraciones reales del histórico (`559968f1` Icer, `8608eef9` GSMart+viaje,
-`a8a76aa5` potencial+competencia), con `temperature: 0`, y se entrega tabla con:
+- Recuento por vista y contraste contra los bloques de ese motivo (mismo nº de filas).
+- Un cliente con las tres baterías del caso de prueba: debe salir con 3 filas en
+  `v_visita_competencia` y sus `gap_eur` correctos.
+- Comprobación de RLS: consulta como comercial y como admin devuelven volúmenes
+  distintos y coherentes con `clientes_permitidos`.
 
-- motivos acertados por narración,
-- número de bloques `competencia` (se espera 1 → 3 en la narración de baterías),
-- bloques `seguimiento` sobrantes (se espera que desaparezcan),
-- campos correctos y selects fuera de enum,
-- latencia y coste.
+## Entregable 2 — Comparativa `sol` vs `luna` en RESULTADOS.md
 
-Conclusión explícita: si fase4.3 rompe algo que fase4.2 acertaba, se dice y se
-revierte a fase4.2.
+Se añade a `scripts/bench-visita-voz/RESULTADOS.md`, antes de la tabla de
+fase4.2 vs fase4.3, la sección **"Elección de modelo — sol vs luna (prompt fase4.2)"**
+con los datos de aquella ejecución: motivos acertados (luna 7/7, sol 6/7 más un bloque
+inventado), campos correctos, selects fuera de enum, latencia (luna 3,3–5,7 s; sol
+7,6–13,3 s) y coste (~26× a favor de luna), y la conclusión escrita de por qué se fija
+luna. Queda marcado como transcripción de la ejecución del 09/08/2026, no como una
+tirada nueva; si prefieres reejecutarla ahora con el harness actual para que los números
+salgan del mismo script, lo hago y se anota como ejecución nueva.
 
 No se avanza a ninguna otra fase.
