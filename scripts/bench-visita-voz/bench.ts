@@ -191,24 +191,43 @@ const veredicto = (r: Resumen, e: Caso["esperado"]) => {
 // ------------------------------------------------------------------ main
 
 const soloActual = process.argv.includes("--solo-actual");
+/** --modelos a,b : misma versión de prompt (la actual) contra varios modelos. */
+const argModelos = process.argv.find((a) => a.startsWith("--modelos="));
+const modelos = argModelos ? argModelos.split("=")[1].split(",").map((s) => s.trim()) : [];
+
 const casos = JSON.parse(readFileSync(join(DIR, "narraciones.json"), "utf8")) as Caso[];
 const motivos = cargarMotivos();
-const versiones = soloActual
-  ? [{ nombre: VERSION_PROMPT, sistema: sistemaExtraccion(motivos), schema: esquemaExtraccion(motivos) }]
-  : [
-      { nombre: VERSION_ANTERIOR, sistema: sistemaFase42(motivos), schema: esquemaFase42(motivos) },
-      { nombre: VERSION_PROMPT, sistema: sistemaExtraccion(motivos), schema: esquemaExtraccion(motivos) },
-    ];
+
+interface Combinacion {
+  nombre: string;
+  modelo: string;
+  sistema: string;
+  schema: unknown;
+}
+
+const combinaciones: Combinacion[] = modelos.length
+  ? modelos.map((m) => ({
+      nombre: `${VERSION_PROMPT} / ${m}`,
+      modelo: m,
+      sistema: sistemaExtraccion(motivos),
+      schema: esquemaExtraccion(motivos),
+    }))
+  : soloActual
+    ? [{ nombre: VERSION_PROMPT, modelo: MODELO_EXTRACCION, sistema: sistemaExtraccion(motivos), schema: esquemaExtraccion(motivos) }]
+    : [
+        { nombre: VERSION_ANTERIOR, modelo: MODELO_EXTRACCION, sistema: sistemaFase42(motivos), schema: esquemaFase42(motivos) },
+        { nombre: VERSION_PROMPT, modelo: MODELO_EXTRACCION, sistema: sistemaExtraccion(motivos), schema: esquemaExtraccion(motivos) },
+      ];
 
 const filas: string[] = [];
 for (const caso of casos) {
   const usuario = usuarioExtraccion(caso.narracion, caso.cliente);
-  for (const v of versiones) {
+  for (const v of combinaciones) {
     try {
-      const { ms, uso, salida } = await llamar(v.sistema, usuario, v.schema);
+      const { ms, uso, salida } = await llamar(v.sistema, usuario, v.schema, v.modelo);
       const r = resumir(salida, motivos, ms, uso);
       filas.push(
-        `| ${caso.etiqueta} | ${v.nombre} | ${r.motivos.join(", ") || "—"} | ${r.competencia} | ${r.seguimiento} | ${r.campos} | ${r.fueraEnum.length} | ${(r.ms / 1000).toFixed(1)} s | ${r.tokens} | ${veredicto(r, caso.esperado)} |`,
+        `| ${caso.etiqueta} | ${v.nombre} | ${r.motivos.join(", ") || "—"} | ${r.competencia} | ${r.seguimiento} | ${r.campos} | ${r.fueraEnum.length ? r.fueraEnum.join(", ") : 0} | ${(r.ms / 1000).toFixed(1)} s | ${r.tokens} | ${veredicto(r, caso.esperado)} |`,
       );
       console.log(filas[filas.length - 1]);
     } catch (e) {
@@ -220,11 +239,13 @@ for (const caso of casos) {
 
 const md =
   `# Resultados del banco de pruebas — ${new Date().toISOString().slice(0, 10)}\n\n` +
-  `Modelo: \`${MODELO_EXTRACCION}\`. Narraciones: \`narraciones.json\` (observaciones reales del histórico).\n\n` +
-  "| Narración | Versión | Motivos | Bloques competencia | Bloques seguimiento | Campos rellenos | Fuera de enum | Latencia | Tokens | Veredicto |\n" +
+  `Prompt: \`${VERSION_PROMPT}\`. Modelos: ${[...new Set(combinaciones.map((c) => c.modelo))].map((m) => `\`${m}\``).join(", ")}.\n` +
+  "Narraciones: `narraciones.json` (observaciones reales del histórico).\n\n" +
+  "| Narración | Versión / modelo | Motivos | Bloques competencia | Bloques seguimiento | Campos rellenos | Fuera de enum | Latencia | Tokens | Veredicto |\n" +
   "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n" +
   filas.join("\n") + "\n\n" +
   "Resultado esperado de cada narración, en `narraciones.json` (`esperado`).\n";
 
 writeFileSync(join(DIR, "RESULTADOS-ultima-ejecucion.md"), md);
 console.log("\nEscrito RESULTADOS-ultima-ejecucion.md");
+
