@@ -28,8 +28,13 @@ interface UseHistoricoFilters {
   userDelegacion?: string | null;
 }
 
+/** Consulta paginada genérica: el builder se tipa laxo para no expandir el union de tablas/vistas. */
+interface PaginableQuery<T> {
+  range(from: number, to: number): PromiseLike<{ data: T[] | null; error: unknown }>;
+}
+
 async function fetchAllPaginated<T>(
-  buildQuery: () => ReturnType<ReturnType<typeof supabase.from>["select"]>,
+  buildQuery: () => PaginableQuery<T>,
   pageSize = 1000
 ): Promise<T[]> {
   let all: T[] = [];
