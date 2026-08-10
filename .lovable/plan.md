@@ -1,110 +1,62 @@
-# Reproceso del histórico a bloques — plan y estimación (no se ejecuta nada)
+# Catálogo de competidores reales + revisión del resto de catálogos
 
-## Estado verificado ahora mismo
+## Lo que he comprobado en el histórico
 
-- Visitas con `observaciones` no vacía: **18.017** (tu cifra de 18.031 es prácticamente exacta).
-- `visita_bloques`: 21.493 filas, de las cuales **21.484 con `campos = '{}'`** (una por visita histórica).
-- De esos bloques vacíos: **1.297 llevan `nota_revision`** y **10.456 tienen `validacion` distinta de
-  `pendiente`** (263 `NO CORRECTO`). Es el resultado de la 6a y no se puede perder.
-- Longitud media de la observación histórica: **121 caracteres** (máx. 1.248). Son textos muy cortos.
-- `reprocesar_historico_a_bloques()` hoy **no llama a la IA**: solo marca
-  `campos_meta._reprocesar = true` en hasta `_limite` bloques. Es un marcador de cola, nada más.
-- Coincidencias por palabra clave en esos textos: ~4.808 mencionan competencia/precio y ~6.976
-  promoción/oferta/campaña. Sirve para muestrear la prueba previa.
+Contraste de cada valor contra las 18.017 observaciones (y sus originales):
 
-## 1. Coste y latencia estimados
+- Genéricos actuales: **AD Parts 0, Recalvi 0, Sernauto 0**, "Grupo Serca" 8 y "Grupo Andel" 8
+  (y esos pocos son coincidencias parciales, no la empresa), "Alcázar" 3. Confirmado: la lista de la
+  FASE 3 no sirve.
+- Tus competidores sí aparecen, y en el orden que dices: **Luis Moleón 607, Grupo Peña 445,
+  Eurorecambios 251** (incluye "Salysan"), Pedreño 93, Bahía 82, Aliauto 68, JJ 58, Trapaco 50,
+  Resumpe 43, Moral 43, Relusur 42, Fuenpar 38, Würth 37, Recamer 35, Del Olmo 29, Sabán 28,
+  Hnos. Martínez 15, Berner 15, Resurmop 12, Scora 10, Medialdea 9, CBM 8, Cotocar 8, Emex 7,
+  San Cristóbal 7, Lomeña 5, Blinker 5, Davasa 3, Varisa 1, Maquidiesel 1.
 
-Tu cifra es correcta en orden de magnitud, con un matiz importante a la baja.
+## Cambio 1 — Sustituir el catálogo `competidores`
 
-- Cada llamada envía un system prompt fijo de ~12.000 tokens (las 11 plantillas + catálogos). El texto
-  histórico añade solo ~40 tokens de media, así que **el coste por visita es casi el mismo que el de las
-  narraciones del banco de pruebas**: ~0,012 créditos.
-- Coste bruto: 18.017 × 0,012 ≈ **216 créditos**. Confirmado.
-- Matiz: el system es idéntico carácter por carácter en todas las llamadas, así que con caché de prompt
-  la parte cacheada se factura más barata. En la práctica el rango realista es **130–220 créditos**.
-  El número exacto sale de la prueba de 30, que se extrapola por tokens reales facturados.
-- Latencia: luna tardó 4,1–6,1 s con narraciones largas; con 121 caracteres se espera **2–4 s**.
-  Con concurrencia 4–6 llamadas simultáneas: **2,5–4 horas** de reloj para las 18.017.
-  En serie serían más de 15 horas, por eso no puede ser una sola pasada.
+- `is_active = false` en los 7 genéricos (AD Parts, Grupo Serca, Recalvi, Grupo Andel,
+  Auto Recambios Alcázar, Sernauto, Distribuidor local). **No se borra ninguno**: si algún bloque ya
+  los tuviera guardados, el valor sigue siendo legible.
+- Se insertan los 30 reales activos, con `orden` según la frecuencia medida arriba, de modo que en el
+  desplegable el comercial encuentre primero Luis Moleón, Grupo Peña y Eurorecambios.
+- "Otro (detállalo en la conclusión)" ya existe: se conserva y se manda al final del orden.
 
-## 2. Cómo se procesa
+## Cambio 2 — Alias en la ayuda de `competencia.competidor`
 
-Cola en base de datos + worker por lotes, invocable tantas veces como haga falta.
+La ayuda pasa a incluir la tabla de equivalencias, que es lo que la IA lee como descripción del campo:
 
-- Se añaden a `visita_bloques` columnas de control: `reproceso_estado`
-  (`pendiente`/`en_curso`/`hecho`/`error`), `reproceso_intentos`, `reproceso_error`, `reproceso_en`.
-- `reprocesar_historico_a_bloques()` pasa a **encolar**: marca `reproceso_estado='pendiente'` en los
-  bloques vacíos cuya visita tiene texto. Idempotente: no reencola lo que ya está `hecho`.
-- Nueva función de borde `visita-reproceso` (solo admin) que en cada invocación:
-  1. toma un lote de **50** bloques `pendiente` con `SELECT ... FOR UPDATE SKIP LOCKED` y los pone
-     `en_curso` — dos ejecuciones simultáneas nunca cogen el mismo bloque;
-  2. lanza las llamadas a la pasarela con **concurrencia 5** y reutiliza el mismo prompt y el mismo
-     validador de campos que la voz en directo (`_shared/visita-voz-prompt.ts`);
-  3. ante `429`/`402`/error de red: espera exponencial (1 s, 4 s, 15 s) y hasta **3 intentos**; si
-     agota, deja el bloque en `error` con el motivo y **sigue con el resto**;
-  4. ante `402` (créditos agotados) aborta el lote entero y lo devuelve a `pendiente`: no se quema
-     saldo dando vueltas.
-  5. devuelve un resumen `{procesados, ok, error, restantes}`.
-- Reanudable por construcción: si se corta a mitad, los `en_curso` con más de 10 minutos vuelven a
-  `pendiente` al inicio de la siguiente invocación.
-- Disparo desde una pantalla de administración con un botón "procesar siguiente lote" y un contador,
-  que puede quedarse encadenando lotes mientras esté abierta. Sin trabajos de fondo invisibles.
-- El trigger agregado `trg_visita_bloques_agregado` se deja activo: el reproceso no toca `validacion`.
+> Elige de la lista; la misma empresa debe registrarse siempre igual. Alias habituales:
+> LM / L.M. / LMR / Luis / Moleón = **Luis Moleón**; Peña / G. Peña = **Grupo Peña**;
+> Euro / Salysan = **Eurorecambios**. Si el competidor no está en la lista, elige
+> "Otro (detállalo en la conclusión)" y escribe el nombre en la conclusión.
 
-## 3. Qué pasa con los bloques que ya existen
+Con esto la extracción de voz y el futuro reproceso del histórico reconocen "me lo hace LM a 40 €"
+sin cambiar el prompt.
 
-Se **rellenan**, no se sustituyen. Regla concreta por visita:
+## Cambio 3 — Revisión de los demás catálogos
 
-- El bloque histórico existente es el **bloque 0** y no se borra nunca. Conserva su `id`,
-  `validacion`, `nota_revision`, `revisado_por` y `revisado_en` intactos: el reproceso solo escribe en
-  `campos`, `campos_meta`, `motivo_key` (si estaba nulo) y las columnas nuevas de control.
-- Si la IA devuelve **un** bloque, sus campos van al bloque 0.
-- Si devuelve **varios** (p. ej. tres comparativas de competencia), el primero va al bloque 0 y el
-  resto se **insertan como bloques nuevos** de la misma visita, heredando `validacion` y
-  `nota_revision` del bloque 0 para no degradar lo revisado por el director.
-- Si no devuelve nada útil, el bloque 0 se queda como está y se marca `hecho` con
-  `campos_meta._sin_extraccion = true`. No se pierde el texto: `observaciones` sigue en la visita.
-- Salvaguarda: el reproceso **nunca** actualiza un bloque cuyo `campos` ya no esté vacío.
-
-## 4. Prueba previa sobre 30 visitas
-
-Antes de tocar nada masivo: muestra estratificada de 30, sembrada con semilla fija para poder repetirla.
-
-- 10 con mención de competencia/precio, 10 con promoción/oferta/campaña, 5 sin ninguna palabra clave,
-  5 con `nota_revision` no nula (para comprobar que sobrevive).
-- Se procesan sobre una copia de trabajo, **sin escribir en `visita_bloques`**: el resultado se vuelca
-  en `scripts/bench-visita-voz/RESULTADOS-reproceso-historico.md` con, por cada visita: texto original,
-  motivos detectados, nº de bloques, campos rellenos, selects fuera de enum, latencia y tokens.
-- Al final: tabla resumen con coste real medido y su extrapolación a 18.017, más el % de visitas de las
-  que no se saca ningún campo.
-- Con eso decides si se lanza, si se ajusta el prompt antes, o si se limita a un subconjunto.
-
-## 5. Trazabilidad de origen
-
-Cada bloque tocado por el reproceso queda marcado:
-
-- `visitas.analisis_modelo` y `visitas.analisis_prompt_version` se rellenan igual que en la voz.
-- Además, en `campos_meta._origen` del bloque: `{"fuente":"texto_historico","modelo":"…","prompt":"fase4.3","en":"…"}`.
-  Los bloques de voz en directo no lo llevan, así que la distinción es directa en consulta y las vistas
-  de la 6b pueden filtrar por ella sin cambios de esquema.
+- **`temas_gsmart`** — correcto, no se toca. GSMart aparece 1.048 veces y los seis puntos son el guion
+  literal que el director exige ("HAY UN GUION, HAY QUE CEÑIRSE A ESE GUIÓN"). Un ajuste menor: el
+  banco de pruebas detectó que el modelo devuelve "Formación" fuera de enum, así que se añade ese
+  sinónimo a la ayuda apuntando a "Formación / repaso del guion".
+- **`tipo_ejes`** — real: SAF 669, BPW 132, ROR 33. Pero **Fruehauf sale 1 vez y Guitart 0**: los dejo
+  activos salvo que me digas lo contrario, porque son marcas de eje que existen y el coste de tenerlas
+  es nulo; si prefieres una lista limpia, los desactivo.
+- **`partners`** — no son nombres inventados sino categorías de acompañante (proveedor, marca, taller,
+  otro). No tiene sentido contrastarlo contra el texto: se queda igual.
+- **`marcas_vehiculo`** y **`canales_envio`** — también son categorías cerradas correctas, sin cambios.
 
 ## Detalle técnico
 
-- Modelo: `openai/gpt-5.6-luna`, prompt `fase4.3`, `temperature: 0`, mismo esquema estricto.
-- Se reutiliza `esquemaExtraccion` / `sistemaExtraccion` de `_shared/visita-voz-prompt.ts`: un solo
-  sitio donde vive el prompt, para que voz e histórico no diverjan.
-- Migración: columnas de control + reescritura de `reprocesar_historico_a_bloques()` como encolador +
-  función de desencolado con `SKIP LOCKED`, todas admin-only y con los `GRANT`/`REVOKE` del
-  endurecimiento vigente.
+Una sola operación de datos sobre `catalogos_opciones` (desactivar + insertar con `ON CONFLICT` por
+clave/valor para que sea reejecutable) y una actualización de `ayuda` en `motivo_campos` para
+`competencia.competidor` y `gsmart.tema`. Sin cambios de esquema y sin tocar `visita_bloques`.
+La caché de catálogo de la función de voz es de 5 minutos, así que el cambio entra solo.
 
-## Anotado, no tocado
+## Verificación
 
-El bloque `promocion` que se pierde en algunas tiradas queda registrado como **candidato a fase 4.4**.
-No se modifica el prompt en este trabajo; si la prueba de 30 lo confirma, se documenta ahí con datos.
-
-## Orden de ejecución propuesto
-
-1. Migración de columnas de control y funciones de cola (no procesa nada).
-2. Función de borde `visita-reproceso` y pantalla de administración.
-3. **Prueba de 30** y entrega de resultados. Parada para tu decisión.
-4. Solo con tu visto bueno: lanzamiento por lotes de las 18.017.
+- Listado del catálogo activo tras el cambio, en orden.
+- Comprobación de que ningún bloque existente queda con un `competidor` que ya no exista en la tabla.
+- Una tirada del banco de pruebas con una narración que mencione "LM" para confirmar que ahora mapea a
+  Luis Moleón en vez de quedarse vacío.
