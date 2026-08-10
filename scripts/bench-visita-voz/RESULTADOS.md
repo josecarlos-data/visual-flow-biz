@@ -59,3 +59,5 @@ fase4.2 acertara. La latencia sigue muy por debajo de los 10 s y el coste no se 
 Variabilidad entre ejecuciones, no achacable a la versión:
 - `gsmart.tema="Formación"` sale a veces fuera del enum; el servidor lo descarta.
 - Un `informacion_potencial` marginal aparece o no en las dos primeras narraciones.
+- El bloque `promocion` de la narración de Icer (oferta de Icer con queso) se pierde en
+  algunas tiradas con ambos modelos: es el candidato a corregir en una futura fase4.4.
