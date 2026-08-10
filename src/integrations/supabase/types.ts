@@ -1160,6 +1160,34 @@ export type Database = {
             foreignKeyName: "visita_bloques_visita_id_fkey"
             columns: ["visita_id"]
             isOneToOne: false
+            referencedRelation: "v_visita_accion_pendiente"
+            referencedColumns: ["visita_id"]
+          },
+          {
+            foreignKeyName: "visita_bloques_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_bloques_campos"
+            referencedColumns: ["visita_id"]
+          },
+          {
+            foreignKeyName: "visita_bloques_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_competencia"
+            referencedColumns: ["visita_id"]
+          },
+          {
+            foreignKeyName: "visita_bloques_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_oferta"
+            referencedColumns: ["visita_id"]
+          },
+          {
+            foreignKeyName: "visita_bloques_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
             referencedRelation: "visitas"
             referencedColumns: ["id"]
           },
@@ -1283,6 +1311,34 @@ export type Database = {
             foreignKeyName: "visitas_visita_origen_id_fkey"
             columns: ["visita_origen_id"]
             isOneToOne: false
+            referencedRelation: "v_visita_accion_pendiente"
+            referencedColumns: ["visita_id"]
+          },
+          {
+            foreignKeyName: "visitas_visita_origen_id_fkey"
+            columns: ["visita_origen_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_bloques_campos"
+            referencedColumns: ["visita_id"]
+          },
+          {
+            foreignKeyName: "visitas_visita_origen_id_fkey"
+            columns: ["visita_origen_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_competencia"
+            referencedColumns: ["visita_id"]
+          },
+          {
+            foreignKeyName: "visitas_visita_origen_id_fkey"
+            columns: ["visita_origen_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_oferta"
+            referencedColumns: ["visita_id"]
+          },
+          {
+            foreignKeyName: "visitas_visita_origen_id_fkey"
+            columns: ["visita_origen_id"]
+            isOneToOne: false
             referencedRelation: "visitas"
             referencedColumns: ["id"]
           },
@@ -1330,6 +1386,34 @@ export type Database = {
             foreignKeyName: "visitas_planificadas_visita_id_fkey"
             columns: ["visita_id"]
             isOneToOne: false
+            referencedRelation: "v_visita_accion_pendiente"
+            referencedColumns: ["visita_id"]
+          },
+          {
+            foreignKeyName: "visitas_planificadas_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_bloques_campos"
+            referencedColumns: ["visita_id"]
+          },
+          {
+            foreignKeyName: "visitas_planificadas_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_competencia"
+            referencedColumns: ["visita_id"]
+          },
+          {
+            foreignKeyName: "visitas_planificadas_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_oferta"
+            referencedColumns: ["visita_id"]
+          },
+          {
+            foreignKeyName: "visitas_planificadas_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
             referencedRelation: "visitas"
             referencedColumns: ["id"]
           },
@@ -1358,7 +1442,176 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_ficha_flota_actual: {
+        Row: {
+          cod_cliente: number | null
+          fecha_ultima_actualizacion: string | null
+          marcas_vehiculo: string | null
+          num_mecanicos: number | null
+          num_vehiculos: number | null
+          observaciones: string | null
+          persona_contacto: string | null
+          potencial_estimado: number | null
+          referencias_consumo: string | null
+          tipo_ejes: string | null
+          tipo_trabajo: string | null
+          visita_id_origen: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visitas_cod_cliente_fk"
+            columns: ["cod_cliente"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["cod_cliente"]
+          },
+        ]
+      }
+      v_visita_accion_pendiente: {
+        Row: {
+          bloque_id: string | null
+          cliente: string | null
+          cod_cliente: number | null
+          created_at: string | null
+          fecha: string | null
+          fecha_accion: string | null
+          motivo_key: string | null
+          proxima_accion: string | null
+          ruta: string | null
+          validacion: string | null
+          vendedor: string | null
+          visita_id: string | null
+          zona: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visita_bloques_motivo_key_fkey"
+            columns: ["motivo_key"]
+            isOneToOne: false
+            referencedRelation: "motivos_visita"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "visitas_cod_cliente_fk"
+            columns: ["cod_cliente"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["cod_cliente"]
+          },
+        ]
+      }
+      v_visita_bloques_campos: {
+        Row: {
+          bloque_created_at: string | null
+          bloque_id: string | null
+          bloque_orden: number | null
+          campo_key: string | null
+          cita: string | null
+          cod_cliente: number | null
+          completo: boolean | null
+          confianza: string | null
+          estado: string | null
+          fecha: string | null
+          hora: string | null
+          motivo_key: string | null
+          nota_revision: string | null
+          origen: string | null
+          ruta: string | null
+          tipo: string | null
+          validacion: string | null
+          valor_fecha: string | null
+          valor_num: number | null
+          valor_texto: string | null
+          vendedor: string | null
+          visita_id: string | null
+          zona: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visita_bloques_motivo_key_fkey"
+            columns: ["motivo_key"]
+            isOneToOne: false
+            referencedRelation: "motivos_visita"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "visitas_cod_cliente_fk"
+            columns: ["cod_cliente"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["cod_cliente"]
+          },
+        ]
+      }
+      v_visita_competencia: {
+        Row: {
+          bloque_id: string | null
+          cod_cliente: number | null
+          competidor: string | null
+          completo: boolean | null
+          conclusion: string | null
+          created_at: string | null
+          fecha: string | null
+          gap_eur: number | null
+          gap_pct: number | null
+          marca_competencia: string | null
+          nota_revision: string | null
+          origen: string | null
+          precio_competencia: number | null
+          precio_rimosa: number | null
+          referencia_competencia: string | null
+          resultado_venta: string | null
+          ruta: string | null
+          validacion: string | null
+          vendedor: string | null
+          visita_id: string | null
+          zona: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visitas_cod_cliente_fk"
+            columns: ["cod_cliente"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["cod_cliente"]
+          },
+        ]
+      }
+      v_visita_oferta: {
+        Row: {
+          bloque_id: string | null
+          canal_envio: string | null
+          cantidad: number | null
+          cod_cliente: number | null
+          completo: boolean | null
+          created_at: string | null
+          fecha: string | null
+          fuera_de_plazo: boolean | null
+          importe_estimado: number | null
+          motivo_fuera_plazo: string | null
+          nota_revision: string | null
+          origen: string | null
+          precio_ofertado: number | null
+          producto: string | null
+          proxima_accion: string | null
+          referencia: string | null
+          respuesta_cliente: string | null
+          ruta: string | null
+          validacion: string | null
+          vendedor: string | null
+          visita_id: string | null
+          zona: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visitas_cod_cliente_fk"
+            columns: ["cod_cliente"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["cod_cliente"]
+          },
+        ]
+      }
     }
     Functions: {
       buscar_productos: {
@@ -1668,6 +1921,8 @@ export type Database = {
           nota: string
         }[]
       }
+      to_date_visita: { Args: { _v: string }; Returns: string }
+      to_num_visita: { Args: { _v: string }; Returns: number }
       upsert_clientes_maestro: { Args: { _rows: Json }; Returns: number }
       upsert_productos_maestro: { Args: { _rows: Json }; Returns: number }
       vendedores_objetivos: {
