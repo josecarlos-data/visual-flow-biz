@@ -226,5 +226,5 @@ const md =
   filas.join("\n") + "\n\n" +
   "Resultado esperado de cada narración, en `narraciones.json` (`esperado`).\n";
 
-writeFileSync(join(DIR, "RESULTADOS.md"), md);
-console.log("\nEscrito RESULTADOS.md");
+writeFileSync(join(DIR, "RESULTADOS-ultima-ejecucion.md"), md);
+console.log("\nEscrito RESULTADOS-ultima-ejecucion.md");
