@@ -22,7 +22,7 @@ import {
   VERSION_PROMPT,
   type CampoDef,
   type MotivoDef,
-} from "../../supabase/functions/visita-voz/prompt.ts";
+} from "../../supabase/functions/_shared/visita-voz-prompt.ts";
 import { EXTRA_COMPETENCIA_FASE42, sistemaFase42, VERSION_ANTERIOR } from "./prompt-fase4.2.ts";
 
 const DIR = import.meta.dir;

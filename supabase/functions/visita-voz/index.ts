@@ -11,7 +11,7 @@ import {
   VERSION_PROMPT,
   type CampoDef,
   type MotivoDef,
-} from "./prompt.ts";
+} from "../_shared/visita-voz-prompt.ts";
 
 const GATEWAY = "https://ai.gateway.lovable.dev/v1";
 

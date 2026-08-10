@@ -2,7 +2,7 @@
  * Snapshot del system prompt de fase4.2, congelado para poder comparar versiones.
  * NO se toca nunca: si el prompt cambia, se añade otro snapshot, no se edita este.
  */
-import type { MotivoDef } from "../../supabase/functions/visita-voz/prompt.ts";
+import type { MotivoDef } from "../../supabase/functions/_shared/visita-voz-prompt.ts";
 
 export const VERSION_ANTERIOR = "fase4.2";
 
