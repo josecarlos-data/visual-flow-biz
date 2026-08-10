@@ -102,7 +102,7 @@ function esquemaFase42(motivos: MotivoDef[]) {
   return esquema;
 }
 
-async function llamar(sistema: string, usuario: string, schema: unknown) {
+async function llamar(sistema: string, usuario: string, schema: unknown, modelo = MODELO_EXTRACCION) {
   const t0 = Date.now();
   const res = await fetch(GATEWAY, {
     method: "POST",
@@ -111,7 +111,7 @@ async function llamar(sistema: string, usuario: string, schema: unknown) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: MODELO_EXTRACCION,
+      model: modelo,
       reasoning_effort: "none",
       temperature: 0,
       messages: [
