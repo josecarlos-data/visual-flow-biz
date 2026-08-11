@@ -22,6 +22,20 @@ export interface UploadResult {
   message?: string;
 }
 
+/** Casilla opcional que el administrador marca antes de subir. */
+export interface DatasetOption {
+  key: string;
+  label: string;
+  description?: string;
+}
+
+/** Contador que se muestra en la previsualización, antes de escribir nada. */
+export interface SummaryItem {
+  label: string;
+  value: number | string;
+  tone?: "default" | "warn" | "danger";
+}
+
 export interface DatasetModule<TParsed> {
   key: string;
   name: string;
@@ -29,10 +43,15 @@ export interface DatasetModule<TParsed> {
   icon: LucideIcon;
   expectedColumns: string[];
   parse: (buffer: ArrayBuffer) => TParsed;
+  /** Enriquecimiento asíncrono (consultas a la base) antes de previsualizar. */
+  prepare?: (data: TParsed) => Promise<TParsed>;
+  /** Contadores de la previsualización. */
+  summary?: (data: TParsed) => SummaryItem[];
+  options?: DatasetOption[];
   countLabel: (data: TParsed) => string;
   rowCount: (data: TParsed) => number;
   previewColumns: PreviewColumn[];
   previewRows: (data: TParsed, limit: number) => Record<string, unknown>[];
-  upload: (data: TParsed) => Promise<UploadResult>;
+  upload: (data: TParsed, options?: Record<string, boolean>) => Promise<UploadResult>;
   invalidate: (qc: QueryClient) => void;
 }

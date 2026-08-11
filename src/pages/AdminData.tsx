@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Database as DbIcon, Upload, FileSpreadsheet, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
@@ -15,6 +16,8 @@ export default function AdminData() {
   const [parsedData, setParsedData] = useState<unknown>(null);
   const [fileName, setFileName] = useState<string>("");
   const [uploading, setUploading] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+  const [options, setOptions] = useState<Record<string, boolean>>({});
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const queryClient = useQueryClient();
 
@@ -27,6 +30,7 @@ export default function AdminData() {
     setParsedData(null);
     setFileName("");
     setUploadResult(null);
+    setOptions({});
   };
 
   const handleSelectDataset = (key: string) => {
@@ -43,11 +47,19 @@ export default function AdminData() {
       setUploadResult(null);
 
       const reader = new FileReader();
-      reader.onload = (ev) => {
+      reader.onload = async (ev) => {
         try {
           const buffer = ev.target?.result;
           if (!buffer) throw new Error("No se pudo leer el archivo");
-          const data = dataset.parse(buffer as ArrayBuffer);
+          let data = dataset.parse(buffer as ArrayBuffer);
+          if (dataset.prepare) {
+            setPreparing(true);
+            try {
+              data = await dataset.prepare(data);
+            } finally {
+              setPreparing(false);
+            }
+          }
           setParsedData(data);
           toast({
             title: dataset.countLabel(data),
@@ -57,7 +69,10 @@ export default function AdminData() {
           console.error("Parse error:", err);
           toast({
             title: "Error al leer el archivo",
-            description: "Asegúrate de que es un archivo Excel válido y con las columnas esperadas.",
+            description:
+              err instanceof Error
+                ? err.message
+                : "Asegúrate de que es un archivo válido y con las columnas esperadas.",
             variant: "destructive",
           });
         }
@@ -72,7 +87,7 @@ export default function AdminData() {
     setUploading(true);
     setUploadResult(null);
 
-    const result = await dataset.upload(parsedData);
+    const result = await dataset.upload(parsedData, options);
     setUploadResult(result);
     setUploading(false);
     dataset.invalidate(queryClient);
@@ -86,6 +101,8 @@ export default function AdminData() {
 
   const previewRows = dataset && parsedData ? dataset.previewRows(parsedData, 20) : [];
   const totalRows = dataset && parsedData ? dataset.rowCount(parsedData) : 0;
+  const summary = dataset?.summary && parsedData ? dataset.summary(parsedData) : [];
+
 
   return (
     <div className="space-y-6">
@@ -160,6 +177,12 @@ export default function AdminData() {
                 </div>
               </label>
 
+              {preparing && (
+                <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Analizando el fichero…
+                </span>
+              )}
+
               {totalRows > 0 && (
                 <Button onClick={handleUpload} disabled={uploading}>
                   {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
@@ -167,6 +190,47 @@ export default function AdminData() {
                 </Button>
               )}
             </div>
+
+            {summary.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {summary.map((s) => (
+                  <div
+                    key={s.label}
+                    className={cn(
+                      "rounded-md border px-3 py-2 text-xs",
+                      s.tone === "danger"
+                        ? "border-destructive/40 bg-destructive/5 text-destructive"
+                        : s.tone === "warn"
+                          ? "border-input bg-muted/50"
+                          : "border-input",
+                    )}
+                  >
+                    <span className="font-semibold">{s.value}</span>{" "}
+                    <span className="text-muted-foreground">{s.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {dataset.options?.length ? (
+              <div className="space-y-2 rounded-md border border-input p-3">
+                {dataset.options.map((o) => (
+                  <label key={o.key} className="flex cursor-pointer items-start gap-3 text-sm">
+                    <Checkbox
+                      checked={options[o.key] === true}
+                      onCheckedChange={(v) => setOptions((prev) => ({ ...prev, [o.key]: v === true }))}
+                    />
+                    <span>
+                      <span className="font-medium">{o.label}</span>
+                      {o.description && (
+                        <span className="block text-xs text-muted-foreground">{o.description}</span>
+                      )}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            ) : null}
+
 
             {uploadResult && (
               <div className="space-y-3 rounded-md border border-input p-3 text-sm">
