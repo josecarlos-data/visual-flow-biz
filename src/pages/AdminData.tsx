@@ -177,6 +177,12 @@ export default function AdminData() {
                 </div>
               </label>
 
+              {preparing && (
+                <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Analizando el fichero…
+                </span>
+              )}
+
               {totalRows > 0 && (
                 <Button onClick={handleUpload} disabled={uploading}>
                   {uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
@@ -184,6 +190,47 @@ export default function AdminData() {
                 </Button>
               )}
             </div>
+
+            {summary.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {summary.map((s) => (
+                  <div
+                    key={s.label}
+                    className={cn(
+                      "rounded-md border px-3 py-2 text-xs",
+                      s.tone === "danger"
+                        ? "border-destructive/40 bg-destructive/5 text-destructive"
+                        : s.tone === "warn"
+                          ? "border-input bg-muted/50"
+                          : "border-input",
+                    )}
+                  >
+                    <span className="font-semibold">{s.value}</span>{" "}
+                    <span className="text-muted-foreground">{s.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {dataset.options?.length ? (
+              <div className="space-y-2 rounded-md border border-input p-3">
+                {dataset.options.map((o) => (
+                  <label key={o.key} className="flex cursor-pointer items-start gap-3 text-sm">
+                    <Checkbox
+                      checked={options[o.key] === true}
+                      onCheckedChange={(v) => setOptions((prev) => ({ ...prev, [o.key]: v === true }))}
+                    />
+                    <span>
+                      <span className="font-medium">{o.label}</span>
+                      {o.description && (
+                        <span className="block text-xs text-muted-foreground">{o.description}</span>
+                      )}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            ) : null}
+
 
             {uploadResult && (
               <div className="space-y-3 rounded-md border border-input p-3 text-sm">
