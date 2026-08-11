@@ -11,6 +11,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { toast } from "@/hooks/use-toast";
+import { CatalogosAdmin } from "@/components/CatalogosAdmin";
+
 import { useMotivos, useMotivosAdmin, useCatalogos, type Motivo, type MotivoCampo } from "@/hooks/useCrm";
 import {
   TIPOS_CAMPO,
