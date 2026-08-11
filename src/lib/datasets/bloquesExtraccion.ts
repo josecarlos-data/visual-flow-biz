@@ -168,7 +168,7 @@ export function castear(
   valor: string,
   def: CampoDef,
   catalogos: Record<string, string[]>,
-): { ok: true; valor: unknown } | { ok: false; error: string } {
+): { ok: boolean; valor?: unknown; error?: string } {
   const permitidas = () => resolverOpciones(def.opciones, catalogos);
   const encaja = (v: string) => {
     const lista = permitidas();
