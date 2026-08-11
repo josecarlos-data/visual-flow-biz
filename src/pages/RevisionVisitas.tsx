@@ -310,7 +310,7 @@ export default function RevisionVisitas() {
                 <div key={b.id} className="space-y-2 rounded-md border p-3 text-sm">
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-medium">{i + 1}. {nombreMotivo(b.motivo_key)}</p>
-                    {badgeValidacion(b.validacion)}
+                    <span className="flex items-center gap-2">{esExterno(b) && badgeImportado}{badgeValidacion(b.validacion)}</span>
                   </div>
                   {Object.entries(b.campos ?? {}).filter(([, val]) => val != null && val !== "").map(([k, val]) => (
                     <p key={k} className="flex justify-between gap-3">
