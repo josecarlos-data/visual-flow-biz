@@ -384,6 +384,9 @@ export default function AdminVisitas() {
           ))}
         </Accordion>
       )}
+
+      <CatalogosAdmin />
     </div>
+
   );
 }
