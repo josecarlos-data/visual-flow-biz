@@ -269,11 +269,12 @@ async function prepare(data: BloquesExtraccion): Promise<BloquesExtraccion> {
       rechazos.push({ fila, motivo: `campo_key "${campo_key}" no existe o no está activo en "${motivo_key}"` });
       return;
     }
-    const confianza = normalizarNumero(r.confianza);
-    if (confianza === null || confianza < 0 || confianza > 1) {
-      rechazos.push({ fila, motivo: `confianza "${r.confianza ?? ""}" no es un número entre 0 y 1` });
+    const confianzaRaw = (r.confianza ?? "").trim().toLowerCase();
+    if (confianzaRaw && !["alta", "media", "baja"].includes(confianzaRaw)) {
+      rechazos.push({ fila, motivo: `confianza "${r.confianza ?? ""}" debe ser alta, media o baja` });
       return;
     }
+    const confianza = confianzaRaw || "media";
     if (!valor) {
       rechazos.push({ fila, motivo: `valor vacío para "${campo_key}"` });
       return;
