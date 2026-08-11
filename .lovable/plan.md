@@ -22,13 +22,13 @@ En Gestión de Datos aparece una tarjeta nueva: **Bloques de visita (extracción
 Agrupando por `(visita_id, orden)`:
 
 - **orden = 0**: actualiza el bloque indicado por `bloque_id`, escribiendo solo `campos`, `campos_meta` y, si difiere, `motivo_key`. No se tocan `validacion`, `nota_revision`, `revisado_por` ni `revisado_en` (resultado de la FASE 6a).
-- **orden > 0**: crea un bloque nuevo en esa visita heredando `validacion` y `nota_revision` del bloque 0 de la misma visita.
-- **Rango reservado de numeración**: los bloques importados no comparten numeración con los que crea la voz en directo. Se guardan con `orden_efectivo = 1000 + orden` (1001, 1002, ...), de modo que todo `orden >= 1000` es, por convención, origen "extracción externa" y todo `orden < 1000` es voz o histórico.
 - **orden > 0**: crea un bloque nuevo en esa visita heredando `validacion` y `nota_revision` del bloque 0 de la misma visita. Si ya existe un bloque con ese `(visita_id, orden_efectivo)` y origen `texto_externo`, se actualiza en lugar de crear otro.
 - **Rango reservado de numeración**: los bloques importados no comparten numeración con los que crea la voz en directo. Se guardan con `orden_efectivo = 1000 + orden` (1001, 1002, ...), de modo que todo `orden >= 1000` es, por convención, origen "extracción externa" y todo `orden < 1000` es voz o histórico.
 - **Salvaguarda**: nunca se pisa un bloque cuyo `campos` tenga contenido de origen voz o manual. Sí se permite reescribir un bloque cuyo `campos_meta._origen.fuente === "texto_externo"` (escrito por una importación previa), y solo cuando la casilla de sobrescritura está marcada; en caso contrario se salta y se reporta. Esto hace posible volver a subir un fichero corregido.
 - Al sobrescribir se siguen sin tocar `validacion`, `nota_revision`, `revisado_por` ni `revisado_en`.
 - **Idempotencia**: los bloques adicionales se identifican por `(visita_id, orden_efectivo)`. Reimportar nunca duplica bloques ni confunde un bloque de voz con uno importado.
+
+### Contenido escrito
 
 - `campos`: valores planos `{campo_key: valor}` casteados según el `tipo` definido en `motivo_campos` (número, booleano, multiselect separado por `" | "`, resto texto).
 - `campos_meta`: `{campo_key: {cita, confianza}}` más `_origen: {"fuente":"texto_externo","en":"<fecha de importación>"}`, para poder distinguir después lo extraído de texto histórico de lo dictado por voz.
