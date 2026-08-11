@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { CheckCircle2, Clock, XCircle, Search, ExternalLink, RefreshCw, Loader2 } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
+import { CheckCircle2, Clock, XCircle, Search, ExternalLink, RefreshCw, Loader2, FileDown, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import {
   useVisitasRevision, useRevisionMutations, useMotivos, useClientes,
@@ -24,11 +25,29 @@ const ESTADOS = [
   { key: "todas", label: "Todas", icon: Search },
 ];
 
+/** Un bloque es "importado" si su extracción vino de un fichero externo. */
+const esExterno = (b: VisitaBloque) => {
+  const origen = (b.campos_meta as { _origen?: { fuente?: string } } | null)?._origen;
+  return origen?.fuente === "texto_externo";
+};
+
+/** Confianza cualitativa por campo: alta / media / baja. */
+const confianzasDe = (b: VisitaBloque): string[] =>
+  Object.entries(b.campos_meta ?? {})
+    .filter(([k]) => k !== "_origen")
+    .map(([, v]) => String((v as { confianza?: unknown } | null)?.confianza ?? "").trim().toLowerCase())
+    .filter(Boolean);
+
+const tieneDudas = (b: VisitaBloque) => confianzasDe(b).some((c) => c === "baja" || c === "media");
+
 const badgeValidacion = (v: string | null) => {
   if (v === "CORRECTO") return <Badge variant="secondary" className="gap-1"><CheckCircle2 className="h-3 w-3" /> Validada</Badge>;
   if (v === "NO CORRECTO") return <Badge variant="destructive" className="gap-1"><XCircle className="h-3 w-3" /> No correcta</Badge>;
   return <Badge variant="outline" className="gap-1"><Clock className="h-3 w-3" /> Pendiente</Badge>;
 };
+
+const badgeImportado = <Badge variant="outline" className="gap-1 border-primary/40 text-primary"><FileDown className="h-3 w-3" /> Importado</Badge>;
+
 
 export default function RevisionVisitas() {
   const { data: visitas, isLoading } = useVisitasRevision();
@@ -39,8 +58,24 @@ export default function RevisionVisitas() {
   const { guardar: guardarSituacion } = useSituacionesMutations();
   const reanalizar = useReanalizarVisita();
 
-  const [estado, setEstado] = useState("pendiente");
-  const [q, setQ] = useState("");
+  const [params, setParams] = useSearchParams();
+  const get = (k: string, def = "") => params.get(k) ?? def;
+  const setParam = (k: string, v: string | null) => {
+    const next = new URLSearchParams(params);
+    if (!v || v === "todas" || v === "todos") next.delete(k);
+    else next.set(k, v);
+    setParams(next, { replace: true });
+  };
+
+  const estado = get("estado", "pendiente");
+  const q = get("q");
+  const origen = get("origen", "todos");
+  const motivoFiltro = get("motivo", "todos");
+  const soloDudas = get("dudas") === "1";
+  const desde = get("desde");
+  const hasta = get("hasta");
+  const hayFiltros = ["estado", "q", "origen", "motivo", "dudas", "desde", "hasta"].some((k) => params.get(k));
+
   const [sel, setSel] = useState<Visita | null>(null);
   const [nota, setNota] = useState("");
   const [observaciones, setObservaciones] = useState("");
@@ -55,11 +90,33 @@ export default function RevisionVisitas() {
 
   const nombreMotivo = (key: string | null) => motivos?.find((m) => m.key === key)?.nombre ?? key ?? "Sin motivo";
 
+  // Bloques de todas las visitas cargadas: los filtros por origen/motivo/confianza los miran.
+  const { data: bloquesMap } = useVisitaBloques((visitas ?? []).slice(0, 300).map((v) => v.id));
+  const bloquesDe = (v: Visita) => bloquesMap?.get(v.id) ?? [];
+  const resumenMotivos = (v: Visita) => {
+    const bs = bloquesDe(v);
+    if (!bs.length) return nombreMotivo(v.motivo_key);
+    return bs.map((b) => nombreMotivo(b.motivo_key)).join(" + ");
+  };
+  const visitaImportada = (v: Visita) => bloquesDe(v).some(esExterno);
+
   const filtradas = useMemo(() => {
     const term = q.trim().toLowerCase();
     return (visitas ?? []).filter((v) => {
       const val = v.validacion ?? "pendiente";
       if (estado !== "todas" && val !== estado) return false;
+      if (desde && v.fecha < desde) return false;
+      if (hasta && v.fecha > hasta) return false;
+
+      const bs = bloquesMap?.get(v.id) ?? [];
+      if (origen === "externo" && !bs.some(esExterno)) return false;
+      if (origen === "voz" && (bs.length === 0 || bs.some(esExterno))) return false;
+      if (motivoFiltro !== "todos") {
+        const enBloques = bs.some((b) => b.motivo_key === motivoFiltro);
+        if (!enBloques && v.motivo_key !== motivoFiltro) return false;
+      }
+      if (soloDudas && !bs.some(tieneDudas)) return false;
+
       if (!term) return true;
       const nombre = v.cod_cliente ? nombrePorCod.get(v.cod_cliente) ?? "" : v.cliente_externo ?? "";
       return (
@@ -68,18 +125,10 @@ export default function RevisionVisitas() {
         nombreMotivo(v.motivo_key).toLowerCase().includes(term)
       );
     });
-  }, [visitas, estado, q, nombrePorCod, motivos]);
-
-  // Bloques de las visitas visibles: una visita puede llevar varias plantillas.
-  const { data: bloquesMap } = useVisitaBloques(filtradas.slice(0, 200).map((v) => v.id));
-  const bloquesDe = (v: Visita) => bloquesMap?.get(v.id) ?? [];
-  const resumenMotivos = (v: Visita) => {
-    const bs = bloquesDe(v);
-    if (!bs.length) return nombreMotivo(v.motivo_key);
-    return bs.map((b) => nombreMotivo(b.motivo_key)).join(" + ");
-  };
+  }, [visitas, estado, q, origen, motivoFiltro, soloDudas, desde, hasta, bloquesMap, nombrePorCod, motivos]);
 
   const pendientes = (visitas ?? []).filter((v) => (v.validacion ?? "pendiente") === "pendiente").length;
+
 
 
   const abrir = (v: Visita) => {
@@ -144,16 +193,67 @@ export default function RevisionVisitas() {
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Tabs value={estado} onValueChange={setEstado}>
+        <Tabs value={estado} onValueChange={(v) => setParam("estado", v === "pendiente" ? null : v)}>
           <TabsList>
             {ESTADOS.map((e) => <TabsTrigger key={e.key} value={e.key}>{e.label}</TabsTrigger>)}
           </TabsList>
         </Tabs>
         <div className="relative sm:w-72">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-8" placeholder="Cliente, comercial o motivo…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <Input className="pl-8" placeholder="Cliente, comercial o motivo…" value={q} onChange={(e) => setParam("q", e.target.value)} />
         </div>
       </div>
+
+      <Card>
+        <CardContent className="flex flex-wrap items-end gap-3 p-3">
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Origen</Label>
+            <Select value={origen} onValueChange={(v) => setParam("origen", v)}>
+              <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="voz">Voz en directo</SelectItem>
+                <SelectItem value="externo">Extracción externa</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Motivo</Label>
+            <Select value={motivoFiltro} onValueChange={(v) => setParam("motivo", v)}>
+              <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos los motivos</SelectItem>
+                {(motivos ?? []).map((m) => <SelectItem key={m.key} value={m.key}>{m.nombre}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Desde</Label>
+            <Input type="date" className="w-40" value={desde} onChange={(e) => setParam("desde", e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Hasta</Label>
+            <Input type="date" className="w-40" value={hasta} onChange={(e) => setParam("hasta", e.target.value)} />
+          </div>
+
+          <label className="flex items-center gap-2 pb-2 text-sm">
+            <input type="checkbox" checked={soloDudas} onChange={(e) => setParam("dudas", e.target.checked ? "1" : null)} />
+            Solo con confianza baja o media
+          </label>
+
+          <div className="ml-auto flex items-center gap-3 pb-1.5">
+            <span className="text-sm text-muted-foreground">{filtradas.length} resultado{filtradas.length === 1 ? "" : "s"}</span>
+            {hayFiltros && (
+              <Button variant="ghost" size="sm" onClick={() => setParams(new URLSearchParams(), { replace: true })}>
+                <X className="mr-1 h-3.5 w-3.5" /> Limpiar filtros
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
 
       {isLoading ? (
         <div className="space-y-2">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-20" />)}</div>
@@ -175,6 +275,7 @@ export default function RevisionVisitas() {
                   {v.observaciones && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{v.observaciones}</p>}
                 </button>
                 <div className="flex shrink-0 items-center gap-2">
+                  {visitaImportada(v) && badgeImportado}
                   {badgeValidacion(v.validacion)}
                   {v.cod_cliente && (
                     <Button asChild variant="ghost" size="icon">
@@ -209,7 +310,7 @@ export default function RevisionVisitas() {
                 <div key={b.id} className="space-y-2 rounded-md border p-3 text-sm">
                   <div className="flex items-center justify-between gap-2">
                     <p className="font-medium">{i + 1}. {nombreMotivo(b.motivo_key)}</p>
-                    {badgeValidacion(b.validacion)}
+                    <span className="flex items-center gap-2">{esExterno(b) && badgeImportado}{badgeValidacion(b.validacion)}</span>
                   </div>
                   {Object.entries(b.campos ?? {}).filter(([, val]) => val != null && val !== "").map(([k, val]) => (
                     <p key={k} className="flex justify-between gap-3">
