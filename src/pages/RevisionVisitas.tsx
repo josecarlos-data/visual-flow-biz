@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { CheckCircle2, Clock, XCircle, Search, ExternalLink, RefreshCw, Loader2 } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
+import { CheckCircle2, Clock, XCircle, Search, ExternalLink, RefreshCw, Loader2, FileDown, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import {
   useVisitasRevision, useRevisionMutations, useMotivos, useClientes,
@@ -24,11 +25,29 @@ const ESTADOS = [
   { key: "todas", label: "Todas", icon: Search },
 ];
 
+/** Un bloque es "importado" si su extracción vino de un fichero externo. */
+const esExterno = (b: VisitaBloque) => {
+  const origen = (b.campos_meta as { _origen?: { fuente?: string } } | null)?._origen;
+  return origen?.fuente === "texto_externo";
+};
+
+/** Confianza cualitativa por campo: alta / media / baja. */
+const confianzasDe = (b: VisitaBloque): string[] =>
+  Object.entries(b.campos_meta ?? {})
+    .filter(([k]) => k !== "_origen")
+    .map(([, v]) => String((v as { confianza?: unknown } | null)?.confianza ?? "").trim().toLowerCase())
+    .filter(Boolean);
+
+const tieneDudas = (b: VisitaBloque) => confianzasDe(b).some((c) => c === "baja" || c === "media");
+
 const badgeValidacion = (v: string | null) => {
   if (v === "CORRECTO") return <Badge variant="secondary" className="gap-1"><CheckCircle2 className="h-3 w-3" /> Validada</Badge>;
   if (v === "NO CORRECTO") return <Badge variant="destructive" className="gap-1"><XCircle className="h-3 w-3" /> No correcta</Badge>;
   return <Badge variant="outline" className="gap-1"><Clock className="h-3 w-3" /> Pendiente</Badge>;
 };
+
+const badgeImportado = <Badge variant="outline" className="gap-1 border-primary/40 text-primary"><FileDown className="h-3 w-3" /> Importado</Badge>;
+
 
 export default function RevisionVisitas() {
   const { data: visitas, isLoading } = useVisitasRevision();
