@@ -58,8 +58,24 @@ export default function RevisionVisitas() {
   const { guardar: guardarSituacion } = useSituacionesMutations();
   const reanalizar = useReanalizarVisita();
 
-  const [estado, setEstado] = useState("pendiente");
-  const [q, setQ] = useState("");
+  const [params, setParams] = useSearchParams();
+  const get = (k: string, def = "") => params.get(k) ?? def;
+  const setParam = (k: string, v: string | null) => {
+    const next = new URLSearchParams(params);
+    if (!v || v === "todas" || v === "todos") next.delete(k);
+    else next.set(k, v);
+    setParams(next, { replace: true });
+  };
+
+  const estado = get("estado", "pendiente");
+  const q = get("q");
+  const origen = get("origen", "todos");
+  const motivoFiltro = get("motivo", "todos");
+  const soloDudas = get("dudas") === "1";
+  const desde = get("desde");
+  const hasta = get("hasta");
+  const hayFiltros = ["estado", "q", "origen", "motivo", "dudas", "desde", "hasta"].some((k) => params.get(k));
+
   const [sel, setSel] = useState<Visita | null>(null);
   const [nota, setNota] = useState("");
   const [observaciones, setObservaciones] = useState("");
@@ -74,11 +90,33 @@ export default function RevisionVisitas() {
 
   const nombreMotivo = (key: string | null) => motivos?.find((m) => m.key === key)?.nombre ?? key ?? "Sin motivo";
 
+  // Bloques de todas las visitas cargadas: los filtros por origen/motivo/confianza los miran.
+  const { data: bloquesMap } = useVisitaBloques((visitas ?? []).slice(0, 300).map((v) => v.id));
+  const bloquesDe = (v: Visita) => bloquesMap?.get(v.id) ?? [];
+  const resumenMotivos = (v: Visita) => {
+    const bs = bloquesDe(v);
+    if (!bs.length) return nombreMotivo(v.motivo_key);
+    return bs.map((b) => nombreMotivo(b.motivo_key)).join(" + ");
+  };
+  const visitaImportada = (v: Visita) => bloquesDe(v).some(esExterno);
+
   const filtradas = useMemo(() => {
     const term = q.trim().toLowerCase();
     return (visitas ?? []).filter((v) => {
       const val = v.validacion ?? "pendiente";
       if (estado !== "todas" && val !== estado) return false;
+      if (desde && v.fecha < desde) return false;
+      if (hasta && v.fecha > hasta) return false;
+
+      const bs = bloquesMap?.get(v.id) ?? [];
+      if (origen === "externo" && !bs.some(esExterno)) return false;
+      if (origen === "voz" && (bs.length === 0 || bs.some(esExterno))) return false;
+      if (motivoFiltro !== "todos") {
+        const enBloques = bs.some((b) => b.motivo_key === motivoFiltro);
+        if (!enBloques && v.motivo_key !== motivoFiltro) return false;
+      }
+      if (soloDudas && !bs.some(tieneDudas)) return false;
+
       if (!term) return true;
       const nombre = v.cod_cliente ? nombrePorCod.get(v.cod_cliente) ?? "" : v.cliente_externo ?? "";
       return (
@@ -87,18 +125,10 @@ export default function RevisionVisitas() {
         nombreMotivo(v.motivo_key).toLowerCase().includes(term)
       );
     });
-  }, [visitas, estado, q, nombrePorCod, motivos]);
-
-  // Bloques de las visitas visibles: una visita puede llevar varias plantillas.
-  const { data: bloquesMap } = useVisitaBloques(filtradas.slice(0, 200).map((v) => v.id));
-  const bloquesDe = (v: Visita) => bloquesMap?.get(v.id) ?? [];
-  const resumenMotivos = (v: Visita) => {
-    const bs = bloquesDe(v);
-    if (!bs.length) return nombreMotivo(v.motivo_key);
-    return bs.map((b) => nombreMotivo(b.motivo_key)).join(" + ");
-  };
+  }, [visitas, estado, q, origen, motivoFiltro, soloDudas, desde, hasta, bloquesMap, nombrePorCod, motivos]);
 
   const pendientes = (visitas ?? []).filter((v) => (v.validacion ?? "pendiente") === "pendiente").length;
+
 
 
   const abrir = (v: Visita) => {
