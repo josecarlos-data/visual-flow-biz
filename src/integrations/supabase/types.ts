@@ -44,6 +44,7 @@ export type Database = {
           created_at: string
           id: string
           is_active: boolean
+          nota: string | null
           orden: number
           updated_at: string
           valor: string
@@ -53,6 +54,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          nota?: string | null
           orden?: number
           updated_at?: string
           valor: string
@@ -62,6 +64,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          nota?: string | null
           orden?: number
           updated_at?: string
           valor?: string
