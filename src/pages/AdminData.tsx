@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableHeader, TableHead, TableBody, TableRow, TableCell } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Database as DbIcon, Upload, FileSpreadsheet, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
@@ -15,6 +16,8 @@ export default function AdminData() {
   const [parsedData, setParsedData] = useState<unknown>(null);
   const [fileName, setFileName] = useState<string>("");
   const [uploading, setUploading] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+  const [options, setOptions] = useState<Record<string, boolean>>({});
   const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
   const queryClient = useQueryClient();
 
@@ -27,6 +30,7 @@ export default function AdminData() {
     setParsedData(null);
     setFileName("");
     setUploadResult(null);
+    setOptions({});
   };
 
   const handleSelectDataset = (key: string) => {
@@ -43,11 +47,19 @@ export default function AdminData() {
       setUploadResult(null);
 
       const reader = new FileReader();
-      reader.onload = (ev) => {
+      reader.onload = async (ev) => {
         try {
           const buffer = ev.target?.result;
           if (!buffer) throw new Error("No se pudo leer el archivo");
-          const data = dataset.parse(buffer as ArrayBuffer);
+          let data = dataset.parse(buffer as ArrayBuffer);
+          if (dataset.prepare) {
+            setPreparing(true);
+            try {
+              data = await dataset.prepare(data);
+            } finally {
+              setPreparing(false);
+            }
+          }
           setParsedData(data);
           toast({
             title: dataset.countLabel(data),
@@ -57,7 +69,10 @@ export default function AdminData() {
           console.error("Parse error:", err);
           toast({
             title: "Error al leer el archivo",
-            description: "Asegúrate de que es un archivo Excel válido y con las columnas esperadas.",
+            description:
+              err instanceof Error
+                ? err.message
+                : "Asegúrate de que es un archivo válido y con las columnas esperadas.",
             variant: "destructive",
           });
         }
@@ -72,7 +87,7 @@ export default function AdminData() {
     setUploading(true);
     setUploadResult(null);
 
-    const result = await dataset.upload(parsedData);
+    const result = await dataset.upload(parsedData, options);
     setUploadResult(result);
     setUploading(false);
     dataset.invalidate(queryClient);
@@ -86,6 +101,8 @@ export default function AdminData() {
 
   const previewRows = dataset && parsedData ? dataset.previewRows(parsedData, 20) : [];
   const totalRows = dataset && parsedData ? dataset.rowCount(parsedData) : 0;
+  const summary = dataset?.summary && parsedData ? dataset.summary(parsedData) : [];
+
 
   return (
     <div className="space-y-6">
