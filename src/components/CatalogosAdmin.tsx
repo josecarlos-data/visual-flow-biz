@@ -62,7 +62,7 @@ function OpcionRow({ opcion, clave }: { opcion: Opcion | null; clave: string }) 
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["catalogos-opciones-admin"] });
-      void qc.invalidateQueries({ queryKey: ["catalogos"] });
+      void qc.invalidateQueries({ queryKey: ["crm_catalogos"] });
       if (nuevo) setDraft({ valor: "", orden: 999, is_active: true, nota: "" });
       toast({ title: nuevo ? "Valor añadido" : "Valor guardado" });
     },
