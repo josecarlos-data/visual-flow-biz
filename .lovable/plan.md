@@ -10,10 +10,12 @@ En Gestión de Datos aparece una tarjeta nueva: **Bloques de visita (extracción
 2. La app agrupa las filas por visita y bloque y muestra una **previsualización** antes de escribir nada:
    - bloques que se van a actualizar,
    - bloques que se van a crear,
-   - bloques que se saltan por tener ya contenido (o por estar ya importados),
+   - bloques candidatos a **sobrescritura** (ya rellenados por una importación anterior),
+   - bloques que se saltan por tener contenido de voz o manual,
    - filas rechazadas, con el motivo concreto de cada rechazo.
-3. Solo si el administrador confirma se escribe en la base de datos. Lo rechazado nunca aborta el resto: se importa lo válido y se informa de lo demás.
-4. Al terminar, el informe distingue cuatro categorías: bloques actualizados, bloques creados, bloques saltados por la salvaguarda, filas rechazadas por validación y, aparte, **bloques que fallaron al escribir** por error de red o de permisos (no por validación), con el mensaje devuelto. Un fallo de escritura no interrumpe el resto de la importación.
+3. En la previsualización hay una casilla **"Sobrescribir bloques importados anteriormente"**, desactivada por defecto. Si no se marca, los candidatos a sobrescritura se saltan y se reportan; si se marca, se reescriben.
+4. Solo si el administrador confirma se escribe en la base de datos. Lo rechazado nunca aborta el resto: se importa lo válido y se informa de lo demás.
+5. Al terminar, el informe distingue: bloques actualizados, bloques creados, bloques sobrescritos, bloques saltados por la salvaguarda, filas rechazadas por validación y, aparte, **bloques que fallaron al escribir** por error de red o de permisos (no por validación), con el mensaje devuelto. Un fallo de escritura no interrumpe el resto de la importación.
 
 ## Reglas de importación
 
