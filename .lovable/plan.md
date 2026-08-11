@@ -55,8 +55,9 @@ Los bloques de una visita se numeran en pantalla por posición (1, 2, 3...), nun
 - Parseo del CSV con **Papaparse** (`papaparse` + `@types/papaparse`): `delimiter: ';'`, `quoteChar: '"'`, `header: true`, `skipEmptyLines: true`. Lectura del `ArrayBuffer` como UTF-8 con detección y eliminación del BOM. Así el campo `cita`, que es texto libre, puede contener `;`, comillas dobles escapadas y saltos de línea sin romper el fichero. Los errores que devuelva Papaparse se incluyen en el informe de filas rechazadas.
 - Antes de validar se cargan en memoria: `motivos_visita` (claves activas), `motivo_campos` (clave, tipo, `opciones`, `is_active`) y `catalogos_opciones`, reutilizando `resolverOpciones`/`camposActivos` de `src/lib/motivoCampos.ts` para no duplicar reglas.
 - Contra la base de datos, en lotes por `visita_id` (chunks de ~200 para no exceder límites de PostgREST):
-  - `select id, visita_id, orden, campos, validacion, nota_revision from visita_bloques where visita_id in (...)` para comprobar pertenencia, salvaguarda, herencia y bloques importados ya existentes (`orden >= 1000`);
+  - `select id, visita_id, orden, motivo_key, campos, campos_meta, validacion, nota_revision from visita_bloques where visita_id in (...)` para comprobar pertenencia, salvaguarda (mirando `campos_meta._origen.fuente`), herencia y bloques importados ya existentes (`orden >= 1000`);
   - `update` del bloque 0 solo con `campos`, `campos_meta` y `motivo_key`;
+  - `update` de los bloques `orden >= 1000` ya existentes de origen `texto_externo` cuando la casilla de sobrescritura está marcada;
   - `insert` de los bloques con `orden_efectivo = 1000 + orden` que no existan aún.
 - Cada `update`/`insert` se ejecuta con captura de error individual: los fallos de escritura (red, RLS) se acumulan en su propia lista con el mensaje y el `visita_id`/`orden`, y se muestran como etapa separada del informe sin detener el resto del lote.
 - La escritura se hace desde el cliente con las políticas RLS actuales de `visita_bloques` (admin). No se añaden tablas, RPC ni migraciones.
