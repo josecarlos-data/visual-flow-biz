@@ -21,7 +21,6 @@ Agrupando por `(visita_id, orden)`:
 
 - **orden = 0**: actualiza el bloque indicado por `bloque_id`, escribiendo solo `campos`, `campos_meta` y, si difiere, `motivo_key`. No se tocan `validacion`, `nota_revision`, `revisado_por` ni `revisado_en` (resultado de la FASE 6a).
 - **orden > 0**: crea un bloque nuevo en esa visita heredando `validacion` y `nota_revision` del bloque 0 de la misma visita.
-- **orden > 0**: crea un bloque nuevo en esa visita heredando `validacion` y `nota_revision` del bloque 0 de la misma visita.
 - **Rango reservado de numeración**: los bloques importados no comparten numeración con los que crea la voz en directo. Se guardan con `orden_efectivo = 1000 + orden` (1001, 1002, ...), de modo que todo `orden >= 1000` es, por convención, origen "extracción externa" y todo `orden < 1000` es voz o histórico.
 - **Salvaguarda**: nunca se actualiza ni se pisa un bloque cuyo `campos` ya tenga contenido; se salta y se reporta.
 - **Idempotencia**: los bloques adicionales se identifican por `(visita_id, orden_efectivo)`. Al reimportar el mismo fichero no se crean duplicados ni se confunde nunca un bloque de voz con uno importado; los bloques ya rellenados caen en la salvaguarda y se reportan como "ya importado".
