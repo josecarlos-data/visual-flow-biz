@@ -193,16 +193,67 @@ export default function RevisionVisitas() {
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Tabs value={estado} onValueChange={setEstado}>
+        <Tabs value={estado} onValueChange={(v) => setParam("estado", v === "pendiente" ? null : v)}>
           <TabsList>
             {ESTADOS.map((e) => <TabsTrigger key={e.key} value={e.key}>{e.label}</TabsTrigger>)}
           </TabsList>
         </Tabs>
         <div className="relative sm:w-72">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-8" placeholder="Cliente, comercial o motivo…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <Input className="pl-8" placeholder="Cliente, comercial o motivo…" value={q} onChange={(e) => setParam("q", e.target.value)} />
         </div>
       </div>
+
+      <Card>
+        <CardContent className="flex flex-wrap items-end gap-3 p-3">
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Origen</Label>
+            <Select value={origen} onValueChange={(v) => setParam("origen", v)}>
+              <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="voz">Voz en directo</SelectItem>
+                <SelectItem value="externo">Extracción externa</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Motivo</Label>
+            <Select value={motivoFiltro} onValueChange={(v) => setParam("motivo", v)}>
+              <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos los motivos</SelectItem>
+                {(motivos ?? []).map((m) => <SelectItem key={m.key} value={m.key}>{m.nombre}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Desde</Label>
+            <Input type="date" className="w-40" value={desde} onChange={(e) => setParam("desde", e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Hasta</Label>
+            <Input type="date" className="w-40" value={hasta} onChange={(e) => setParam("hasta", e.target.value)} />
+          </div>
+
+          <label className="flex items-center gap-2 pb-2 text-sm">
+            <input type="checkbox" checked={soloDudas} onChange={(e) => setParam("dudas", e.target.checked ? "1" : null)} />
+            Solo con confianza baja o media
+          </label>
+
+          <div className="ml-auto flex items-center gap-3 pb-1.5">
+            <span className="text-sm text-muted-foreground">{filtradas.length} resultado{filtradas.length === 1 ? "" : "s"}</span>
+            {hayFiltros && (
+              <Button variant="ghost" size="sm" onClick={() => setParams(new URLSearchParams(), { replace: true })}>
+                <X className="mr-1 h-3.5 w-3.5" /> Limpiar filtros
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
 
       {isLoading ? (
         <div className="space-y-2">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-20" />)}</div>
