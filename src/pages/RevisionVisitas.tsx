@@ -275,6 +275,7 @@ export default function RevisionVisitas() {
                   {v.observaciones && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{v.observaciones}</p>}
                 </button>
                 <div className="flex shrink-0 items-center gap-2">
+                  {visitaImportada(v) && badgeImportado}
                   {badgeValidacion(v.validacion)}
                   {v.cod_cliente && (
                     <Button asChild variant="ghost" size="icon">
