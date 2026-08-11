@@ -13,6 +13,7 @@ En Gestión de Datos aparece una tarjeta nueva: **Bloques de visita (extracción
    - bloques que se saltan por tener ya contenido (o por estar ya importados),
    - filas rechazadas, con el motivo concreto de cada rechazo.
 3. Solo si el administrador confirma se escribe en la base de datos. Lo rechazado nunca aborta el resto: se importa lo válido y se informa de lo demás.
+4. Al terminar, el informe distingue cuatro categorías: bloques actualizados, bloques creados, bloques saltados por la salvaguarda, filas rechazadas por validación y, aparte, **bloques que fallaron al escribir** por error de red o de permisos (no por validación), con el mensaje devuelto. Un fallo de escritura no interrumpe el resto de la importación.
 
 ## Reglas de importación
 
