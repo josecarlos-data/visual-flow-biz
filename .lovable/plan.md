@@ -33,12 +33,21 @@ Agrupando por `(visita_id, orden)`:
 - `campos`: valores planos `{campo_key: valor}` casteados según el `tipo` definido en `motivo_campos` (número, booleano, multiselect separado por `" | "`, resto texto).
 - `campos_meta`: `{campo_key: {cita, confianza}}` más `_origen: {"fuente":"texto_externo","en":"<fecha de importación>"}`, para poder distinguir después lo extraído de texto histórico de lo dictado por voz.
 
-### Validaciones previas (fila a fila)
+### Validaciones
+
+Antes de procesar nada se comprueba que la **cabecera del CSV contenga exactamente las ocho columnas esperadas**; si no, la importación se aborta con un mensaje claro indicando qué columnas faltan o sobran.
+
+Después, fila a fila (rechazo individual, sin abortar el resto):
 
 - `motivo_key` existe en `motivos_visita`.
 - `campo_key` existe y está activo dentro de ese motivo.
 - Campos `select`: el valor pertenece al catálogo referenciado o a la lista literal de opciones. Los `multiselect` validan cada valor por separado.
 - `bloque_id` existe y pertenece a `visita_id`.
+- `confianza`: se acepta tanto `0.85` como `0,85` (Excel en español) y se normaliza a número. Si no es numérica o queda fuera del rango 0–1, la fila se rechaza indicando ese motivo concreto en el informe.
+
+### Numeración visible para el usuario
+
+Los bloques de una visita se numeran en pantalla por posición (1, 2, 3...), nunca por el valor bruto de `orden`, para que nadie vea "Bloque 1001". `NuevaVisita.tsx` ya usa el índice (`Bloque {i + 1}`) y `RevisionVisitas.tsx` no muestra número; se revisará cada punto donde se listan bloques y, si alguno pinta el valor bruto, se corrige a numeración por posición sobre la lista ya ordenada por `orden`.
 
 ## Detalle técnico
 
