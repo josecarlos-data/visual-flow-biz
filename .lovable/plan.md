@@ -13,6 +13,7 @@ En Gestión de Datos aparece una tarjeta nueva: **Bloques de visita (extracción
    - bloques que se saltan por tener ya contenido (o por estar ya importados),
    - filas rechazadas, con el motivo concreto de cada rechazo.
 3. Solo si el administrador confirma se escribe en la base de datos. Lo rechazado nunca aborta el resto: se importa lo válido y se informa de lo demás.
+4. Al terminar, el informe distingue cuatro categorías: bloques actualizados, bloques creados, bloques saltados por la salvaguarda, filas rechazadas por validación y, aparte, **bloques que fallaron al escribir** por error de red o de permisos (no por validación), con el mensaje devuelto. Un fallo de escritura no interrumpe el resto de la importación.
 
 ## Reglas de importación
 
@@ -20,8 +21,9 @@ Agrupando por `(visita_id, orden)`:
 
 - **orden = 0**: actualiza el bloque indicado por `bloque_id`, escribiendo solo `campos`, `campos_meta` y, si difiere, `motivo_key`. No se tocan `validacion`, `nota_revision`, `revisado_por` ni `revisado_en` (resultado de la FASE 6a).
 - **orden > 0**: crea un bloque nuevo en esa visita heredando `validacion` y `nota_revision` del bloque 0 de la misma visita.
+- **Rango reservado de numeración**: los bloques importados no comparten numeración con los que crea la voz en directo. Se guardan con `orden_efectivo = 1000 + orden` (1001, 1002, ...), de modo que todo `orden >= 1000` es, por convención, origen "extracción externa" y todo `orden < 1000` es voz o histórico.
 - **Salvaguarda**: nunca se actualiza ni se pisa un bloque cuyo `campos` ya tenga contenido; se salta y se reporta.
-- **Idempotencia**: los bloques adicionales se identifican por `(visita_id, orden)`. Al reimportar el mismo fichero no se crean duplicados; los bloques ya rellenados caen en la salvaguarda y se reportan como "ya importado".
+- **Idempotencia**: los bloques adicionales se identifican por `(visita_id, orden_efectivo)`. Al reimportar el mismo fichero no se crean duplicados ni se confunde nunca un bloque de voz con uno importado; los bloques ya rellenados caen en la salvaguarda y se reportan como "ya importado".
 
 ### Contenido escrito
 
@@ -38,11 +40,12 @@ Agrupando por `(visita_id, orden)`:
 ## Detalle técnico
 
 - Nuevo módulo `src/lib/datasets/bloquesExtraccion.ts` que implementa `DatasetModule`, registrado en `src/lib/datasets/index.ts`. No hace falta tocar `AdminData.tsx`: la UI ya es genérica (selector, previsualización y reporte por etapas vía `UploadStageResult`).
-- Parseo del CSV en cliente: lectura del `ArrayBuffer` como texto UTF-8 con detección de BOM, split por `;` respetando comillas dobles y saltos de línea escapados.
+- Parseo del CSV con **Papaparse** (`papaparse` + `@types/papaparse`): `delimiter: ';'`, `quoteChar: '"'`, `header: true`, `skipEmptyLines: true`. Lectura del `ArrayBuffer` como UTF-8 con detección y eliminación del BOM. Así el campo `cita`, que es texto libre, puede contener `;`, comillas dobles escapadas y saltos de línea sin romper el fichero. Los errores que devuelva Papaparse se incluyen en el informe de filas rechazadas.
 - Antes de validar se cargan en memoria: `motivos_visita` (claves activas), `motivo_campos` (clave, tipo, `opciones`, `is_active`) y `catalogos_opciones`, reutilizando `resolverOpciones`/`camposActivos` de `src/lib/motivoCampos.ts` para no duplicar reglas.
 - Contra la base de datos, en lotes por `visita_id` (chunks de ~200 para no exceder límites de PostgREST):
-  - `select id, visita_id, orden, campos, validacion, nota_revision from visita_bloques where visita_id in (...)` para comprobar pertenencia, salvaguarda y herencia;
-  - `update` por bloque 0 solo con `campos`, `campos_meta` y `motivo_key`;
-  - `insert` de los bloques `orden > 0` que no existan aún.
+  - `select id, visita_id, orden, campos, validacion, nota_revision from visita_bloques where visita_id in (...)` para comprobar pertenencia, salvaguarda, herencia y bloques importados ya existentes (`orden >= 1000`);
+  - `update` del bloque 0 solo con `campos`, `campos_meta` y `motivo_key`;
+  - `insert` de los bloques con `orden_efectivo = 1000 + orden` que no existan aún.
+- Cada `update`/`insert` se ejecuta con captura de error individual: los fallos de escritura (red, RLS) se acumulan en su propia lista con el mensaje y el `visita_id`/`orden`, y se muestran como etapa separada del informe sin detener el resto del lote.
 - La escritura se hace desde el cliente con las políticas RLS actuales de `visita_bloques` (admin). No se añaden tablas, RPC ni migraciones.
 - `invalidate` refresca las queries de visitas/bloques en React Query.
