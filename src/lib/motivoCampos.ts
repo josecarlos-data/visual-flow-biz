@@ -78,3 +78,32 @@ export const parseMulti = (v: string | undefined): string[] =>
   (v ?? "").split("|").map((s) => s.trim()).filter(Boolean);
 
 export const serializeMulti = (vals: string[]): string => vals.join(SEP_MULTI);
+
+/**
+ * Convención RIMOSA: un precio no conseguido se registra como 0, nunca vacío.
+ * Los comerciales escriben "0000", "00" o "0,00"; todo eso es el mismo cero.
+ * Devuelve el valor normalizado como número en texto, o el original si no es un número.
+ */
+export function normalizarNumero(v: string | undefined | null): string {
+  const s = String(v ?? "").trim();
+  if (!s) return "";
+  const limpio = s.replace(/\s/g, "").replace(/\./g, "").replace(",", ".");
+  const n = Number(limpio);
+  if (!Number.isFinite(n)) return s;
+  return String(n);
+}
+
+/** Normaliza todos los campos de tipo número de un bloque antes de guardarlo. */
+export function normalizarValoresNumericos<T extends CampoLike & { campo_key: string }>(
+  campos: T[],
+  valores: Record<string, string>,
+): Record<string, string> {
+  const salida = { ...valores };
+  for (const c of campos) {
+    if (c.tipo !== "numero") continue;
+    const v = salida[c.campo_key];
+    if (v === undefined) continue;
+    salida[c.campo_key] = normalizarNumero(v);
+  }
+  return salida;
+}
