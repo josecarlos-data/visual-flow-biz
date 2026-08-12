@@ -10,6 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { DATASETS, type DatasetModule, type UploadResult } from "@/lib/datasets";
+import RechazosImportacion from "@/components/RechazosImportacion";
 
 export default function AdminData() {
   const [activeKey, setActiveKey] = useState<string>(DATASETS[0]?.key ?? "");
