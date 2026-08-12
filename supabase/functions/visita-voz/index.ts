@@ -106,6 +106,19 @@ async function cargarCatalogo(): Promise<Catalogo> {
   return valor;
 }
 
+// ------------------------------------------------------------------ saneado
+
+/**
+ * El modelo emite de forma intermitente escapes unicode malformados que llegan
+ * como caracteres de control (Cami\u0003n en vez de Camión). Se limpian y se
+ * normaliza a NFC antes de escribir nada en campos o campos_meta.
+ */
+const sanear = (v: unknown): string =>
+  String(v ?? "")
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
+    .normalize("NFC");
+
 // ------------------------------------------------------- vocabulario de audio
 
 /** Términos del sector que el transcriptor confunde ("Icer" -> "Ize", "el polígono" -> "Alpoliva"). */
@@ -114,6 +127,8 @@ const VOCABULARIO_BASE = [
   "electromecánico", "ejes SAF", "ejes BPW", "pastillas", "discos",
   "Icer", "Febi", "Dometic", "Sachs", "TitanX", "Knorr",
   "Volvo", "Scania", "DAF", "Ford", "Eurorrecambios",
+  "Schmitz", "Lecitrailer", "Leciñena", "Kögel", "Jaltest", "Texa", "Autocom", "Delphi",
+  "JOST", "ROR", "Mann Filter", "Wabco", "Banner", "Axcar", "Meritor", "NRF", "IADA", "Ryme",
 ];
 
 let vocabCache: { texto: string; hasta: number } | null = null;
@@ -122,8 +137,9 @@ async function vocabularioTranscripcion(): Promise<string> {
   if (vocabCache && vocabCache.hasta > Date.now()) return vocabCache.texto;
   const terminos = [...VOCABULARIO_BASE];
   try {
-    const { competidores } = await cargarCatalogo();
-    terminos.push(...competidores);
+    const { competidores, marcasRecambio, marcasRemolque } = await cargarCatalogo();
+    // Así el vocabulario se mantiene solo al dar de alta marcas nuevas en los catálogos.
+    terminos.push(...competidores, ...marcasRecambio, ...marcasRemolque);
     const { data } = await admin().rpc("get_distinct_vendedores" as never);
     for (const v of (data ?? []) as { vendedor: string }[]) {
       if (v?.vendedor) terminos.push(String(v.vendedor));
