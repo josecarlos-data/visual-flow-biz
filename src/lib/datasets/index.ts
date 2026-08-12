@@ -14,4 +14,4 @@ export const DATASETS: DatasetModule<any>[] = [
   comprasDataset,
 ];
 
-export type { DatasetModule, UploadResult, UploadStageResult, DatasetOption, SummaryItem } from "./types";
+export type { DatasetModule, UploadResult, UploadStageResult, DatasetOption, SummaryItem, RejectionRow } from "./types";
