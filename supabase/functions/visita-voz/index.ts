@@ -257,6 +257,7 @@ const referenciaPlausible = (v: string) => v.trim().length >= 3 && /\d/.test(v);
 function valorValido(c: CampoDef, v: unknown): string | null {
   if (v === null || v === undefined || String(v).trim() === "") return null;
   const s = sanear(v).trim();
+  if (s === "") return null;
   if (c.opciones.length && c.tipo === "select" && !c.opciones.includes(s)) return null;
   if (c.tipo === "referencia" && !referenciaPlausible(s)) return null;
   return s;
@@ -390,7 +391,7 @@ Deno.serve(async (req) => {
     // 2) Transcripción -> bloques (o respuesta a la repregunta). Reanalizar entra por aquí:
     //    llega la transcripción ya guardada y NO se vuelve a transcribir.
     const body = await req.json();
-    const transcripcion = String(body?.transcripcion ?? "").trim();
+    const transcripcion = sanear(body?.transcripcion).trim();
     if (!transcripcion) return json({ error: "No hay transcripción que analizar" }, 400);
 
     if (body?.accion === "repreguntar") {
