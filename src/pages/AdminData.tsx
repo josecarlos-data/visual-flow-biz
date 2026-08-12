@@ -231,6 +231,14 @@ export default function AdminData() {
                 ))}
               </div>
             ) : null}
+            {rechazos.length > 0 && (
+              <RechazosImportacion
+                rechazos={rechazos}
+                columnas={dataset.rejectionColumns ?? dataset.expectedColumns}
+                fileName={fileName}
+              />
+            )}
+
 
 
             {uploadResult && (
