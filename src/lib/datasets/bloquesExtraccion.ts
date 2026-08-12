@@ -35,6 +35,8 @@ type CsvRow = Record<string, string | undefined>;
 export interface Rechazo {
   fila: number;
   motivo: string;
+  /** Contenido original de la fila del CSV, para poder consultarla y descargarla. */
+  row: CsvRow;
 }
 
 export interface BloquePlan {
@@ -124,7 +126,11 @@ function parseCsv(buffer: ArrayBuffer): BloquesExtraccion {
 
   const rechazos: Rechazo[] = res.errors
     .filter((e) => e.row !== undefined)
-    .map((e) => ({ fila: (e.row ?? 0) + 2, motivo: `CSV mal formado: ${e.message}` }));
+    .map((e) => ({
+      fila: (e.row ?? 0) + 2,
+      row: ((res.data ?? [])[e.row ?? 0] ?? {}) as CsvRow,
+      motivo: `CSV mal formado: ${e.message}`,
+    }));
 
   const rows = (res.data ?? []).filter((r) => Object.values(r).some((v) => textoLimpio(v) !== ""));
 
@@ -254,38 +260,38 @@ async function prepare(data: BloquesExtraccion): Promise<BloquesExtraccion> {
     const valor = (r.valor ?? "").trim();
     const cita = r.cita ?? "";
 
-    if (!visita_id) return rechazos.push({ fila, motivo: "visita_id vacío" }) && undefined;
+    if (!visita_id) return rechazos.push({ fila, row: r, motivo: "visita_id vacío" }) && undefined;
     const orden = Number(ordenRaw);
     if (!Number.isInteger(orden) || orden < 0) {
-      rechazos.push({ fila, motivo: `orden "${ordenRaw}" no es un entero >= 0` });
+      rechazos.push({ fila, row: r, motivo: `orden "${ordenRaw}" no es un entero >= 0` });
       return;
     }
     if (!motivosSet.has(motivo_key)) {
-      rechazos.push({ fila, motivo: `motivo_key "${motivo_key}" no existe en motivos_visita` });
+      rechazos.push({ fila, row: r, motivo: `motivo_key "${motivo_key}" no existe en motivos_visita` });
       return;
     }
     const def = camposMap.get(`${motivo_key}::${campo_key}`);
     if (!def) {
-      rechazos.push({ fila, motivo: `campo_key "${campo_key}" no existe o no está activo en "${motivo_key}"` });
+      rechazos.push({ fila, row: r, motivo: `campo_key "${campo_key}" no existe o no está activo en "${motivo_key}"` });
       return;
     }
     const confianzaRaw = (r.confianza ?? "").trim().toLowerCase();
     if (confianzaRaw && !["alta", "media", "baja"].includes(confianzaRaw)) {
-      rechazos.push({ fila, motivo: `confianza "${r.confianza ?? ""}" debe ser alta, media o baja` });
+      rechazos.push({ fila, row: r, motivo: `confianza "${r.confianza ?? ""}" debe ser alta, media o baja` });
       return;
     }
     const confianza = confianzaRaw || "media";
     if (!valor) {
-      rechazos.push({ fila, motivo: `valor vacío para "${campo_key}"` });
+      rechazos.push({ fila, row: r, motivo: `valor vacío para "${campo_key}"` });
       return;
     }
     const cast = castear(valor, def, catalogosMap);
     if (!cast.ok) {
-      rechazos.push({ fila, motivo: `${campo_key}: ${cast.error}` });
+      rechazos.push({ fila, row: r, motivo: `${campo_key}: ${cast.error}` });
       return;
     }
     if (orden === 0 && !bloque_id) {
-      rechazos.push({ fila, motivo: "orden 0 requiere bloque_id" });
+      rechazos.push({ fila, row: r, motivo: "orden 0 requiere bloque_id" });
       return;
     }
 
@@ -450,6 +456,8 @@ export const bloquesExtraccionDataset: DatasetModule<BloquesExtraccion> = {
       motivo_key: p.motivo_key,
       num_campos: Object.keys(p.campos).length,
     })),
+  rejections: (d) => d.rechazos.map((r) => ({ fila: r.fila, motivo: r.motivo, row: { ...r.row } })),
+  rejectionColumns: [...COLUMNAS],
   upload: async (d, options) => {
     const sobrescribir = options?.sobrescribir === true;
     const items = sobrescribir ? [...d.plan, ...d.sobrescribibles] : d.plan;
@@ -493,7 +501,7 @@ export const bloquesExtraccionDataset: DatasetModule<BloquesExtraccion> = {
         name: "Filas rechazadas por validación",
         success: 0,
         errors: d.rechazos.length,
-        message: d.rechazos.slice(0, 5).map((r) => `fila ${r.fila}: ${r.motivo}`).join(" · ") || undefined,
+        message: d.rechazos.length ? "Consulta el detalle completo y descarga el CSV más abajo." : undefined,
       },
       {
         name: "Fallos de escritura (red o permisos)",

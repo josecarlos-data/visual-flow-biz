@@ -10,6 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { DATASETS, type DatasetModule, type UploadResult } from "@/lib/datasets";
+import RechazosImportacion from "@/components/RechazosImportacion";
 
 export default function AdminData() {
   const [activeKey, setActiveKey] = useState<string>(DATASETS[0]?.key ?? "");
@@ -102,6 +103,7 @@ export default function AdminData() {
   const previewRows = dataset && parsedData ? dataset.previewRows(parsedData, 20) : [];
   const totalRows = dataset && parsedData ? dataset.rowCount(parsedData) : 0;
   const summary = dataset?.summary && parsedData ? dataset.summary(parsedData) : [];
+  const rechazos = dataset?.rejections && parsedData ? dataset.rejections(parsedData) : [];
 
 
   return (
@@ -230,6 +232,14 @@ export default function AdminData() {
                 ))}
               </div>
             ) : null}
+            {rechazos.length > 0 && (
+              <RechazosImportacion
+                rechazos={rechazos}
+                columnas={dataset.rejectionColumns ?? dataset.expectedColumns}
+                fileName={fileName}
+              />
+            )}
+
 
 
             {uploadResult && (

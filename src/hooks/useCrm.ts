@@ -462,16 +462,18 @@ export function useVisitas(limit = 200) {
 }
 
 /** Visitas registradas por comerciales pendientes de revisar o ya validadas. */
-export function useVisitasRevision(limit = 300) {
+/**
+ * Visitas para la pantalla de revisión.
+ * `origen`: "app" (registradas en la app), "gespromo" (importadas) o "todas".
+ * El filtro se aplica en la consulta para que el límite no se coma resultados.
+ */
+export function useVisitasRevision(origen: "app" | "gespromo" | "todas" = "app", limit = 1000) {
   return useQuery({
-    queryKey: ["crm_visitas_revision", limit],
+    queryKey: ["crm_visitas_revision", origen, limit],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("visitas")
-        .select("*")
-        .eq("origen", "app")
-        .order("fecha", { ascending: false })
-        .limit(limit);
+      let query = supabase.from("visitas").select("*");
+      if (origen !== "todas") query = query.eq("origen", origen);
+      const { data, error } = await query.order("fecha", { ascending: false }).limit(limit);
       if (error) throw error;
       return (data ?? []) as unknown as Visita[];
     },
