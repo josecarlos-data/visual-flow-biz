@@ -116,15 +116,44 @@ async function cargarCatalogo(): Promise<Catalogo> {
 // ------------------------------------------------------------------ saneado
 
 /**
- * El modelo emite de forma intermitente escapes unicode malformados que llegan
- * como caracteres de control (Cami\u0003n en vez de Camión). Se limpian y se
- * normaliza a NFC antes de escribir nada en campos o campos_meta.
+ * El modelo emite de forma intermitente escapes unicode malformados: la secuencia
+ * UTF-8 de una vocal acentuada llega corrompida como carácter de control
+ * (Cami\u0003n, Reparaci\u001f3n). Borrar el control sin más destruye la palabra
+ * ("Camin", "Reparaci3n") y deja huérfanos los campos que validan contra catálogo,
+ * así que primero se restauran las secuencias conocidas y solo lo irreconocible
+ * se elimina. Cada caso se registra en el log para medir si sigue ocurriendo.
  */
-const sanear = (v: unknown): string =>
-  String(v ?? "")
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
-    .normalize("NFC");
+const RESTAURACIONES: [RegExp, string][] = [
+  // Patrón 1F <dígito>: el segundo byte de la secuencia UTF-8 sobrevive como dígito.
+  [/\u001f1/g, "á"], [/\u001f9/g, "é"], [/\u001f-/g, "í"],
+  [/\u001f3/g, "ó"], [/\u001f:/g, "ú"], [/\u001f1\u001f/g, "ñ"],
+  // Patrón 03: el byte de continuación se pierde entero; se deduce por el contexto.
+  [/([Cc])ami\u0003n/g, "$1amión"], [/([Ff])rigor\u0003fico/g, "$1rigorífico"],
+  [/aci\u0003n\b/g, "ación"], [/si\u0003n\b/g, "sión"], [/ma\u0003ana/g, "mañana"],
+  [/a\u0003o\b/g, "año"], [/([Cc])ami\u0003on/g, "$1amión"],
+];
+
+/** Solo lo que quede irreconocible tras las restauraciones. */
+// eslint-disable-next-line no-control-regex
+const CONTROL_RESIDUAL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
+
+const sanear = (v: unknown, contexto = ""): string => {
+  const original = String(v ?? "");
+  // eslint-disable-next-line no-control-regex
+  if (!/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(original)) {
+    return original.normalize("NFC");
+  }
+  let texto = original;
+  for (const [patron, reemplazo] of RESTAURACIONES) texto = texto.replace(patron, reemplazo);
+  const residual = texto.match(CONTROL_RESIDUAL)?.length ?? 0;
+  texto = texto.replace(CONTROL_RESIDUAL, "").normalize("NFC");
+  console.warn(
+    `[saneado] control detectado${contexto ? ` en ${contexto}` : ""}: ` +
+      `restaurado="${texto.slice(0, 120)}" residual_eliminado=${residual}`,
+  );
+  return texto;
+};
+
 
 // ------------------------------------------------------- vocabulario de audio
 
@@ -235,7 +264,7 @@ async function transcribir(key: string, audio: File) {
   if (!String(text ?? "").trim()) {
     return json({ error: "No se ha detectado voz en la grabación. Inténtalo de nuevo." }, 400);
   }
-  return json({ transcripcion: sanear(text) });
+  return json({ transcripcion: sanear(text, "transcripcion") });
 }
 
 interface BloqueSalida {
@@ -246,7 +275,7 @@ interface BloqueSalida {
 
 /** Recorta la cita a 12 palabras por si el modelo devuelve la frase entera. */
 const recortarCita = (cita: string) => {
-  const palabras = sanear(cita).trim().split(/\s+/).filter(Boolean);
+  const palabras = sanear(cita, "cita").trim().split(/\s+/).filter(Boolean);
   return palabras.length <= 12 ? palabras.join(" ") : palabras.slice(0, 12).join(" ") + "…";
 };
 
@@ -256,7 +285,7 @@ const referenciaPlausible = (v: string) => v.trim().length >= 3 && /\d/.test(v);
 /** Normaliza y valida el valor devuelto para un campo. Devuelve null si no vale. */
 function valorValido(c: CampoDef, v: unknown): string | null {
   if (v === null || v === undefined || String(v).trim() === "") return null;
-  const s = sanear(v).trim();
+  const s = sanear(v, `campo ${c.campo_key}`).trim();
   if (s === "") return null;
   if (c.opciones.length && c.tipo === "select" && !c.opciones.includes(s)) return null;
   if (c.tipo === "referencia" && !referenciaPlausible(s)) return null;
@@ -391,7 +420,7 @@ Deno.serve(async (req) => {
     // 2) Transcripción -> bloques (o respuesta a la repregunta). Reanalizar entra por aquí:
     //    llega la transcripción ya guardada y NO se vuelve a transcribir.
     const body = await req.json();
-    const transcripcion = sanear(body?.transcripcion).trim();
+    const transcripcion = sanear(body?.transcripcion, "transcripcion").trim();
     if (!transcripcion) return json({ error: "No hay transcripción que analizar" }, 400);
 
     if (body?.accion === "repreguntar") {
