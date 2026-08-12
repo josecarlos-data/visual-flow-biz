@@ -59,7 +59,11 @@ export default function NuevaVisita() {
   const [avisosRef, setAvisosRef] = useState<string[]>([]);
   const [repreguntaHecha, setRepreguntaHecha] = useState(false);
   const [respondiendo, setRespondiendo] = useState<string | null>(null);
+  /** Cliente con el que se hizo el último análisis por voz, para detectar cambios posteriores. */
+  const [clienteAnalizado, setClienteAnalizado] = useState<string>("");
+  const [avisoCliente, setAvisoCliente] = useState(false);
   const [saving, setSaving] = useState(false);
+
 
   const motivosActivos = useMemo(() => (motivos ?? []).filter((m) => m.is_active), [motivos]);
   const motivoDe = (key: string): Motivo | undefined => motivos?.find((m) => m.key === key);
