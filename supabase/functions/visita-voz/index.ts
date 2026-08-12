@@ -264,7 +264,7 @@ async function transcribir(key: string, audio: File) {
   if (!String(text ?? "").trim()) {
     return json({ error: "No se ha detectado voz en la grabación. Inténtalo de nuevo." }, 400);
   }
-  return json({ transcripcion: sanear(text) });
+  return json({ transcripcion: sanear(text, "transcripcion") });
 }
 
 interface BloqueSalida {
@@ -275,7 +275,7 @@ interface BloqueSalida {
 
 /** Recorta la cita a 12 palabras por si el modelo devuelve la frase entera. */
 const recortarCita = (cita: string) => {
-  const palabras = sanear(cita).trim().split(/\s+/).filter(Boolean);
+  const palabras = sanear(cita, "cita").trim().split(/\s+/).filter(Boolean);
   return palabras.length <= 12 ? palabras.join(" ") : palabras.slice(0, 12).join(" ") + "…";
 };
 
@@ -285,7 +285,7 @@ const referenciaPlausible = (v: string) => v.trim().length >= 3 && /\d/.test(v);
 /** Normaliza y valida el valor devuelto para un campo. Devuelve null si no vale. */
 function valorValido(c: CampoDef, v: unknown): string | null {
   if (v === null || v === undefined || String(v).trim() === "") return null;
-  const s = sanear(v).trim();
+  const s = sanear(v, `campo ${c.campo_key}`).trim();
   if (s === "") return null;
   if (c.opciones.length && c.tipo === "select" && !c.opciones.includes(s)) return null;
   if (c.tipo === "referencia" && !referenciaPlausible(s)) return null;
@@ -420,7 +420,7 @@ Deno.serve(async (req) => {
     // 2) Transcripción -> bloques (o respuesta a la repregunta). Reanalizar entra por aquí:
     //    llega la transcripción ya guardada y NO se vuelve a transcribir.
     const body = await req.json();
-    const transcripcion = sanear(body?.transcripcion).trim();
+    const transcripcion = sanear(body?.transcripcion, "transcripcion").trim();
     if (!transcripcion) return json({ error: "No hay transcripción que analizar" }, 400);
 
     if (body?.accion === "repreguntar") {
