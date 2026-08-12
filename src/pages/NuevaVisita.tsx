@@ -479,7 +479,43 @@ export default function NuevaVisita() {
         </CardContent>
       </Card>
 
+      {avisoCliente && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-400/70 bg-amber-50/60 p-3 text-sm dark:bg-amber-500/10">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="space-y-2">
+            <p>
+              Has cambiado de cliente después de analizar la nota. Los bloques actuales se generaron con el cliente
+              anterior en el contexto del análisis.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                disabled={extrayendo || !transcripcion.trim()}
+                onClick={() => analizarTranscripcion(transcripcion, codCliente, cliente?.cliente ?? "")}
+              >
+                {extrayendo ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Wand2 className="mr-1 h-4 w-4" />}
+                Volver a analizar con este cliente
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setClienteAnalizado(codCliente);
+                  setAvisoCliente(false);
+                }}
+              >
+                Mantener los bloques
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              No hace falta regrabar: se reutiliza la transcripción que ya tienes.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Chuleta previa: recordatorio, no obliga a elegir motivo */}
+
       {esEfectiva && (
         <Card>
           <Collapsible defaultOpen={!transcripcion}>
