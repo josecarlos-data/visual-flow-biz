@@ -50,7 +50,9 @@ const badgeImportado = <Badge variant="outline" className="gap-1 border-primary/
 
 
 export default function RevisionVisitas() {
-  const { data: visitas, isLoading } = useVisitasRevision();
+  const [params, setParams] = useSearchParams();
+  const origen = (params.get("origen") ?? "app") as "app" | "gespromo" | "todas";
+  const { data: visitas, isLoading } = useVisitasRevision(origen);
   const { data: motivos } = useMotivos();
   const { data: clientes } = useClientes(false, "alfabetico");
   const { revisar } = useRevisionMutations();
@@ -58,18 +60,17 @@ export default function RevisionVisitas() {
   const { guardar: guardarSituacion } = useSituacionesMutations();
   const reanalizar = useReanalizarVisita();
 
-  const [params, setParams] = useSearchParams();
   const get = (k: string, def = "") => params.get(k) ?? def;
   const setParam = (k: string, v: string | null) => {
     const next = new URLSearchParams(params);
-    if (!v || v === "todas" || v === "todos") next.delete(k);
+    if (!v || (k !== "origen" && (v === "todas" || v === "todos"))) next.delete(k);
+    else if (k === "origen" && v === "app") next.delete(k);
     else next.set(k, v);
     setParams(next, { replace: true });
   };
 
   const estado = get("estado", "pendiente");
   const q = get("q");
-  const origen = get("origen", "todos");
   const motivoFiltro = get("motivo", "todos");
   const soloDudas = get("dudas") === "1";
   const desde = get("desde");
@@ -91,7 +92,7 @@ export default function RevisionVisitas() {
   const nombreMotivo = (key: string | null) => motivos?.find((m) => m.key === key)?.nombre ?? key ?? "Sin motivo";
 
   // Bloques de todas las visitas cargadas: los filtros por origen/motivo/confianza los miran.
-  const { data: bloquesMap } = useVisitaBloques((visitas ?? []).slice(0, 300).map((v) => v.id));
+  const { data: bloquesMap } = useVisitaBloques((visitas ?? []).map((v) => v.id));
   const bloquesDe = (v: Visita) => bloquesMap?.get(v.id) ?? [];
   const resumenMotivos = (v: Visita) => {
     const bs = bloquesDe(v);
@@ -109,8 +110,6 @@ export default function RevisionVisitas() {
       if (hasta && v.fecha > hasta) return false;
 
       const bs = bloquesMap?.get(v.id) ?? [];
-      if (origen === "externo" && !bs.some(esExterno)) return false;
-      if (origen === "voz" && (bs.length === 0 || bs.some(esExterno))) return false;
       if (motivoFiltro !== "todos") {
         const enBloques = bs.some((b) => b.motivo_key === motivoFiltro);
         if (!enBloques && v.motivo_key !== motivoFiltro) return false;
@@ -125,9 +124,9 @@ export default function RevisionVisitas() {
         nombreMotivo(v.motivo_key).toLowerCase().includes(term)
       );
     });
-  }, [visitas, estado, q, origen, motivoFiltro, soloDudas, desde, hasta, bloquesMap, nombrePorCod, motivos]);
+  }, [visitas, estado, q, motivoFiltro, soloDudas, desde, hasta, bloquesMap, nombrePorCod, motivos]);
 
-  const pendientes = (visitas ?? []).filter((v) => (v.validacion ?? "pendiente") === "pendiente").length;
+  const pendientes = filtradas.filter((v) => (v.validacion ?? "pendiente") === "pendiente").length;
 
 
 
@@ -188,7 +187,8 @@ export default function RevisionVisitas() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Revisión de visitas</h1>
         <p className="text-muted-foreground">
-          Valida, corrige y completa las visitas registradas por el equipo comercial. {pendientes} pendiente{pendientes === 1 ? "" : "s"}.
+          Valida, corrige y completa las visitas registradas por el equipo comercial.{" "}
+          {filtradas.length} visita{filtradas.length === 1 ? "" : "s"} · {pendientes} pendiente{pendientes === 1 ? "" : "s"} de revisar.
         </p>
       </div>
 
@@ -209,11 +209,11 @@ export default function RevisionVisitas() {
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Origen</Label>
             <Select value={origen} onValueChange={(v) => setParam("origen", v)}>
-              <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-56"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                <SelectItem value="voz">Voz en directo</SelectItem>
-                <SelectItem value="externo">Extracción externa</SelectItem>
+                <SelectItem value="app">Registradas en la app</SelectItem>
+                <SelectItem value="gespromo">Importadas de Gespromo</SelectItem>
+                <SelectItem value="todas">Todas</SelectItem>
               </SelectContent>
             </Select>
           </div>
