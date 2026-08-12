@@ -1,64 +1,41 @@
-# Importación de bloques de visita desde extracción externa
+# Ficha de cliente enriquecida — contenedor de hechos de perfil
 
-Se descarta el reproceso por IA del histórico. En su lugar, el resultado de la extracción hecha fuera se sube como CSV desde el panel de administración, igual que el resto de fuentes de datos.
+Modo Plan. No se ejecuta nada todavía. Cuando se apruebe: solo migración SQL, sin tocar componentes, páginas ni edge functions.
 
-## Qué verá el administrador
+## Contraste con el esquema real
 
-En Gestión de Datos aparece una tarjeta nueva: **Bloques de visita (extracción externa)**.
+Verificado contra la base de datos actual:
 
-1. Selecciona el CSV (separador `;`, columnas `visita_id;bloque_id;orden;motivo_key;campo_key;valor;confianza;cita`).
-2. La app agrupa las filas por visita y bloque y muestra una **previsualización** antes de escribir nada:
-   - bloques que se van a actualizar,
-   - bloques que se van a crear,
-   - bloques candidatos a **sobrescritura** (ya rellenados por una importación anterior),
-   - bloques que se saltan por tener contenido de voz o manual,
-   - filas rechazadas, con el motivo concreto de cada rechazo.
-3. En la previsualización hay una casilla **"Sobrescribir bloques importados anteriormente"**, desactivada por defecto. Si no se marca, los candidatos a sobrescritura se saltan y se reportan; si se marca, se reescriben.
-4. Solo si el administrador confirma se escribe en la base de datos. Lo rechazado nunca aborta el resto: se importa lo válido y se informa de lo demás.
-5. Al terminar, el informe distingue: bloques actualizados, bloques creados, bloques sobrescritos, bloques saltados por la salvaguarda, filas rechazadas por validación y, aparte, **bloques que fallaron al escribir** por error de red o de permisos (no por validación), con el mensaje devuelto. Un fallo de escritura no interrumpe el resto de la importación.
+- `clientes.cod_cliente` tiene restricción UNIQUE propia, así que la FK desde `cliente_perfil_datos` es válida.
+- `visitas.id` y `visita_bloques.id` son claves primarias uuid: las dos FK propuestas funcionan.
+- `public.can_view_cliente(uuid, integer)`, `public.is_admin(uuid)` y `public.update_updated_at_column()` existen con esas firmas exactas, y las dos primeras tienen permiso de ejecución para usuarios autenticados (necesario porque se evalúan dentro de las políticas). Nombres correctos, nada que renombrar.
+- `motivo_campos` no tiene todavía ninguna columna de enlace a perfil: la columna nueva no choca con nada.
+- El motivo `informacion_potencial` tiene 17 campos activos; excluyendo `persona_contacto` y `observaciones` el seed crea 15 atributos.
 
-## Reglas de importación
+Puntos a corregir o tener en cuenta (todos menores; el modelo de hechos se mantiene tal cual):
 
-Agrupando por `(visita_id, orden)`:
+1. **La vista debe declararse con `security_invoker = true`.** Las cinco vistas del proyecto (`v_visita_bloques_campos`, `v_ficha_flota_actual`, etc.) lo llevan. Sin eso la vista se evalúa con permisos del propietario y salta el aislamiento por comercial: cualquier usuario vería el perfil de todos los clientes.
+2. **Nombre de la vista.** La convención del proyecto es prefijo `v_`. Se creará como `public.v_cliente_perfil_vigente`.
+3. **Índices.** El índice compuesto `(cod_cliente, atributo_key, observado_en DESC, created_at DESC)` es exactamente el que necesita el `DISTINCT ON` de la vista, pero conviene hacerlo **parcial** con `WHERE estado <> 'descartado'`, que es el mismo filtro de la vista. Con eso, el índice suelto `(atributo_key) WHERE estado <> 'descartado'` sobra para la consulta de valor vigente; se mantiene solo si se quiere listar "todos los clientes con un atributo dado" (informes tipo "quién tiene máquina de diagnosis"), que sí es un caso previsto. Se deja, pero como índice parcial de apoyo a informes, no a la ficha. `(visita_id)` es útil para el borrado en cascada y para el enlace inverso desde la visita: se mantiene.
+4. **`GRANT` explícitos.** Ambas tablas y la vista necesitan GRANT para `authenticated` (y `service_role`); sin ellos la API devuelve error de permisos aunque las políticas sean correctas. Nada para `anon`.
+5. **`opciones` heredadas del seed.** En `motivo_campos` ese campo unas veces es una lista literal y otras una referencia a catálogo (`{"catalogo": "..."}`); 4 de los 15 atributos son referencias. Se copia tal cual, que es lo correcto: el resolutor de opciones ya entiende los dos formatos.
+6. **Conflicto potencial con el importador CSV (fase siguiente, no ahora).** El importador reescribe bloques existentes de origen externo con UPDATE sobre el mismo `visita_bloques.id`. Con `UNIQUE (bloque_id, atributo_key)`, la promoción del dato tendrá que ser un upsert sobre esa clave, no un insert; si no, una reimportación fallará por duplicado. Queda anotado para cuando se implemente la escritura.
+7. **Borrado de bloques.** `bloque_id ... ON DELETE CASCADE` implica que borrar un bloque de visita borra sus hechos derivados. Es coherente con el modelo (el hecho lo observa ese bloque), pero conviene saberlo: el histórico de ese dato desaparece con él.
+8. **`v_ficha_flota_actual` queda como está.** Hoy deriva el perfil vigente directamente de `visita_bloques`. No se toca en esta fase; convivirá con la tabla nueva hasta que la escritura de hechos esté en marcha.
 
-- **orden = 0**: actualiza el bloque indicado por `bloque_id`, escribiendo solo `campos`, `campos_meta` y, si difiere, `motivo_key`. No se tocan `validacion`, `nota_revision`, `revisado_por` ni `revisado_en` (resultado de la FASE 6a).
-- **orden > 0**: crea un bloque nuevo en esa visita heredando `validacion` y `nota_revision` del bloque 0 de la misma visita. Si ya existe un bloque con ese `(visita_id, orden_efectivo)` y origen `texto_externo`, se actualiza en lugar de crear otro.
-- **Rango reservado de numeración**: los bloques importados no comparten numeración con los que crea la voz en directo. Se guardan con `orden_efectivo = 1000 + orden` (1001, 1002, ...), de modo que todo `orden >= 1000` es, por convención, origen "extracción externa" y todo `orden < 1000` es voz o histórico.
-- **Salvaguarda**: nunca se pisa un bloque cuyo `campos` tenga contenido de origen voz o manual. Sí se permite reescribir un bloque cuyo `campos_meta._origen.fuente === "texto_externo"` (escrito por una importación previa), y solo cuando la casilla de sobrescritura está marcada; en caso contrario se salta y se reporta. Esto hace posible volver a subir un fichero corregido.
-- Al sobrescribir se siguen sin tocar `validacion`, `nota_revision`, `revisado_por` ni `revisado_en`.
-- **Idempotencia**: los bloques adicionales se identifican por `(visita_id, orden_efectivo)`. Reimportar nunca duplica bloques ni confunde un bloque de voz con uno importado.
+Nada más del esquema propuesto entra en conflicto: no hay tabla, columna, función ni política con esos nombres.
 
-### Contenido escrito
+## Migración a aplicar
 
-- `campos`: valores planos `{campo_key: valor}` casteados según el `tipo` definido en `motivo_campos` (número, booleano, multiselect separado por `" | "`, resto texto).
-- `campos_meta`: `{campo_key: {cita, confianza}}` más `_origen: {"fuente":"texto_externo","en":"<fecha de importación>"}`, para poder distinguir después lo extraído de texto histórico de lo dictado por voz.
+1. `public.perfil_atributos` con los campos indicados (`key` como PK textual).
+2. `public.cliente_perfil_datos` con las FK, los CHECK de `fuente` y `estado`, y `UNIQUE (bloque_id, atributo_key)`.
+3. Índices: compuesto parcial para el valor vigente, `(visita_id)`, y parcial por `atributo_key` para informes.
+4. `motivo_campos.perfil_atributo_key text REFERENCES perfil_atributos(key) ON DELETE SET NULL`.
+5. Vista `public.v_cliente_perfil_vigente` con `security_invoker = true`.
+6. Triggers `update_updated_at_column()` en ambas tablas.
+7. GRANT + RLS:
+   - `perfil_atributos`: lectura para autenticados; alta, cambio y borrado solo administradores.
+   - `cliente_perfil_datos`: ver, crear y modificar solo si el usuario tiene visibilidad sobre ese cliente; borrar solo administradores.
+8. Seed de los 15 atributos desde `informacion_potencial` y relleno de `perfil_atributo_key`.
 
-### Validaciones
-
-Antes de procesar nada se comprueba que la **cabecera del CSV contenga exactamente las ocho columnas esperadas**; si no, la importación se aborta con un mensaje claro indicando qué columnas faltan o sobran.
-
-Después, fila a fila (rechazo individual, sin abortar el resto):
-
-- `motivo_key` existe en `motivos_visita`.
-- `campo_key` existe y está activo dentro de ese motivo.
-- Campos `select`: el valor pertenece al catálogo referenciado o a la lista literal de opciones. Los `multiselect` validan cada valor por separado.
-- `bloque_id` existe y pertenece a `visita_id`.
-- `confianza`: se acepta tanto `0.85` como `0,85` (Excel en español) y se normaliza a número. Si no es numérica o queda fuera del rango 0–1, la fila se rechaza indicando ese motivo concreto en el informe.
-
-### Numeración visible para el usuario
-
-Los bloques de una visita se numeran en pantalla por posición (1, 2, 3...), nunca por el valor bruto de `orden`, para que nadie vea "Bloque 1001". `NuevaVisita.tsx` ya usa el índice (`Bloque {i + 1}`) y `RevisionVisitas.tsx` no muestra número; se revisará cada punto donde se listan bloques y, si alguno pinta el valor bruto, se corrige a numeración por posición sobre la lista ya ordenada por `orden`.
-
-## Detalle técnico
-
-- Nuevo módulo `src/lib/datasets/bloquesExtraccion.ts` que implementa `DatasetModule`, registrado en `src/lib/datasets/index.ts`. No hace falta tocar `AdminData.tsx`: la UI ya es genérica (selector, previsualización y reporte por etapas vía `UploadStageResult`).
-- Parseo del CSV con **Papaparse** (`papaparse` + `@types/papaparse`): `delimiter: ';'`, `quoteChar: '"'`, `header: true`, `skipEmptyLines: true`. Lectura del `ArrayBuffer` como UTF-8 con detección y eliminación del BOM. Así el campo `cita`, que es texto libre, puede contener `;`, comillas dobles escapadas y saltos de línea sin romper el fichero. Los errores que devuelva Papaparse se incluyen en el informe de filas rechazadas.
-- Antes de validar se cargan en memoria: `motivos_visita` (claves activas), `motivo_campos` (clave, tipo, `opciones`, `is_active`) y `catalogos_opciones`, reutilizando `resolverOpciones`/`camposActivos` de `src/lib/motivoCampos.ts` para no duplicar reglas.
-- Contra la base de datos, en lotes por `visita_id` (chunks de ~200 para no exceder límites de PostgREST):
-  - `select id, visita_id, orden, motivo_key, campos, campos_meta, validacion, nota_revision from visita_bloques where visita_id in (...)` para comprobar pertenencia, salvaguarda (mirando `campos_meta._origen.fuente`), herencia y bloques importados ya existentes (`orden >= 1000`);
-  - `update` del bloque 0 solo con `campos`, `campos_meta` y `motivo_key`;
-  - `update` de los bloques `orden >= 1000` ya existentes de origen `texto_externo` cuando la casilla de sobrescritura está marcada;
-  - `insert` de los bloques con `orden_efectivo = 1000 + orden` que no existan aún.
-- Cada `update`/`insert` se ejecuta con captura de error individual: los fallos de escritura (red, RLS) se acumulan en su propia lista con el mensaje y el `visita_id`/`orden`, y se muestran como etapa separada del informe sin detener el resto del lote.
-- La escritura se hace desde el cliente con las políticas RLS actuales de `visita_bloques` (admin). No se añaden tablas, RPC ni migraciones.
-- `invalidate` refresca las queries de visitas/bloques en React Query.
+No se inserta ningún dato en `cliente_perfil_datos`.
