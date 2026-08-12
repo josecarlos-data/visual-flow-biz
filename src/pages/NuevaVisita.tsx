@@ -16,7 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useClientes, useMotivos, useCatalogos, hoyISO, crearBloques, type Motivo, type MotivoCampo } from "@/hooks/useCrm";
-import { camposVisibles } from "@/lib/motivoCampos";
+import { camposVisibles, normalizarValoresNumericos } from "@/lib/motivoCampos";
 
 type Meta = Record<string, { cita?: string; confianza?: string }>;
 
@@ -362,7 +362,8 @@ export default function NuevaVisita() {
           (creada as { id: string }).id,
           bloques.map((b) => ({
             motivo_key: b.motivoKey,
-            campos: b.valores,
+            // Los números se guardan como número: "0000", "00" o "0,00" quedan en 0.
+            campos: normalizarValoresNumericos(motivoDe(b.motivoKey)?.campos ?? [], b.valores),
             campos_meta: b.meta,
             completo: pendientesDe(b).length === 0,
           })),

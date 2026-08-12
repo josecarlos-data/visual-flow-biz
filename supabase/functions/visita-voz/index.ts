@@ -48,6 +48,8 @@ const admin = () =>
 interface Catalogo {
   motivos: MotivoDef[];
   competidores: string[];
+  marcasRecambio: string[];
+  marcasRemolque: string[];
 }
 
 /**
@@ -101,10 +103,28 @@ async function cargarCatalogo(): Promise<Catalogo> {
     .map((m) => ({ ...m, campos: campos.filter((c) => c.motivo_key === m.key) }))
     .filter((m) => m.campos.length > 0);
 
-  const valor: Catalogo = { motivos, competidores: catalogos["competidores"] ?? [] };
+  const valor: Catalogo = {
+    motivos,
+    competidores: catalogos["competidores"] ?? [],
+    marcasRecambio: catalogos["marcas_recambio"] ?? [],
+    marcasRemolque: catalogos["marcas_remolque"] ?? [],
+  };
   cache = { valor, hasta: Date.now() + TTL_CACHE_MS };
   return valor;
 }
+
+// ------------------------------------------------------------------ saneado
+
+/**
+ * El modelo emite de forma intermitente escapes unicode malformados que llegan
+ * como caracteres de control (Cami\u0003n en vez de Camión). Se limpian y se
+ * normaliza a NFC antes de escribir nada en campos o campos_meta.
+ */
+const sanear = (v: unknown): string =>
+  String(v ?? "")
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
+    .normalize("NFC");
 
 // ------------------------------------------------------- vocabulario de audio
 
@@ -114,6 +134,8 @@ const VOCABULARIO_BASE = [
   "electromecánico", "ejes SAF", "ejes BPW", "pastillas", "discos",
   "Icer", "Febi", "Dometic", "Sachs", "TitanX", "Knorr",
   "Volvo", "Scania", "DAF", "Ford", "Eurorrecambios",
+  "Schmitz", "Lecitrailer", "Leciñena", "Kögel", "Jaltest", "Texa", "Autocom", "Delphi",
+  "JOST", "ROR", "Mann Filter", "Wabco", "Banner", "Axcar", "Meritor", "NRF", "IADA", "Ryme",
 ];
 
 let vocabCache: { texto: string; hasta: number } | null = null;
@@ -122,8 +144,9 @@ async function vocabularioTranscripcion(): Promise<string> {
   if (vocabCache && vocabCache.hasta > Date.now()) return vocabCache.texto;
   const terminos = [...VOCABULARIO_BASE];
   try {
-    const { competidores } = await cargarCatalogo();
-    terminos.push(...competidores);
+    const { competidores, marcasRecambio, marcasRemolque } = await cargarCatalogo();
+    // Así el vocabulario se mantiene solo al dar de alta marcas nuevas en los catálogos.
+    terminos.push(...competidores, ...marcasRecambio, ...marcasRemolque);
     const { data } = await admin().rpc("get_distinct_vendedores" as never);
     for (const v of (data ?? []) as { vendedor: string }[]) {
       if (v?.vendedor) terminos.push(String(v.vendedor));
@@ -212,7 +235,7 @@ async function transcribir(key: string, audio: File) {
   if (!String(text ?? "").trim()) {
     return json({ error: "No se ha detectado voz en la grabación. Inténtalo de nuevo." }, 400);
   }
-  return json({ transcripcion: String(text) });
+  return json({ transcripcion: sanear(text) });
 }
 
 interface BloqueSalida {
@@ -223,7 +246,7 @@ interface BloqueSalida {
 
 /** Recorta la cita a 12 palabras por si el modelo devuelve la frase entera. */
 const recortarCita = (cita: string) => {
-  const palabras = String(cita ?? "").trim().split(/\s+/).filter(Boolean);
+  const palabras = sanear(cita).trim().split(/\s+/).filter(Boolean);
   return palabras.length <= 12 ? palabras.join(" ") : palabras.slice(0, 12).join(" ") + "…";
 };
 
@@ -233,7 +256,8 @@ const referenciaPlausible = (v: string) => v.trim().length >= 3 && /\d/.test(v);
 /** Normaliza y valida el valor devuelto para un campo. Devuelve null si no vale. */
 function valorValido(c: CampoDef, v: unknown): string | null {
   if (v === null || v === undefined || String(v).trim() === "") return null;
-  const s = String(v).trim();
+  const s = sanear(v).trim();
+  if (s === "") return null;
   if (c.opciones.length && c.tipo === "select" && !c.opciones.includes(s)) return null;
   if (c.tipo === "referencia" && !referenciaPlausible(s)) return null;
   return s;
@@ -367,7 +391,7 @@ Deno.serve(async (req) => {
     // 2) Transcripción -> bloques (o respuesta a la repregunta). Reanalizar entra por aquí:
     //    llega la transcripción ya guardada y NO se vuelve a transcribir.
     const body = await req.json();
-    const transcripcion = String(body?.transcripcion ?? "").trim();
+    const transcripcion = sanear(body?.transcripcion).trim();
     if (!transcripcion) return json({ error: "No hay transcripción que analizar" }, 400);
 
     if (body?.accion === "repreguntar") {
