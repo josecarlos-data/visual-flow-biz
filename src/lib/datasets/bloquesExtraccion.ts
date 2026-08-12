@@ -456,6 +456,8 @@ export const bloquesExtraccionDataset: DatasetModule<BloquesExtraccion> = {
       motivo_key: p.motivo_key,
       num_campos: Object.keys(p.campos).length,
     })),
+  rejections: (d) => d.rechazos.map((r) => ({ fila: r.fila, motivo: r.motivo, row: { ...r.row } })),
+  rejectionColumns: [...COLUMNAS],
   upload: async (d, options) => {
     const sobrescribir = options?.sobrescribir === true;
     const items = sobrescribir ? [...d.plan, ...d.sobrescribibles] : d.plan;
@@ -499,7 +501,7 @@ export const bloquesExtraccionDataset: DatasetModule<BloquesExtraccion> = {
         name: "Filas rechazadas por validación",
         success: 0,
         errors: d.rechazos.length,
-        message: d.rechazos.slice(0, 5).map((r) => `fila ${r.fila}: ${r.motivo}`).join(" · ") || undefined,
+        message: d.rechazos.length ? "Consulta el detalle completo y descarga el CSV más abajo." : undefined,
       },
       {
         name: "Fallos de escritura (red o permisos)",
