@@ -102,6 +102,7 @@ export default function AdminData() {
   const previewRows = dataset && parsedData ? dataset.previewRows(parsedData, 20) : [];
   const totalRows = dataset && parsedData ? dataset.rowCount(parsedData) : 0;
   const summary = dataset?.summary && parsedData ? dataset.summary(parsedData) : [];
+  const rechazos = dataset?.rejections && parsedData ? dataset.rejections(parsedData) : [];
 
 
   return (
