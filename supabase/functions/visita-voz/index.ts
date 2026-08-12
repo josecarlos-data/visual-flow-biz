@@ -116,15 +116,44 @@ async function cargarCatalogo(): Promise<Catalogo> {
 // ------------------------------------------------------------------ saneado
 
 /**
- * El modelo emite de forma intermitente escapes unicode malformados que llegan
- * como caracteres de control (Cami\u0003n en vez de Camión). Se limpian y se
- * normaliza a NFC antes de escribir nada en campos o campos_meta.
+ * El modelo emite de forma intermitente escapes unicode malformados: la secuencia
+ * UTF-8 de una vocal acentuada llega corrompida como carácter de control
+ * (Cami\u0003n, Reparaci\u001f3n). Borrar el control sin más destruye la palabra
+ * ("Camin", "Reparaci3n") y deja huérfanos los campos que validan contra catálogo,
+ * así que primero se restauran las secuencias conocidas y solo lo irreconocible
+ * se elimina. Cada caso se registra en el log para medir si sigue ocurriendo.
  */
-const sanear = (v: unknown): string =>
-  String(v ?? "")
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
-    .normalize("NFC");
+const RESTAURACIONES: [RegExp, string][] = [
+  // Patrón 1F <dígito>: el segundo byte de la secuencia UTF-8 sobrevive como dígito.
+  [/\u001f1/g, "á"], [/\u001f9/g, "é"], [/\u001f-/g, "í"],
+  [/\u001f3/g, "ó"], [/\u001f:/g, "ú"], [/\u001f1\u001f/g, "ñ"],
+  // Patrón 03: el byte de continuación se pierde entero; se deduce por el contexto.
+  [/([Cc])ami\u0003n/g, "$1amión"], [/([Ff])rigor\u0003fico/g, "$1rigorífico"],
+  [/aci\u0003n\b/g, "ación"], [/si\u0003n\b/g, "sión"], [/ma\u0003ana/g, "mañana"],
+  [/a\u0003o\b/g, "año"], [/([Cc])ami\u0003on/g, "$1amión"],
+];
+
+/** Solo lo que quede irreconocible tras las restauraciones. */
+// eslint-disable-next-line no-control-regex
+const CONTROL_RESIDUAL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
+
+const sanear = (v: unknown, contexto = ""): string => {
+  const original = String(v ?? "");
+  // eslint-disable-next-line no-control-regex
+  if (!/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(original)) {
+    return original.normalize("NFC");
+  }
+  let texto = original;
+  for (const [patron, reemplazo] of RESTAURACIONES) texto = texto.replace(patron, reemplazo);
+  const residual = texto.match(CONTROL_RESIDUAL)?.length ?? 0;
+  texto = texto.replace(CONTROL_RESIDUAL, "").normalize("NFC");
+  console.warn(
+    `[saneado] control detectado${contexto ? ` en ${contexto}` : ""}: ` +
+      `restaurado="${texto.slice(0, 120)}" residual_eliminado=${residual}`,
+  );
+  return texto;
+};
+
 
 // ------------------------------------------------------- vocabulario de audio
 
