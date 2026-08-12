@@ -128,28 +128,17 @@ export default function NuevaVisita() {
     return res.transcripcion ?? null;
   };
 
-  /** Graba una vez toda la visita: se pinta la transcripción y la extracción va por detrás. */
-  const procesarVisita = async (blob: Blob) => {
-    setTranscribiendo(true);
+  /**
+   * Extracción a partir de una transcripción ya existente: no vuelve a transcribir,
+   * así que sirve tanto para el primer análisis como para reanalizar tras cambiar de cliente.
+   */
+  const analizarTranscripcion = async (texto: string, cod: string, nombreCliente: string) => {
+    setExtrayendo(true);
     setErrorExtraccion(null);
     setAvisosRef([]);
-    let texto: string | null = null;
-    try {
-      texto = await transcribirAudio(blob);
-    } catch (e) {
-      setTranscribiendo(false);
-      toast({ title: "No se ha podido transcribir", description: (e as Error).message, variant: "destructive" });
-      return;
-    }
-    setTranscribiendo(false);
-    if (!texto) return;
-
-    // La narración ya está en pantalla; la extracción corre en paralelo.
-    setTranscripcion(texto);
-    setExtrayendo(true);
     try {
       const { data, error } = await supabase.functions.invoke("visita-voz", {
-        body: { transcripcion: texto, cliente_nombre: cliente?.cliente ?? "" },
+        body: { transcripcion: texto, cliente_nombre: nombreCliente },
       });
       if (error) throw new Error((await (error as { context?: Response }).context?.text?.()) || error.message);
       const res = data as {
@@ -177,6 +166,8 @@ export default function NuevaVisita() {
       setAvisosRef(avisos);
       setRepreguntaHecha(false);
       setBloques(propuestos.length ? propuestos : [nuevoBloque(motivosActivos[0]?.key ?? "")]);
+      setClienteAnalizado(cod);
+      setAvisoCliente(false);
       toast({
         title: propuestos.length ? `${propuestos.length} bloque(s) propuestos` : "Sin datos suficientes",
         description: propuestos.length
@@ -195,6 +186,28 @@ export default function NuevaVisita() {
       setExtrayendo(false);
     }
   };
+
+  /** Graba una vez toda la visita: se pinta la transcripción y la extracción va por detrás. */
+  const procesarVisita = async (blob: Blob) => {
+    setTranscribiendo(true);
+    setErrorExtraccion(null);
+    setAvisosRef([]);
+    let texto: string | null = null;
+    try {
+      texto = await transcribirAudio(blob);
+    } catch (e) {
+      setTranscribiendo(false);
+      toast({ title: "No se ha podido transcribir", description: (e as Error).message, variant: "destructive" });
+      return;
+    }
+    setTranscribiendo(false);
+    if (!texto) return;
+
+    // La narración ya está en pantalla; la extracción corre en paralelo.
+    setTranscripcion(texto);
+    await analizarTranscripcion(texto, codCliente, cliente?.cliente ?? "");
+  };
+
 
   /** Segunda tanda: el comercial contesta por voz a los campos que faltan de un bloque. */
   const responderRepregunta = async (uid: string, blob: Blob) => {
