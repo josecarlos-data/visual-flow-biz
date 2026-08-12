@@ -36,6 +36,13 @@ export interface SummaryItem {
   tone?: "default" | "warn" | "danger";
 }
 
+/** Fila rechazada durante la validación, con su contenido original. */
+export interface RejectionRow {
+  fila: number;
+  motivo: string;
+  row: Record<string, unknown>;
+}
+
 export interface DatasetModule<TParsed> {
   key: string;
   name: string;
