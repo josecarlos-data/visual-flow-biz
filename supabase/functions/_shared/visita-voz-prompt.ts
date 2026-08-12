@@ -22,8 +22,16 @@
  *     `competencia` independiente; prohibido resumir varias comparativas en uno.
  *   · `seguimiento` solo se instancia si NO se ha creado ningún otro bloque, salvo
  *     contenido sobrante que no encaje en ninguno de ellos.
+ * - fase4.4 (12/08/2026) — Criterios afinados tras procesar 18.647 observaciones del histórico:
+ *   · Ejemplos de competidores corregidos (Recanor no existe): Luis Moleón, Grupo Peña, Eurorecambios.
+ *   · Nueva sección ALIAS Y NORMALIZACIÓN (LM, Peña, Titan/TitanX, Garret, Lemforder, Alko,
+ *     Mann Filter, recambio original con la marca del fabricante, servicio oficial).
+ *   · Campos con opciones: si el valor no está en la lista va a null y el literal al texto libre
+ *     del bloque; prohibido forzar a "Otra" ni al valor más parecido.
+ *   · Un solo valor en los select (marca_competencia); " | " es exclusivo de multiselect.
+ *   · Nueva sección de reglas para `informacion_potencial` (potencial de compra del cliente).
  */
-export const VERSION_PROMPT = "fase4.3";
+export const VERSION_PROMPT = "fase4.4";
 
 /**
  * Extracción: clasificar y rellenar campos con reglas explícitas. No es razonamiento,
