@@ -185,7 +185,7 @@ export function sistemaExtraccion(motivos: MotivoDef[]) {
     "- seguimiento es el cajón de último recurso: SOLO se instancia si no has creado ningún otro bloque. Si ya hay al menos un " +
     "bloque de otro motivo, no añadas seguimiento salvo que quede contenido concreto que no encaje en ninguno de ellos; en ese " +
     "caso el bloque recoge únicamente ese contenido sobrante, nunca un resumen de lo ya repartido.\n" +
-    "- COMPETENCIA, REGLA IMPERATIVA: si en la narración aparece un competidor nombrado (Euro Recambios, Recanor, etc.) o un precio " +
+    "- COMPETENCIA, REGLA IMPERATIVA: si en la narración aparece un competidor nombrado (Luis Moleón, Grupo Peña, Eurorecambios, etc.) o un precio " +
     "de otro proveedor, creas SIEMPRE un bloque competencia con competidor, precio_rimosa, precio_competencia y resultado_venta. " +
     "Va ADEMÁS del bloque de seguimiento o de revisión que corresponda: no son excluyentes, la misma situación genera los dos. " +
     "Los precios de la comparativa nunca se quedan solo dentro de un texto libre como motivo_perdida; van a sus campos numéricos " +
