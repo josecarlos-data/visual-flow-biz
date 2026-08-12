@@ -193,18 +193,45 @@ export function sistemaExtraccion(motivos: MotivoDef[]) {
     "- UN BLOQUE POR COMPARATIVA: cada referencia comparada es una comparativa independiente. Si el comercial compara dos o más " +
     "referencias o productos con precios distintos, devuelves un bloque competencia por cada uno, con su referencia, sus dos " +
     "precios y su resultado_venta. Nunca resumas varias comparativas en un solo bloque ni dejes resultado_venta vacío.\n" +
-    "  Ejemplo: «se los compra a Euro Recambios a 120 cuando nosotros lo tenemos a 142, me ha enseñado el albarán» => " +
-    "un bloque revision_seguimiento con resultado 'Venta perdida' Y un bloque competencia con competidor=Euro Recambios, " +
+    "  Ejemplo: «se los compra a Eurorecambios a 120 cuando nosotros lo tenemos a 142, me ha enseñado el albarán» => " +
+    "un bloque revision_seguimiento con resultado 'Venta perdida' Y un bloque competencia con competidor=Eurorecambios, " +
     "precio_competencia=120, precio_rimosa=142, resultado_venta el que corresponda.\n" +
     "  Ejemplo con dos referencias: «la batería de 110 se la dan a 78 y nosotros a 92, y la de 140 a 105 frente a nuestros 121» => " +
     "DOS bloques competencia: uno con precio_competencia=78 y precio_rimosa=92, otro con precio_competencia=105 y " +
     "precio_rimosa=121, cada uno con su referencia y su resultado_venta.\n" +
     "- Un motivo solo se instancia si hay al menos un dato real en la narración. Nunca crees un bloque vacío por si acaso.\n" +
     "- Si el mismo motivo aparece dos veces con contenido distinto, devuelve dos elementos en su lista, nunca uno con los datos mezclados.\n\n" +
+    "ALIAS Y NORMALIZACIÓN (usa siempre el nombre de catálogo, no el que suene en la grabación):\n" +
+    "- 'LM', 'L.M.', 'LMR', 'Luis', 'Moleón' => Luis Moleón.\n" +
+    "- 'Peña', 'G. Peña' => Grupo Peña.\n" +
+    "- Salysan es una empresa aparte: NO es Eurorecambios ni se mezcla con ella.\n" +
+    "- 'Titan' es TitanX (radiadores), nunca Titanium (que es marca de baterías).\n" +
+    "- 'Garret' => Garrett. 'Knorr-Bremse' => Knorr. 'Lemforder' => Lemförder. 'Alko' => AL-KO.\n" +
+    "- 'MANN FILTER', 'Mann', 'Mann-Filter' => Mann Filter.\n" +
+    "- El recambio original se registra con la marca del fabricante: «lo compra original DAF» => DAF.\n" +
+    "- «se lo ofrecen en la Renault», «en el servicio oficial» => competidor 'Servicio oficial de la marca', " +
+    "y la marca concreta se anota en conclusion.\n\n" +
+    "INFORMACION_POTENCIAL (alimenta la ficha del cliente y el cálculo de su potencial de compra):\n" +
+    "- tipo_negocio decide con qué fórmula se calcula el potencial. Flotista: tiene vehículos propios («flota de 35 camiones»). " +
+    "Taller: repara vehículos de terceros («es taller de turismo»). Mixto: ambas cosas. Si el texto no permite distinguirlo va a " +
+    "null: un valor inventado falsea el potencial de ese cliente.\n" +
+    "- num_mecanicos son mecánicos NO electromecánicos. Si el comercial solo dice «cuatro mecánicos» sin distinguir, van todos a " +
+    "num_mecanicos y num_electromecanicos queda a null. No repartas a ojo.\n" +
+    "- marca_remolque y tipo_ejes son campos distintos: un remolque Schmitz puede montar ejes BPW o SAF. «remolque Schmitz con ejes " +
+    "SAF» son dos campos, no uno.\n" +
+    "- segmento_vehiculo recoge remolques, plataformas, frigoríficos, autobuses y furgonetas. En marcas_vehiculo van solo fabricantes.\n" +
+    "- proveedor_principal solo si el texto dice cuál es el principal. Si nombra varios sin jerarquía, va a null y los nombres a " +
+    "observaciones.\n" +
+    "- potencial_estimado solo si el comercial da una cifra anual explícita. Nunca lo calcules.\n\n" +
     "REGLAS DE CONTENIDO:\n" +
     "- El cliente YA viene dado por la aplicación: no lo deduzcas de la transcripción ni lo devuelvas.\n" +
     "- No inventes: si la narración no dice nada de un campo, ese campo va a null.\n" +
-    "- En los campos con lista de opciones, devuelve SIEMPRE uno de los valores exactos de la lista, nunca texto libre.\n" +
+    "- En los campos con lista de opciones: si el valor que dice el comercial no está en la lista, deja el campo a null y anota el " +
+    "término literal en el texto libre del bloque (conclusion en competencia, observaciones en el resto). Nunca lo fuerces a 'Otra' " +
+    "ni al valor más parecido de la lista.\n" +
+    "- UN SOLO VALOR EN LOS CAMPOS SELECT: marca_competencia admite una única marca. Si el comercial nombra dos («Borygo Maflow»), " +
+    "son dos comparativas distintas y van en dos bloques competencia, o la segunda se anota en conclusion. El separador ' | ' es " +
+    "exclusivo de los campos multiselect.\n" +
     "- Las referencias de producto se devuelven tal cual las dice el comercial; no las corrijas ni las aproximes, y nunca " +
     "conviertas una palabra suelta en referencia.\n" +
     "- Redacta los textos en español, en tercera persona, breve y concreto.\n" +
