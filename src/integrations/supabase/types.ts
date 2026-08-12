@@ -188,6 +188,160 @@ export type Database = {
         }
         Relationships: []
       }
+      cliente_perfil_datos: {
+        Row: {
+          atributo_key: string
+          bloque_id: string | null
+          cod_cliente: number
+          comercial_nombre: string | null
+          confianza: number | null
+          confirmado_en: string | null
+          confirmado_por: string | null
+          created_at: string
+          descartado_en: string | null
+          descartado_por: string | null
+          estado: string
+          fuente: string
+          id: string
+          motivo_descarte: string | null
+          observado_en: string
+          updated_at: string
+          user_id: string | null
+          valor_num: number | null
+          valor_texto: string
+          visita_id: string | null
+        }
+        Insert: {
+          atributo_key: string
+          bloque_id?: string | null
+          cod_cliente: number
+          comercial_nombre?: string | null
+          confianza?: number | null
+          confirmado_en?: string | null
+          confirmado_por?: string | null
+          created_at?: string
+          descartado_en?: string | null
+          descartado_por?: string | null
+          estado?: string
+          fuente?: string
+          id?: string
+          motivo_descarte?: string | null
+          observado_en: string
+          updated_at?: string
+          user_id?: string | null
+          valor_num?: number | null
+          valor_texto: string
+          visita_id?: string | null
+        }
+        Update: {
+          atributo_key?: string
+          bloque_id?: string | null
+          cod_cliente?: number
+          comercial_nombre?: string | null
+          confianza?: number | null
+          confirmado_en?: string | null
+          confirmado_por?: string | null
+          created_at?: string
+          descartado_en?: string | null
+          descartado_por?: string | null
+          estado?: string
+          fuente?: string
+          id?: string
+          motivo_descarte?: string | null
+          observado_en?: string
+          updated_at?: string
+          user_id?: string | null
+          valor_num?: number | null
+          valor_texto?: string
+          visita_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cliente_perfil_datos_atributo_key_fkey"
+            columns: ["atributo_key"]
+            isOneToOne: false
+            referencedRelation: "perfil_atributos"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "cliente_perfil_datos_bloque_id_fkey"
+            columns: ["bloque_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_accion_pendiente"
+            referencedColumns: ["bloque_id"]
+          },
+          {
+            foreignKeyName: "cliente_perfil_datos_bloque_id_fkey"
+            columns: ["bloque_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_bloques_campos"
+            referencedColumns: ["bloque_id"]
+          },
+          {
+            foreignKeyName: "cliente_perfil_datos_bloque_id_fkey"
+            columns: ["bloque_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_competencia"
+            referencedColumns: ["bloque_id"]
+          },
+          {
+            foreignKeyName: "cliente_perfil_datos_bloque_id_fkey"
+            columns: ["bloque_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_oferta"
+            referencedColumns: ["bloque_id"]
+          },
+          {
+            foreignKeyName: "cliente_perfil_datos_bloque_id_fkey"
+            columns: ["bloque_id"]
+            isOneToOne: false
+            referencedRelation: "visita_bloques"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cliente_perfil_datos_cod_cliente_fkey"
+            columns: ["cod_cliente"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["cod_cliente"]
+          },
+          {
+            foreignKeyName: "cliente_perfil_datos_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_accion_pendiente"
+            referencedColumns: ["visita_id"]
+          },
+          {
+            foreignKeyName: "cliente_perfil_datos_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_bloques_campos"
+            referencedColumns: ["visita_id"]
+          },
+          {
+            foreignKeyName: "cliente_perfil_datos_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_competencia"
+            referencedColumns: ["visita_id"]
+          },
+          {
+            foreignKeyName: "cliente_perfil_datos_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_oferta"
+            referencedColumns: ["visita_id"]
+          },
+          {
+            foreignKeyName: "cliente_perfil_datos_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "visitas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clientes: {
         Row: {
           cif: string | null
@@ -406,6 +560,7 @@ export type Database = {
           label: string
           motivo_key: string
           opciones: Json
+          perfil_atributo_key: string | null
           placeholder: string | null
           requerido_validacion: boolean
           sort_order: number
@@ -423,6 +578,7 @@ export type Database = {
           label: string
           motivo_key: string
           opciones?: Json
+          perfil_atributo_key?: string | null
           placeholder?: string | null
           requerido_validacion?: boolean
           sort_order?: number
@@ -440,6 +596,7 @@ export type Database = {
           label?: string
           motivo_key?: string
           opciones?: Json
+          perfil_atributo_key?: string | null
           placeholder?: string | null
           requerido_validacion?: boolean
           sort_order?: number
@@ -453,6 +610,13 @@ export type Database = {
             columns: ["motivo_key"]
             isOneToOne: false
             referencedRelation: "motivos_visita"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "motivo_campos_perfil_atributo_key_fkey"
+            columns: ["perfil_atributo_key"]
+            isOneToOne: false
+            referencedRelation: "perfil_atributos"
             referencedColumns: ["key"]
           },
         ]
@@ -538,6 +702,51 @@ export type Database = {
           tipo?: string
           updated_at?: string
           vendedor?: string
+        }
+        Relationships: []
+      }
+      perfil_atributos: {
+        Row: {
+          caduca_dias: number | null
+          created_at: string
+          descripcion: string | null
+          grupo: string
+          is_active: boolean
+          key: string
+          nombre: string
+          opciones: Json
+          sort_order: number
+          tipo: string
+          unidad: string | null
+          updated_at: string
+        }
+        Insert: {
+          caduca_dias?: number | null
+          created_at?: string
+          descripcion?: string | null
+          grupo?: string
+          is_active?: boolean
+          key: string
+          nombre: string
+          opciones?: Json
+          sort_order?: number
+          tipo?: string
+          unidad?: string | null
+          updated_at?: string
+        }
+        Update: {
+          caduca_dias?: number | null
+          created_at?: string
+          descripcion?: string | null
+          grupo?: string
+          is_active?: boolean
+          key?: string
+          nombre?: string
+          opciones?: Json
+          sort_order?: number
+          tipo?: string
+          unidad?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -1445,6 +1654,116 @@ export type Database = {
       }
     }
     Views: {
+      v_cliente_perfil_vigente: {
+        Row: {
+          atributo_key: string | null
+          bloque_id: string | null
+          cod_cliente: number | null
+          comercial_nombre: string | null
+          confianza: number | null
+          confirmado_en: string | null
+          confirmado_por: string | null
+          created_at: string | null
+          descartado_en: string | null
+          descartado_por: string | null
+          estado: string | null
+          fuente: string | null
+          id: string | null
+          motivo_descarte: string | null
+          observado_en: string | null
+          updated_at: string | null
+          user_id: string | null
+          valor_num: number | null
+          valor_texto: string | null
+          visita_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cliente_perfil_datos_atributo_key_fkey"
+            columns: ["atributo_key"]
+            isOneToOne: false
+            referencedRelation: "perfil_atributos"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "cliente_perfil_datos_bloque_id_fkey"
+            columns: ["bloque_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_accion_pendiente"
+            referencedColumns: ["bloque_id"]
+          },
+          {
+            foreignKeyName: "cliente_perfil_datos_bloque_id_fkey"
+            columns: ["bloque_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_bloques_campos"
+            referencedColumns: ["bloque_id"]
+          },
+          {
+            foreignKeyName: "cliente_perfil_datos_bloque_id_fkey"
+            columns: ["bloque_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_competencia"
+            referencedColumns: ["bloque_id"]
+          },
+          {
+            foreignKeyName: "cliente_perfil_datos_bloque_id_fkey"
+            columns: ["bloque_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_oferta"
+            referencedColumns: ["bloque_id"]
+          },
+          {
+            foreignKeyName: "cliente_perfil_datos_bloque_id_fkey"
+            columns: ["bloque_id"]
+            isOneToOne: false
+            referencedRelation: "visita_bloques"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cliente_perfil_datos_cod_cliente_fkey"
+            columns: ["cod_cliente"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["cod_cliente"]
+          },
+          {
+            foreignKeyName: "cliente_perfil_datos_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_accion_pendiente"
+            referencedColumns: ["visita_id"]
+          },
+          {
+            foreignKeyName: "cliente_perfil_datos_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_bloques_campos"
+            referencedColumns: ["visita_id"]
+          },
+          {
+            foreignKeyName: "cliente_perfil_datos_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_competencia"
+            referencedColumns: ["visita_id"]
+          },
+          {
+            foreignKeyName: "cliente_perfil_datos_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "v_visita_oferta"
+            referencedColumns: ["visita_id"]
+          },
+          {
+            foreignKeyName: "cliente_perfil_datos_visita_id_fkey"
+            columns: ["visita_id"]
+            isOneToOne: false
+            referencedRelation: "visitas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_ficha_flota_actual: {
         Row: {
           cod_cliente: number | null
