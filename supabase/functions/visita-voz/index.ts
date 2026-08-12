@@ -103,7 +103,12 @@ async function cargarCatalogo(): Promise<Catalogo> {
     .map((m) => ({ ...m, campos: campos.filter((c) => c.motivo_key === m.key) }))
     .filter((m) => m.campos.length > 0);
 
-  const valor: Catalogo = { motivos, competidores: catalogos["competidores"] ?? [] };
+  const valor: Catalogo = {
+    motivos,
+    competidores: catalogos["competidores"] ?? [],
+    marcasRecambio: catalogos["marcas_recambio"] ?? [],
+    marcasRemolque: catalogos["marcas_remolque"] ?? [],
+  };
   cache = { valor, hasta: Date.now() + TTL_CACHE_MS };
   return valor;
 }
