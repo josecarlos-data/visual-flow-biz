@@ -59,7 +59,11 @@ export default function NuevaVisita() {
   const [avisosRef, setAvisosRef] = useState<string[]>([]);
   const [repreguntaHecha, setRepreguntaHecha] = useState(false);
   const [respondiendo, setRespondiendo] = useState<string | null>(null);
+  /** Cliente con el que se hizo el último análisis por voz, para detectar cambios posteriores. */
+  const [clienteAnalizado, setClienteAnalizado] = useState<string>("");
+  const [avisoCliente, setAvisoCliente] = useState(false);
   const [saving, setSaving] = useState(false);
+
 
   const motivosActivos = useMemo(() => (motivos ?? []).filter((m) => m.is_active), [motivos]);
   const motivoDe = (key: string): Motivo | undefined => motivos?.find((m) => m.key === key);
@@ -68,6 +72,19 @@ export default function NuevaVisita() {
     () => clientes?.find((c) => String(c.cod_cliente) === codCliente),
     [clientes, codCliente],
   );
+
+  /**
+   * El análisis se hizo con el nombre del cliente anterior en el prompt: si se cambia de
+   * cliente con bloques ya extraídos por voz, se avisa. No se borra ni se bloquea nada.
+   */
+  const hayExtraccionVoz = transcripcion.trim() !== "" || bloques.some((b) => Object.keys(b.meta).length > 0);
+  useEffect(() => {
+    if (!clienteAnalizado || !codCliente) return;
+    if (codCliente !== clienteAnalizado && hayExtraccionVoz) setAvisoCliente(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [codCliente]);
+
+
 
   const opciones = useMemo(() => {
     const term = busqueda.trim().toLowerCase();
@@ -128,28 +145,17 @@ export default function NuevaVisita() {
     return res.transcripcion ?? null;
   };
 
-  /** Graba una vez toda la visita: se pinta la transcripción y la extracción va por detrás. */
-  const procesarVisita = async (blob: Blob) => {
-    setTranscribiendo(true);
+  /**
+   * Extracción a partir de una transcripción ya existente: no vuelve a transcribir,
+   * así que sirve tanto para el primer análisis como para reanalizar tras cambiar de cliente.
+   */
+  const analizarTranscripcion = async (texto: string, cod: string, nombreCliente: string) => {
+    setExtrayendo(true);
     setErrorExtraccion(null);
     setAvisosRef([]);
-    let texto: string | null = null;
-    try {
-      texto = await transcribirAudio(blob);
-    } catch (e) {
-      setTranscribiendo(false);
-      toast({ title: "No se ha podido transcribir", description: (e as Error).message, variant: "destructive" });
-      return;
-    }
-    setTranscribiendo(false);
-    if (!texto) return;
-
-    // La narración ya está en pantalla; la extracción corre en paralelo.
-    setTranscripcion(texto);
-    setExtrayendo(true);
     try {
       const { data, error } = await supabase.functions.invoke("visita-voz", {
-        body: { transcripcion: texto, cliente_nombre: cliente?.cliente ?? "" },
+        body: { transcripcion: texto, cliente_nombre: nombreCliente },
       });
       if (error) throw new Error((await (error as { context?: Response }).context?.text?.()) || error.message);
       const res = data as {
@@ -177,6 +183,8 @@ export default function NuevaVisita() {
       setAvisosRef(avisos);
       setRepreguntaHecha(false);
       setBloques(propuestos.length ? propuestos : [nuevoBloque(motivosActivos[0]?.key ?? "")]);
+      setClienteAnalizado(cod);
+      setAvisoCliente(false);
       toast({
         title: propuestos.length ? `${propuestos.length} bloque(s) propuestos` : "Sin datos suficientes",
         description: propuestos.length
@@ -195,6 +203,28 @@ export default function NuevaVisita() {
       setExtrayendo(false);
     }
   };
+
+  /** Graba una vez toda la visita: se pinta la transcripción y la extracción va por detrás. */
+  const procesarVisita = async (blob: Blob) => {
+    setTranscribiendo(true);
+    setErrorExtraccion(null);
+    setAvisosRef([]);
+    let texto: string | null = null;
+    try {
+      texto = await transcribirAudio(blob);
+    } catch (e) {
+      setTranscribiendo(false);
+      toast({ title: "No se ha podido transcribir", description: (e as Error).message, variant: "destructive" });
+      return;
+    }
+    setTranscribiendo(false);
+    if (!texto) return;
+
+    // La narración ya está en pantalla; la extracción corre en paralelo.
+    setTranscripcion(texto);
+    await analizarTranscripcion(texto, codCliente, cliente?.cliente ?? "");
+  };
+
 
   /** Segunda tanda: el comercial contesta por voz a los campos que faltan de un bloque. */
   const responderRepregunta = async (uid: string, blob: Blob) => {
@@ -449,7 +479,43 @@ export default function NuevaVisita() {
         </CardContent>
       </Card>
 
+      {avisoCliente && (
+        <div className="flex items-start gap-2 rounded-md border border-amber-400/70 bg-amber-50/60 p-3 text-sm dark:bg-amber-500/10">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+          <div className="space-y-2">
+            <p>
+              Has cambiado de cliente después de analizar la nota. Los bloques actuales se generaron con el cliente
+              anterior en el contexto del análisis.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                disabled={extrayendo || !transcripcion.trim()}
+                onClick={() => analizarTranscripcion(transcripcion, codCliente, cliente?.cliente ?? "")}
+              >
+                {extrayendo ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Wand2 className="mr-1 h-4 w-4" />}
+                Volver a analizar con este cliente
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setClienteAnalizado(codCliente);
+                  setAvisoCliente(false);
+                }}
+              >
+                Mantener los bloques
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              No hace falta regrabar: se reutiliza la transcripción que ya tienes.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Chuleta previa: recordatorio, no obliga a elegir motivo */}
+
       {esEfectiva && (
         <Card>
           <Collapsible defaultOpen={!transcripcion}>
