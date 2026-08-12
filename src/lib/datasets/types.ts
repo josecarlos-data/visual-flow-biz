@@ -59,6 +59,10 @@ export interface DatasetModule<TParsed> {
   rowCount: (data: TParsed) => number;
   previewColumns: PreviewColumn[];
   previewRows: (data: TParsed, limit: number) => Record<string, unknown>[];
+  /** Filas rechazadas por validación, consultables y descargables. */
+  rejections?: (data: TParsed) => RejectionRow[];
+  /** Columnas originales del fichero, para el CSV de rechazos. */
+  rejectionColumns?: string[];
   upload: (data: TParsed, options?: Record<string, boolean>) => Promise<UploadResult>;
   invalidate: (qc: QueryClient) => void;
 }
