@@ -72,8 +72,14 @@ export function admiteIA(c: { is_active: boolean; visibilidad: string; tipo: str
 export function descripcionCampo(c: CampoDef): string {
   const partes = [`${c.label}.`];
   if (c.ayuda) partes.push(c.ayuda);
-  if (c.opciones.length) partes.push(`Elige SIEMPRE uno de estos valores exactos: ${c.opciones.join(" / ")}.`);
+  if (c.opciones.length)
+    partes.push(
+      `Valores permitidos: ${c.opciones.join(" / ")}. Si lo que dice el comercial no coincide con ninguno, deja el campo a null ` +
+        "y anota el término literal en el texto libre del bloque (conclusion en competencia, observaciones en el resto). " +
+        "Nunca lo fuerces a 'Otra' ni al valor más parecido.",
+    );
   if (c.tipo === "multiselect") partes.push("Si son varios, sepáralos con ' | '.");
+  else if (c.opciones.length) partes.push("Un solo valor: ' | ' es exclusivo de los campos multiselect.");
   if (c.tipo === "booleano") partes.push("Responde 'si' o 'no'.");
   if (c.tipo === "numero") partes.push("Solo el número, sin símbolo de moneda.");
   if (c.tipo === "fecha") partes.push("Formato AAAA-MM-DD.");
