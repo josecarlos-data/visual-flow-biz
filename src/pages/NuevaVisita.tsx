@@ -73,6 +73,19 @@ export default function NuevaVisita() {
     [clientes, codCliente],
   );
 
+  /**
+   * El análisis se hizo con el nombre del cliente anterior en el prompt: si se cambia de
+   * cliente con bloques ya extraídos por voz, se avisa. No se borra ni se bloquea nada.
+   */
+  const hayExtraccionVoz = transcripcion.trim() !== "" || bloques.some((b) => Object.keys(b.meta).length > 0);
+  useEffect(() => {
+    if (!clienteAnalizado || !codCliente) return;
+    if (codCliente !== clienteAnalizado && hayExtraccionVoz) setAvisoCliente(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [codCliente]);
+
+
+
   const opciones = useMemo(() => {
     const term = busqueda.trim().toLowerCase();
     const list = clientes ?? [];
