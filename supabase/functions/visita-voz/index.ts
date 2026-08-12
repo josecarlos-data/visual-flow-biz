@@ -48,6 +48,8 @@ const admin = () =>
 interface Catalogo {
   motivos: MotivoDef[];
   competidores: string[];
+  marcasRecambio: string[];
+  marcasRemolque: string[];
 }
 
 /**
